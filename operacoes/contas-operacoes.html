@@ -1,0 +1,2263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contas — operações</title>
+<style>
+  :root {
+    --bg: #09090b;
+    --card: #18181b;
+    --line: #27272a;
+    --muted: #a1a1aa;
+    --text: #fafafa;
+    --emerald: #34d399;
+    --emerald-dim: rgba(16, 185, 129, .12);
+    --red: #fb7185;
+    --blue: #60a5fa;
+    --amber: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { color-scheme: dark; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(900px 420px at 8% -10%, rgba(52,211,153,.16), transparent 55%),
+      radial-gradient(700px 380px at 100% 0%, rgba(96,165,250,.08), transparent 50%),
+      var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 28px 20px 60px; }
+  header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-end; margin-bottom: 22px; }
+  .kicker { color: var(--emerald); font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand .logo { width: 56px; height: 56px; object-fit: contain; flex: none; }
+  h1 { margin: 6px 0 0; font-size: 28px; letter-spacing: -.03em; }
+  .sub { color: var(--muted); margin: 6px 0 0; font-size: 13px; }
+  .account { margin: 10px 0 0; font-size: 18px; font-weight: 700; letter-spacing: -.02em; color: #ecfdf5; }
+  .site-note { margin: 6px 0 0; min-height: 18px; color: #a7f3d0; font-size: 13px; }
+  .site-note.warn { color: #fbbf24; }
+  .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  button, input, select { font: inherit; color: inherit; }
+  .ghost, .primary {
+    height: 40px; border-radius: 999px; padding: 0 16px; cursor: pointer; font-weight: 700; font-size: 13px;
+  }
+  .ghost { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #e4e4e7; }
+  .ghost:hover { background: rgba(255,255,255,.08); }
+  .primary { background: var(--emerald); color: #052e16; border: 0; box-shadow: 0 10px 28px rgba(52,211,153,.22); }
+  .primary:hover { filter: brightness(1.06); }
+  .primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
+  .cards { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 18px; }
+  .card {
+    background: rgba(24,24,27,.38); border: 1px solid rgba(255,255,255,.06); border-radius: 24px; padding: 14px 16px;
+    min-height: 92px; backdrop-filter: blur(16px);
+  }
+  .card .label { font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .card .value { margin-top: 10px; font-size: 22px; font-weight: 800; letter-spacing: -.03em; }
+  .card.red .value { color: var(--red); }
+  .card.emerald .value { color: var(--emerald); }
+  .card.blue .value { color: var(--blue); }
+  .card.zinc .value { color: #e4e4e7; }
+  .panel {
+    background: rgba(24,24,27,.42); border: 1px solid rgba(255,255,255,.06); border-radius: 28px; padding: 18px;
+    margin-bottom: 16px; backdrop-filter: blur(18px);
+  }
+  .grid { display: grid; grid-template-columns: 1.4fr .8fr; gap: 18px; }
+  .fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  label { display: block; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  input, select {
+    width: 100%; height: 46px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 16px; padding: 0 14px;
+  }
+  select {
+    appearance: none; padding-right: 36px;
+    background-image: linear-gradient(45deg, transparent 50%, #34d399 50%), linear-gradient(135deg, #34d399 50%, transparent 50%);
+    background-position: calc(100% - 18px) 20px, calc(100% - 12px) 20px;
+    background-size: 6px 6px, 6px 6px; background-repeat: no-repeat;
+  }
+  input:focus, select:focus { outline: 2px solid rgba(52,211,153,.35); border-color: rgba(52,211,153,.7); }
+  input.who { color: #ecfdf5; font-weight: 700; cursor: default; }
+  .span2 { grid-column: span 2; }
+  .calc {
+    background: rgba(9,9,11,.28); border: 1px solid rgba(255,255,255,.06); border-radius: 24px; padding: 14px;
+  }
+  .calc h3 { margin: 0 0 10px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+  .link-row, .saque-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .link-plus, .link-row button {
+    width: 46px; height: 46px; flex: 0 0 46px; border-radius: 16px; border: 1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.04); color: #e4e4e7; cursor: pointer; font-size: 18px;
+  }
+  .link-plus:hover, .link-row button:hover { color: var(--emerald); border-color: rgba(16,185,129,.45); }
+  .extra-links { margin-top: 8px; border: 1px solid rgba(255,255,255,.06); border-radius: 18px; padding: 10px; background: rgba(9,9,11,.28); }
+  .extra-links p { margin: 0 0 8px; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .saque-row button { width: 36px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: transparent; color: var(--muted); cursor: pointer; }
+  .add {
+    width: 100%; height: 36px; border-radius: 999px; border: 1px dashed rgba(255,255,255,.16); background: transparent; color: var(--muted); cursor: pointer;
+  }
+  .totals { margin-top: 14px; display: grid; gap: 8px; }
+  .line { display: flex; justify-content: space-between; font-size: 13px; color: #d4d4d8; }
+  .line strong { font-size: 15px; }
+  .line.big strong { color: var(--emerald); font-size: 20px; }
+  .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .search { position: relative; margin-bottom: 12px; }
+  .search input { padding-left: 14px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 12px; border-bottom: 1px solid var(--line); }
+  td { padding: 12px; border-bottom: 1px solid rgba(39,39,42,.8); font-size: 13px; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  tr.audited { opacity: .6; }
+  tr.audited td { filter: grayscale(.3); }
+  .neg { color: var(--red); }
+  .pos { color: var(--emerald); }
+  .audit-btn {
+    width: 28px; height: 28px; border: 0; border-radius: 10px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.06); color: #52525b;
+  }
+  .audit-btn:hover { color: #d4d4d8; }
+  .audit-btn.on { background: #10b981; color: #000; box-shadow: 0 8px 16px rgba(16,185,129,.2); }
+  .icon-btn { background: transparent; border: 0; color: var(--muted); cursor: pointer; }
+  .icon-btn:hover { color: var(--red); }
+  .copy-btn:hover { color: var(--emerald); }
+  .copy-note { margin: 0 0 10px; min-height: 18px; color: var(--emerald); font-size: 12px; font-weight: 700; }
+  .modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.62); display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal.open { display: flex; }
+  .modal.gate { background: #09090b; }
+  .modal.gate .sheet { width: min(480px, 100%); }
+  .sheet { width: min(860px, 100%); background: rgba(24,24,27,.82); border: 1px solid rgba(255,255,255,.08); border-radius: 28px; padding: 18px; backdrop-filter: blur(18px); }
+  .ranges { display: grid; gap: 8px; margin-top: 12px; max-height: 360px; overflow: auto; }
+  .range-row { display: grid; grid-template-columns: .9fr 1.3fr .6fr .6fr .8fr 36px; gap: 8px; }
+  .range-box { position: relative; }
+  .range-groups { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .range-chip {
+    height: 28px; padding: 0 8px; border: 0; border-radius: 8px; cursor: pointer;
+    background: #27272a; color: #d4d4d8; font-size: 10px; font-weight: 800;
+    letter-spacing: .04em; text-transform: uppercase;
+  }
+  .range-chip.on { background: #10b981; color: #000; }
+  .range-trigger {
+    width: 100%; height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 0 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.04); color: inherit; cursor: pointer; text-align: left;
+  }
+  .range-trigger.open { border-color: rgba(16,185,129,.85); box-shadow: 0 0 0 1px rgba(16,185,129,.35); }
+  .range-trigger.empty #range-label { color: #71717a; }
+  .range-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .range-chev { flex: none; color: #71717a; transition: transform .15s ease; }
+  .range-trigger.open .range-chev { transform: rotate(180deg); }
+  .range-menu {
+    margin-top: 4px; background: #18181b; border: 1px solid #3f3f46; border-radius: 12px; overflow: auto; max-height: 320px;
+  }
+  .range-opt {
+    width: 100%; min-height: 40px; padding: 10px 14px; border: 0; border-top: 1px solid rgba(63,63,70,.7);
+    background: transparent; color: #e4e4e7; cursor: pointer; text-align: left; font-size: 13px; font-weight: 700;
+  }
+  .range-opt:first-child { border-top: 0; }
+  .range-opt:hover { background: rgba(255,255,255,.04); }
+  .range-opt.on { color: #34d399; background: rgba(16,185,129,.1); }
+  .range-empty { padding: 12px 14px; color: var(--muted); font-size: 12px; }
+  .range-error { margin: 8px 0 0; color: #f87171; font-size: 13px; font-weight: 700; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .filters {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    background: rgba(24,24,27,.38); border: 1px solid rgba(255,255,255,.06); border-radius: 24px; padding: 14px; margin-bottom: 16px;
+    backdrop-filter: blur(16px);
+  }
+  .days { display: flex; flex-wrap: wrap; gap: 6px; }
+  .day, .nav {
+    height: 36px; border: 1px solid rgba(255,255,255,.08); border-radius: 999px; cursor: pointer; font-weight: 700; font-size: 13px;
+    background: rgba(255,255,255,.04); color: #a1a1aa; padding: 0 12px;
+  }
+  .day.on { background: var(--emerald); color: #052e16; }
+  .nav { width: 36px; padding: 0; font-size: 18px; }
+  .nav:hover, .day:hover { color: white; }
+  .day.on:hover { color: #052e16; }
+  .custom-dates { display: flex; align-items: center; gap: 8px; }
+  .custom-dates input { width: 150px; }
+  .period { margin: 0; color: var(--muted); font-size: 12px; width: 100%; }
+  .credit { margin: 8px 0 0; text-align: right; font-size: 11px; color: #52525b; }
+  body.screen-contas .only-montante { display: none !important; }
+  body.screen-montante .only-contas { display: none !important; }
+  .mod-switch { display: flex; gap: 6px; margin-top: 10px; }
+  .mod-switch button.on { background: var(--emerald); color: #052e16; border-color: transparent; }
+  .pull-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+  .pull-row input { width: 150px; }
+  .save-login { display: flex; align-items: center; gap: 8px; margin-top: 14px; color: #d4d4d8; font-size: 13px; font-weight: 700; }
+  .save-login input { width: 18px; height: 18px; }
+  @media (max-width: 1100px) {
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .grid, .fields { grid-template-columns: 1fr; }
+    .span2 { grid-column: auto; }
+  }
+  html, body { background: #09090b; }
+  #proof { display: none; background: #09090b; }
+  #discount { color: var(--emerald); font-weight: 800; }
+  @media print {
+    html, body, #proof {
+      background: #09090b !important;
+      background-color: #09090b !important;
+      color: #fafafa !important;
+      box-shadow: inset 0 0 0 9999px #09090b !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .wrap, .modal { display: none !important; }
+    #proof { display: block !important; min-height: 100vh; padding: 10mm; }
+    #proof .kicker { color: #34d399; font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    #proof h1 { margin: 4px 0 0; font-size: 22px; color: #fafafa; }
+    #proof .sub { color: #a1a1aa; font-size: 11px; margin: 4px 0 12px; }
+    #proof .cards { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 12px; }
+    #proof .card { background: #18181b !important; box-shadow: inset 0 0 0 9999px #18181b !important; border: 1px solid #27272a; border-radius: 14px; padding: 10px; min-height: 0; }
+    #proof .card .label { color: #a1a1aa; font-size: 8px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    #proof .card .value { margin-top: 6px; font-size: 14px; font-weight: 800; }
+    #proof .card.red .value { color: #fb7185; }
+    #proof .card.emerald .value { color: #34d399; }
+    #proof .card.blue .value { color: #60a5fa; }
+    #proof .card.zinc .value { color: #e4e4e7; }
+    #proof .panel { background: #18181b !important; box-shadow: inset 0 0 0 9999px #18181b !important; border: 1px solid #27272a; border-radius: 16px; padding: 10px; }
+    #proof table { width: 100%; border-collapse: collapse; background: #18181b !important; }
+    #proof th, #proof td { background: #18181b !important; box-shadow: inset 0 0 0 9999px #18181b !important; }
+    #proof th { color: #a1a1aa; font-size: 8px; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: 6px; border-bottom: 1px solid #27272a; }
+    #proof td { color: #fafafa; font-size: 10px; padding: 6px; border-bottom: 1px solid #27272a; }
+    #proof td.num, #proof th.num { text-align: right; }
+    #proof .pos { color: #34d399; }
+    #proof .neg { color: #fb7185; }
+    @page { size: A4 landscape; margin: 0; background: #09090b; }
+  }
+</style>
+</head>
+<body class="screen-contas">
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <img class="logo" src="/elite-cpa-logo-4.png" alt="" />
+      <div>
+      <div class="kicker">Elite CPA System</div>
+      <h1 id="screen-title">Operações · Contas</h1>
+      <p class="account" id="account-name">Entre no painel para mostrar a conta.</p>
+      <p class="site-note" id="site-note"></p>
+      <div class="mod-switch" id="mod-switch" hidden>
+        <button class="ghost on" id="go-contas" type="button">Contas</button>
+        <button class="ghost" id="go-montante" type="button">Montante</button>
+      </div>
+      </div>
+    </div>
+    <div class="head-actions">
+      <button class="ghost" id="send-panel" type="button">Sincronizar</button>
+      <button class="ghost" id="open-config" type="button">Comissão e faixas</button>
+      <button class="ghost" id="export-json" type="button">Baixar cópia</button>
+      <button class="primary" id="export-pdf" type="button">Gerar PDF</button>
+    </div>
+  </header>
+
+  <section class="filters">
+    <button class="nav" id="day-prev" type="button" title="Dia anterior">‹</button>
+    <div class="days" id="day-buttons"></div>
+    <button class="nav" id="day-next" type="button" title="Próximo dia">›</button>
+    <div class="custom-dates" id="custom-dates" hidden>
+      <input id="custom-start" type="date" />
+      <span style="color:#a1a1aa">até</span>
+      <input id="custom-end" type="date" />
+    </div>
+    <p class="period" id="period-label"></p>
+    <div class="pull-row">
+      <input id="pull-from" type="date" />
+      <span style="color:#a1a1aa">até</span>
+      <input id="pull-to" type="date" />
+      <button class="ghost" id="pull-site" type="button">Puxar do site</button>
+    </div>
+  </section>
+
+  <section class="cards" id="cards"></section>
+
+  <section class="panel">
+    <div class="grid">
+      <form id="form">
+        <div class="fields">
+          <div>
+            <label>Data</label>
+            <input id="date" type="datetime-local" required />
+          </div>
+          <div class="span2">
+            <label>Nome do cliente</label>
+            <input id="client" list="site-clients" placeholder="Nome do cliente" required />
+            <datalist id="site-clients"></datalist>
+          </div>
+          <div>
+            <label>Operador</label>
+            <input id="operator" class="who" readonly placeholder="Entra no painel para mostrar o nome" />
+          </div>
+          <div class="span2" id="links-box">
+            <label>Link da casa</label>
+            <div id="links"></div>
+          </div>
+          <div>
+            <label>Telefone</label>
+            <input id="phone" placeholder="(11) 99999-9999" />
+          </div>
+          <div class="only-contas">
+            <label>Faixa de depósito *</label>
+            <div class="range-box" id="range-box">
+              <div class="range-groups" id="range-groups"></div>
+              <input type="hidden" id="range" value="" />
+              <button class="range-trigger empty" id="range-trigger" type="button">
+                <span id="range-label">Escolha uma faixa</span>
+                <svg class="range-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div class="range-menu" id="range-menu" hidden></div>
+              <p class="range-error" id="range-error" hidden>⚠ Obrigatório. Selecione a faixa primeiro</p>
+            </div>
+          </div>
+          <div class="only-montante">
+            <label>Taxa</label>
+            <div class="range-box" id="taxa-box">
+              <input type="hidden" id="taxa" value="" />
+              <button class="range-trigger" id="taxa-trigger" type="button">
+                <span id="taxa-label">Escolha a taxa</span>
+                <svg class="range-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <div class="range-menu" id="taxa-menu" hidden></div>
+            </div>
+          </div>
+          <div class="only-montante">
+            <label>Montante</label>
+            <input id="montante" inputmode="decimal" placeholder="0,00" />
+          </div>
+          <div>
+            <label>Contas solicitadas</label>
+            <input id="qty" type="number" min="1" step="1" value="1" required />
+          </div>
+          <div>
+            <label>Desconto %</label>
+            <input id="discount" type="number" min="0" step="0.01" value="0" />
+          </div>
+          <div>
+            <label>Saque informado</label>
+            <input id="withdrawal" type="number" min="0" step="0.01" value="0" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="ghost" id="cancel-edit" type="button" hidden>Cancelar edição</button>
+          <button class="primary" type="submit" id="save">Registrar operação</button>
+        </div>
+      </form>
+      <aside class="calc">
+        <h3>Calculadora de saque</h3>
+        <div id="saques"></div>
+        <button class="add" id="add-saque" type="button">+ Adicionar valor</button>
+        <div class="totals" id="preview"></div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="search"><input id="q" placeholder="Buscar por cliente, operador ou link" /></div>
+    <p class="copy-note" id="copy-note"></p>
+    <div style="overflow:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Audit</th>
+            <th>Data</th>
+            <th>Cliente</th>
+            <th>Operador</th>
+            <th class="num">Contas</th>
+            <th class="num">Desconto</th>
+            <th class="num">Depósito</th>
+            <th class="num">Saque</th>
+            <th class="num">Compra</th>
+            <th class="num">Lucro bruto</th>
+            <th class="num">Comissão</th>
+            <th class="num">Lucro líquido</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+  <p class="credit">Criado por Cauê BR</p>
+</div>
+
+<article id="proof"></article>
+
+<div class="modal" id="panel-modal">
+  <div class="sheet">
+    <h2 style="margin:0 0 8px">Entrar no site</h2>
+    <p class="hint" id="panel-help">O link abre o login do painel. Quando a entrada termina, o programa volta com o seu nome, os clientes e as faixas. O botão Sincronizar manda as operações deste período para o site.</p>
+    <form id="panel-login">
+      <div class="fields" style="margin-top:12px">
+        <div class="span2">
+          <label>Link do painel</label>
+          <input id="panel-slug" value="https://renovanow.online" placeholder="https://renovanow.online" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="ghost" id="panel-close" type="button" hidden>Continuar</button>
+        <button class="primary" type="submit">Entrar no site</button>
+      </div>
+      <label class="save-login"><input id="save-login" type="checkbox" /> Salvar este login</label>
+    </form>
+    <div id="panel-ready" hidden>
+      <p class="hint" id="panel-who"></p>
+      <div id="panel-company-box" hidden>
+        <label>Empresa</label>
+        <select id="panel-company"></select>
+      </div>
+      <p class="hint" id="panel-count"></p>
+      <div class="form-actions">
+        <button class="ghost" id="panel-logout" type="button">Sair da sessão</button>
+        <button class="ghost" id="panel-close-2" type="button">Continuar</button>
+        <button class="primary" id="panel-go" type="button">Sincronizar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="sheet">
+    <h2 style="margin:0 0 8px">Comissão e faixas</h2>
+    <p class="hint">A comissão do painel de Contas sai do lucro bruto. 20 significa 20%.</p>
+    <div class="fields" style="margin-top:12px">
+      <div>
+        <label>Comissão %</label>
+        <input id="cfg-rate" type="number" min="0" step="0.01" />
+      </div>
+    </div>
+    <p class="hint">Dois descontos por quantidade. Acima da quantidade, entra o percentual. Se as duas faixas servirem, vale a de mais contas.</p>
+    <div class="fields">
+      <div>
+        <label>Acima de (contas)</label>
+        <input id="tier1-min" type="number" min="0" step="1" />
+      </div>
+      <div>
+        <label>Desconto 1 %</label>
+        <input id="tier1-pct" type="number" min="0" step="0.01" />
+      </div>
+      <div>
+        <label>Acima de (contas)</label>
+        <input id="tier2-min" type="number" min="0" step="1" />
+      </div>
+      <div>
+        <label>Desconto 2 %</label>
+        <input id="tier2-pct" type="number" min="0" step="0.01" />
+      </div>
+    </div>
+    <div class="ranges" id="range-editor"></div>
+    <button class="add" id="add-range" type="button" style="margin-top:8px">+ Faixa</button>
+    <div class="form-actions">
+      <button class="ghost" id="close-config" type="button">Fechar</button>
+      <button class="primary" id="save-config" type="button">Salvar configuração</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="pick-modal">
+  <div class="sheet">
+    <h2 style="margin:0 0 8px">Qual tela abrir</h2>
+    <p class="hint">Sua conta tem Contas e Montante. Escolha a tela. Dá para trocar depois, lá em cima.</p>
+    <div class="form-actions">
+      <button class="ghost" id="pick-contas" type="button">Contas</button>
+      <button class="primary" id="pick-montante" type="button">Montante</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEY = 'dfs-contas-local-v1';
+const DAY_KEYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+const RANGE_LABELS = {
+  dom: 'Dom', seg: 'Seg', ter: 'Ter', qua: 'Qua', qui: 'Qui', sex: 'Sex', sab: 'Sáb',
+  week: 'Esta Semana', lastWeek: 'Semana Passada', month: 'Este Mês', lastMonth: 'Mês Passado',
+  threeMonths: '3 Meses', all: 'Tudo', custom: 'Personalizado',
+};
+let usingFile = false;
+let removedIds = [];
+const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const groups = ['Grupo 01', 'Grupo 02', 'Grupo 03'];
+const defaultRanges = [
+  { id: 'g1-10-11', group: 'Grupo 01', name: 'De 10 a 11', start: 10, end: 11, price: 5 },
+  { id: 'g1-10-12', group: 'Grupo 01', name: 'De 10 a 12', start: 10, end: 12, price: 6 },
+  { id: 'g1-10-13', group: 'Grupo 01', name: 'De 10 a 13', start: 10, end: 13, price: 7 },
+  { id: 'g1-11-13', group: 'Grupo 01', name: 'De 11 a 13', start: 11, end: 13, price: 8 },
+  { id: 'g1-11-14', group: 'Grupo 01', name: 'De 11 a 14', start: 11, end: 14, price: 9 },
+  { id: 'g1-12-15', group: 'Grupo 01', name: 'De 12 a 15', start: 12, end: 15, price: 10 },
+  { id: 'g1-12-18', group: 'Grupo 01', name: 'De 12 a 18', start: 12, end: 18, price: 11 },
+  { id: 'g2-10', group: 'Grupo 02', name: 'De 10', start: 10, end: 10, price: 6 },
+  { id: 'g2-10-11', group: 'Grupo 02', name: 'De 10 a 11', start: 10, end: 11, price: 7 },
+  { id: 'g2-10-12', group: 'Grupo 02', name: 'De 10 a 12', start: 10, end: 12, price: 8 },
+  { id: 'g2-11-13', group: 'Grupo 02', name: 'De 11 a 13', start: 11, end: 13, price: 9 },
+  { id: 'g2-11-14', group: 'Grupo 02', name: 'De 11 a 14', start: 11, end: 14, price: 10 },
+  { id: 'g2-12-15', group: 'Grupo 02', name: 'De 12 a 15', start: 12, end: 15, price: 11 },
+  { id: 'g2-13-18', group: 'Grupo 02', name: 'De 13 a 18', start: 13, end: 18, price: 12 },
+  { id: 'g3-10', group: 'Grupo 03', name: 'De 10', start: 10, end: 10, price: 7 },
+  { id: 'g3-10-11', group: 'Grupo 03', name: 'De 10 a 11', start: 10, end: 11, price: 8 },
+  { id: 'g3-11-12', group: 'Grupo 03', name: 'De 11 a 12', start: 11, end: 12, price: 9 },
+  { id: 'g3-11-13', group: 'Grupo 03', name: 'De 11 a 13', start: 11, end: 13, price: 10 },
+  { id: 'g3-12-15', group: 'Grupo 03', name: 'De 12 a 15', start: 12, end: 15, price: 11 },
+  { id: 'g3-13-16', group: 'Grupo 03', name: 'De 13 a 16', start: 13, end: 16, price: 12 },
+  { id: 'g3-14-18', group: 'Grupo 03', name: 'De 14 a 18', start: 14, end: 18, price: 13 },
+];
+let state = blankState();
+let editing = null;
+let saques = [''];
+let houseLinks = [''];
+let accountName = '';
+let currentUserId = '';
+let screen = 'contas';
+let access = { contas: true, montante: false };
+let siteRates = [];
+let siteAccountRules = [];
+let siteClients = [];
+let siteRanges = [];
+let siteCampaigns = [];
+let siteReady = false;
+let siteClientsOk = false;
+let phoneFilledFromSite = '';
+
+function foldText(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+function normalizeCategory(raw) {
+  const text = String(raw || '').replace(/\s+/g, ' ').trim();
+  const tagged = text.match(/^(lista|grupo)\s*0*(\d+)$/i);
+  if (!tagged) return text;
+  const kind = tagged[1].toLowerCase() === 'grupo' ? 'Grupo' : 'Lista';
+  return kind + ' ' + tagged[2].padStart(2, '0');
+}
+function sameGroup(a, b) {
+  const left = normalizeCategory(a).toLowerCase();
+  const right = normalizeCategory(b).toLowerCase();
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const numA = left.match(/^(?:grupo|lista)\s+(\d+)$/);
+  const numB = right.match(/^(?:grupo|lista)\s+(\d+)$/);
+  return !!(numA && numB && numA[1] === numB[1]);
+}
+function rangeGroupLabel(range) {
+  if (!range) return '';
+  const explicit = normalizeCategory(range.categoria || range.group || '');
+  if (explicit) return explicit;
+  const nome = String(range.nome || range.name || '').trim();
+  const match = nome.match(/\s+((?:lista|grupo)\s*\d+)\s*$/i);
+  return match ? normalizeCategory(match[1]) : '';
+}
+function asFormRange(item) {
+  if (!item) return null;
+  if (item.nome == null && item.name) return item;
+  const start = item.somaInicio != null && item.somaInicio !== '' ? Number(item.somaInicio) : NaN;
+  const end = item.somaFim != null && item.somaFim !== '' ? Number(item.somaFim) : NaN;
+  return {
+    id: item.id,
+    group: rangeGroupLabel(item) || 'Faixa',
+    name: item.nome || item.name || '',
+    nome: item.nome || item.name || '',
+    start: Number.isFinite(start) ? start : null,
+    end: Number.isFinite(end) ? end : null,
+    price: Number.isFinite(Number(item.valor)) ? Number(item.valor) : null,
+  };
+}
+function findRange(id) {
+  const site = siteRanges.map(asFormRange).filter(Boolean);
+  return site.find((item) => item.id === id) || state.ranges.find((item) => item.id === id || item.name === id) || null;
+}
+function siteRangeForOp(op) {
+  const direct = siteRanges.find((item) => item.id === op.range && String(item.nome || '').trim());
+  if (direct) return asFormRange(direct);
+  const local = state.ranges.find((item) => item.id === op.range);
+  if (!local) return null;
+  const hits = siteRanges.map(asFormRange).filter((item) => item && item.start != null && Number(item.start) === Number(local.start) && Number(item.end) === Number(local.end) && sameGroup(item.group, local.group));
+  if (hits.length === 1) return hits[0];
+  if (hits.length > 1) {
+    const priced = hits.filter((item) => Number(item.price) === Number(local.price));
+    if (priced.length === 1) return priced[0];
+  }
+  return null;
+}
+function phoneDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+function barePhone(value) {
+  const digits = phoneDigits(value);
+  if (digits.startsWith('55') && digits.length > 11) return digits.slice(2);
+  return digits;
+}
+function samePhone(a, b) {
+  const left = barePhone(a);
+  const right = barePhone(b);
+  return left.length >= 8 && left === right;
+}
+function sitePhoneOf(client) {
+  if (!client) return '';
+  const typed = String(client.phone || client.contact || client.whatsapp || '').trim();
+  if (typed) return typed;
+  const digits = phoneDigits(client.normalizedPhone);
+  return digits.length >= 8 ? digits : '';
+}
+function clientPhoneKeys(client) {
+  if (!client) return [];
+  return [client.phone, client.contact, client.whatsapp, client.normalizedPhone].filter((value) => String(value || '').trim());
+}
+function nameHits(name) {
+  const wanted = foldText(name);
+  if (!wanted) return [];
+  return siteClients.filter((item) => foldText(item.name) === wanted || foldText(item.normalizedName) === wanted);
+}
+function phoneHits(phone) {
+  if (barePhone(phone).length < 8) return [];
+  return siteClients.filter((item) => clientPhoneKeys(item).some((value) => samePhone(value, phone)));
+}
+function narrowClients(hits, typedName) {
+  if (hits.length === 1) return hits[0];
+  const typed = String(typedName || '').replace(/\s+/g, ' ').trim();
+  const exact = hits.filter((item) => String(item.name || '').replace(/\s+/g, ' ').trim() === typed);
+  return exact.length === 1 ? exact[0] : null;
+}
+function matchSiteClient(name) {
+  return narrowClients(nameHits(name), name);
+}
+function resolveSiteClient(name, phone) {
+  const typedName = String(name || '').replace(/\s+/g, ' ').trim();
+  if (!foldText(typedName)) return { error: 'Tem operação sem cliente. Não registrei.' };
+  if (!siteClientsOk) return { error: 'O site não devolveu os clientes. Não registrei.' };
+  const byName = nameHits(typedName);
+  const byPhone = phoneHits(phone);
+  const named = narrowClients(byName, typedName);
+  if (byName.length > 1 && !named) {
+    if (byPhone.length === 1 && byName.some((item) => item.id === byPhone[0].id)) return { client: byPhone[0] };
+    if (byPhone.length === 1) return { error: 'O nome e o telefone apontam para clientes diferentes no site. Não criei outro e não substituí.' };
+    return { error: 'Há mais de um cliente "' + typedName + '" no site. Não criei outro e não substituí.' };
+  }
+  const nameClient = named || (byName.length === 1 ? byName[0] : null);
+  if (nameClient) return { client: nameClient };
+  return { create: true, name: typedName, phone: String(phone || '').trim() };
+}
+function syncPhoneFromChosenClient() {
+  const phoneEl = document.getElementById('phone');
+  const hit = matchSiteClient(document.getElementById('client').value);
+  if (!hit) {
+    if (phoneFilledFromSite && phoneEl.value === phoneFilledFromSite) phoneEl.value = '';
+    phoneFilledFromSite = '';
+    return;
+  }
+  phoneFilledFromSite = sitePhoneOf(hit);
+  phoneEl.value = phoneFilledFromSite;
+}
+function campaignWindow(campaign, parts) {
+  if (!campaign || !parts) return false;
+  const startDate = String(campaign.startDate || '').trim();
+  const endDate = String(campaign.endDate || '').trim();
+  if (startDate && parts.day < startDate) return false;
+  if (endDate && parts.day > endDate) return false;
+  const startTime = String(campaign.startTime || '').trim();
+  const endTime = String(campaign.endTime || '').trim();
+  if (startTime && endTime && (parts.time < startTime || parts.time > endTime)) return false;
+  const days = Array.isArray(campaign.weekDays) ? campaign.weekDays : [];
+  if (days.length && !days.includes(parts.week)) return false;
+  return true;
+}
+function campaignAppliesContas(campaign) {
+  const rules = Array.isArray(campaign.groupDiscounts) ? campaign.groupDiscounts : [];
+  if (rules.some((rule) => String(rule.module || '').toLowerCase() === 'contas')) return true;
+  if ((Number(campaign.discountContas) || 0) > 0) return true;
+  if (campaign.category === 'Contas') return true;
+  if (campaign.category === 'Montantes') return false;
+  return true;
+}
+function contasDiscountPercent(campaign, groupLabel) {
+  const rules = (Array.isArray(campaign.groupDiscounts) ? campaign.groupDiscounts : []).filter((rule) => String(rule.module || '').toLowerCase() === 'contas');
+  if (!rules.length) return Number(campaign.discountContas) || 0;
+  const group = normalizeCategory(groupLabel || '');
+  if (group) {
+    const exact = rules.find((rule) => {
+      const raw = String(rule.group || '').trim().toLowerCase();
+      const all = !raw || raw === 'todos' || raw === 'todos os grupos' || raw === 'all';
+      return !all && sameGroup(rule.group, group);
+    });
+    if (exact) return Number(exact.percent) || 0;
+  }
+  const all = rules.find((rule) => {
+    const raw = String(rule.group || '').trim().toLowerCase();
+    return !raw || raw === 'todos' || raw === 'todos os grupos' || raw === 'all';
+  });
+  if (all) return Number(all.percent) || 0;
+  return 0;
+}
+function siteDiscountPercent(value, range) {
+  if (!siteReady) return null;
+  const text = String(value || '').trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(text);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), 0, 0);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = { day: match[1] + '-' + match[2] + '-' + match[3], time: match[4] + ':' + match[5], week: DAY_KEYS[date.getDay()] };
+  const live = siteCampaigns.filter((campaign) => (
+    (campaign.status === 'Ativa' || campaign.status === 'Agendada')
+    && campaignWindow(campaign, parts)
+    && campaignAppliesContas(campaign)
+  ));
+  live.sort((a, b) => {
+    const kind = (campaign) => (campaign.panelKind === 'semanal' ? 1 : 0);
+    if (kind(a) !== kind(b)) return kind(a) - kind(b);
+    return (a.status === 'Ativa' ? 0 : 1) - (b.status === 'Ativa' ? 0 : 1);
+  });
+  if (!live.length) return null;
+  const percent = contasDiscountPercent(live[0], rangeGroupLabel(range));
+  return Number.isFinite(percent) ? percent : null;
+}
+function showAccount(session) {
+  accountName = (session && (session.name || session.email)) || '';
+  const el = document.getElementById('account-name');
+  if (el) el.textContent = accountName || 'Entre no painel para mostrar a conta.';
+  const operator = document.getElementById('operator');
+  if (!operator) return;
+  operator.readOnly = true;
+  operator.value = accountName;
+}
+function paintSiteNote() {
+  const note = document.getElementById('site-note');
+  if (!note) return;
+  if (!accountName) {
+    note.textContent = '';
+    note.className = 'site-note';
+    return;
+  }
+  if (screen === 'montante') {
+    const deposit = moneyNumber(document.getElementById('montante') && document.getElementById('montante').value);
+    const percent = montanteDiscountPercent(document.getElementById('date').value, deposit);
+    note.textContent = percent == null
+      ? 'Montante. Se o site não tiver desconto para esse valor, preencha o percentual.'
+      : 'Montante do site. Taxa ' + selectedTaxa() + '%. Desconto: ' + percent + '%.';
+    note.className = percent == null ? 'site-note warn' : 'site-note';
+    return;
+  }
+  if (!siteReady || !siteRanges.length) {
+    note.textContent = 'O site não devolveu as faixas de depósito. O envio não usa uma faixa chute.';
+    note.className = 'site-note warn';
+    return;
+  }
+  const range = findRange(document.getElementById('range').value);
+  const percent = siteDiscountPercent(document.getElementById('date').value, range);
+  if (percent == null) {
+    note.textContent = 'A sincronização do desconto não foi feita porque não há desconto configurado. Configure manualmente.';
+    note.className = 'site-note warn';
+    return;
+  }
+  const nome = range && (range.nome || range.name) ? (range.nome || range.name) : 'faixa';
+  note.textContent = 'Cadastro do site. ' + nome + '. Desconto do dia: ' + percent + '%.';
+  note.className = 'site-note';
+}
+function ruleIsMontante(rule) {
+  const raw = String((rule && rule.module) || '').trim().toLowerCase();
+  return raw === 'montante' || raw === 'montantes';
+}
+function montanteRuleMatches(rule, value) {
+  const limit = Number(rule && rule.montante);
+  if (!Number.isFinite(limit) || limit <= 0) return true;
+  const below = String(rule.montanteCompare || '') === 'abaixo';
+  return below ? value <= limit + 1e-9 : value + 1e-9 >= limit;
+}
+function montanteDiscountPercent(value, deposit) {
+  if (!siteReady) return null;
+  const text = String(value || '').trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(text);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), 0, 0);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = { day: match[1] + '-' + match[2] + '-' + match[3], time: match[4] + ':' + match[5], week: DAY_KEYS[date.getDay()] };
+  const live = siteCampaigns.filter((campaign) => (
+    (campaign.status === 'Ativa' || campaign.status === 'Agendada')
+    && campaignWindow(campaign, parts)
+    && (campaign.category === 'Montantes' || (Array.isArray(campaign.groupDiscounts) && campaign.groupDiscounts.some(ruleIsMontante)) || (Number(campaign.discountMontantes) || 0) > 0)
+  ));
+  if (!live.length || !(Number(deposit) > 0)) return null;
+  const rules = (Array.isArray(live[0].groupDiscounts) ? live[0].groupDiscounts : []).filter(ruleIsMontante);
+  if (!rules.length) {
+    const percent = Number(live[0].discountMontantes);
+    return Number.isFinite(percent) ? percent : null;
+  }
+  const matched = rules.filter((rule) => montanteRuleMatches(rule, Number(deposit)));
+  if (!matched.length) return 0;
+  matched.sort((a, b) => (Number(b.percent) || 0) - (Number(a.percent) || 0));
+  return Number(matched[0].percent) || 0;
+}
+const defaultRates = [
+  { id: 'r15', multiplicador: 1.5, taxa: 15, observacao: '' },
+  { id: 'r20', multiplicador: 2, taxa: 20, observacao: '' },
+  { id: 'r25', multiplicador: 2.5, taxa: 25, observacao: '' },
+  { id: 'r35', multiplicador: 3, taxa: 35, observacao: '' },
+  { id: 'r45', multiplicador: 4, taxa: 45, observacao: '' },
+];
+const defaultAccountRules = [
+  { montante: 200, qtdContas: 1 }, { montante: 300, qtdContas: 2 }, { montante: 400, qtdContas: 2 },
+  { montante: 500, qtdContas: 3 }, { montante: 600, qtdContas: 3 }, { montante: 700, qtdContas: 4 },
+  { montante: 800, qtdContas: 5 }, { montante: 900, qtdContas: 5 }, { montante: 1000, qtdContas: 6 },
+];
+function rateList() { return siteRates.length ? siteRates : defaultRates; }
+function selectedTaxa() {
+  const hidden = document.getElementById('taxa');
+  const rate = rateList().find((item) => item.id === (hidden && hidden.value));
+  return rate ? Number(rate.taxa) || 0 : 0;
+}
+function rateLabel(rate) {
+  const mult = Number(rate.multiplicador) || 0;
+  const taxa = Number(rate.taxa) || 0;
+  const base = mult.toLocaleString('pt-BR') + ' x ' + taxa.toLocaleString('pt-BR') + '%';
+  return rate.observacao ? base + ' · ' + rate.observacao : base;
+}
+let taxaOpen = false;
+function renderTaxas() {
+  const hidden = document.getElementById('taxa');
+  const list = rateList();
+  if (hidden && !hidden.value && list[0]) hidden.value = list[0].id;
+  const selected = list.find((item) => item.id === (hidden && hidden.value)) || null;
+  const label = document.getElementById('taxa-label');
+  if (label) label.textContent = selected ? rateLabel(selected) : 'Escolha a taxa';
+  const trigger = document.getElementById('taxa-trigger');
+  if (trigger) trigger.classList.toggle('open', taxaOpen);
+  const menu = document.getElementById('taxa-menu');
+  if (!menu) return;
+  menu.hidden = !taxaOpen;
+  menu.innerHTML = list.map((rate) => `<button type="button" class="range-opt${selected && rate.id === selected.id ? ' on' : ''}" data-taxa-id="${escapeHtml(rate.id)}">${escapeHtml(rateLabel(rate))}</button>`).join('');
+}
+function qtyForMontante(value) {
+  const rules = (siteAccountRules.length ? siteAccountRules : defaultAccountRules).slice().sort((a, b) => a.montante - b.montante);
+  let matched = null;
+  rules.forEach((rule) => { if (Number(value) + 1e-9 >= Number(rule.montante)) matched = rule; });
+  return matched ? Number(matched.qtdContas) || 0 : 0;
+}
+function setScreen(next, options) {
+  screen = next === 'montante' && access.montante ? 'montante' : (access.contas ? 'contas' : 'montante');
+  document.body.classList.toggle('screen-montante', screen === 'montante');
+  document.body.classList.toggle('screen-contas', screen !== 'montante');
+  const title = document.getElementById('screen-title');
+  if (title) title.textContent = screen === 'montante' ? 'Operações · Montante' : 'Operações · Contas';
+  const contasBtn = document.getElementById('go-contas');
+  const montanteBtn = document.getElementById('go-montante');
+  if (contasBtn) contasBtn.classList.toggle('on', screen === 'contas');
+  if (montanteBtn) montanteBtn.classList.toggle('on', screen === 'montante');
+  const both = access.contas && access.montante;
+  const sw = document.getElementById('mod-switch');
+  if (sw) sw.hidden = !both;
+  if (state && state.screen !== screen) {
+    state.screen = screen;
+    rememberView();
+    if (!options || !options.silent) save();
+  }
+  renderTaxas();
+  paint();
+}
+function offerScreen(session) {
+  access = {
+    contas: !session || session.contas !== false,
+    montante: !!(session && session.montante),
+  };
+  if (!access.contas && !access.montante) access.contas = true;
+  document.getElementById('pick-modal').classList.remove('open');
+  const saved = state && (state.screen === 'contas' || state.screen === 'montante') ? state.screen : '';
+  if (access.contas && access.montante && !saved) {
+    const sw = document.getElementById('mod-switch');
+    if (sw) sw.hidden = false;
+    document.getElementById('pick-modal').classList.add('open');
+    return;
+  }
+  setScreen(saved || (access.montante && !access.contas ? 'montante' : 'contas'), { silent: true });
+}
+function applyCatalog(catalog) {
+  showAccount(catalog);
+  siteClients = Array.isArray(catalog.clients) ? catalog.clients : [];
+  siteRanges = Array.isArray(catalog.ranges) ? catalog.ranges : [];
+  siteCampaigns = Array.isArray(catalog.campaigns) ? catalog.campaigns : [];
+  siteRates = Array.isArray(catalog.rates) ? catalog.rates : [];
+  siteAccountRules = Array.isArray(catalog.accountRules) ? catalog.accountRules : [];
+  siteClientsOk = !!(catalog && catalog.clientsOk);
+  siteReady = !!(catalog && catalog.clientsOk && catalog.rangesOk && catalog.campaignsOk && siteRanges.length && siteClients.length);
+  const list = document.getElementById('site-clients');
+  if (list) list.innerHTML = siteClients.map((item) => `<option value="${escapeHtml(item.name)}"></option>`).join('');
+  paint();
+  applyAutoDiscount();
+}
+async function loadAccount() {
+  let session = { ok: false };
+  try { session = await panelJson('/painel/status'); } catch (e) { session = { ok: false }; }
+  showAccount(session);
+  if (!session.ok) {
+    siteReady = false;
+    siteClientsOk = false;
+    siteClients = [];
+    siteRanges = [];
+    siteCampaigns = [];
+    paintSiteNote();
+    return;
+  }
+  try {
+    const catalog = await panelJson('/painel/cadastro');
+    applyCatalog(catalog);
+    if (catalog && catalog.message && !siteReady) {
+      const note = document.getElementById('site-note');
+      note.textContent = catalog.message;
+      note.className = 'site-note warn';
+    }
+  } catch (e) {
+    siteReady = false;
+    siteClientsOk = false;
+    const note = document.getElementById('site-note');
+    note.textContent = e.message || 'O site não devolveu o cadastro.';
+    note.className = 'site-note warn';
+  }
+}
+
+function todayKey() { return DAY_KEYS[new Date().getDay()]; }
+function blankState() {
+  return { rate: 20, tier1: { min: 0, percent: 0 }, tier2: { min: 0, percent: 0 }, ranges: defaultRanges, ops: [], dateRange: todayKey(), customStart: '', customEnd: '' };
+}
+function normalize(saved) {
+  if (!saved || !Array.isArray(saved.ops)) return blankState();
+  if (!Array.isArray(saved.ranges) || !saved.ranges.some((item) => item.group)) saved.ranges = defaultRanges;
+  if (!saved.tier1) saved.tier1 = { min: 0, percent: 0 };
+  if (!saved.tier2) saved.tier2 = { min: 0, percent: 0 };
+  if (!RANGE_LABELS[saved.dateRange]) saved.dateRange = todayKey();
+  if (!saved.customStart) saved.customStart = '';
+  if (!saved.customEnd) saved.customEnd = '';
+  return saved;
+}
+function storageKey(userId) {
+  return KEY + ':' + String(userId || '');
+}
+function viewStorageKey(userId) {
+  return KEY + ':view:' + String(userId || '');
+}
+function rememberView() {
+  state.viewStamp = Date.now();
+  try {
+    if (!currentUserId) return;
+    localStorage.setItem(viewStorageKey(currentUserId), JSON.stringify({
+      dateRange: state.dateRange,
+      customStart: state.customStart || '',
+      customEnd: state.customEnd || '',
+      screen: state.screen || '',
+      viewStamp: state.viewStamp,
+    }));
+  } catch (e) {}
+}
+function restoreView(userId) {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(viewStorageKey(userId)) || 'null'); } catch (e) { saved = null; }
+  if (!saved || !saved.dateRange) return;
+  const fileStamp = Number(state.viewStamp) || 0;
+  const localStamp = Number(saved.viewStamp) || 0;
+  if (localStamp < fileStamp) return;
+  state.dateRange = saved.dateRange;
+  state.customStart = saved.customStart || '';
+  state.customEnd = saved.customEnd || '';
+  state.viewStamp = localStamp || fileStamp;
+  if (saved.screen === 'contas' || saved.screen === 'montante') state.screen = saved.screen;
+}
+function readLocal(userId) {
+  if (!userId) return blankState();
+  try { return normalize(JSON.parse(localStorage.getItem(storageKey(userId)) || 'null')); } catch (e) { return blankState(); }
+}
+function discountForQty(qty) {
+  const count = Number(qty) || 0;
+  const tiers = [state.tier1, state.tier2]
+    .map((tier) => ({ min: Number(tier && tier.min) || 0, percent: Number(tier && tier.percent) || 0 }))
+    .filter((tier) => tier.min > 0 && count > tier.min)
+    .sort((a, b) => b.min - a.min);
+  return tiers.length ? tiers[0].percent : 0;
+}
+function discountLabel(qty) {
+  const percent = discountForQty(qty);
+  if (!percent) return 'Sem desconto';
+  const tier = [state.tier1, state.tier2]
+    .map((item) => ({ min: Number(item && item.min) || 0, percent: Number(item && item.percent) || 0 }))
+    .filter((item) => item.percent === percent && (Number(qty) || 0) > item.min)
+    .sort((a, b) => b.min - a.min)[0];
+  return tier ? `${percent}% acima de ${tier.min} contas` : `${percent}%`;
+}
+function save() {
+  try { if (currentUserId) localStorage.setItem(storageKey(currentUserId), JSON.stringify(state)); } catch (e) {}
+  if (!usingFile || !Array.isArray(state.ops)) return Promise.resolve();
+  const removedNow = removedIds.slice();
+  return fetch('/dados/operacoes.json', {
+    method: 'POST',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...state, removedIds: removedNow }),
+  }).then(async (response) => {
+    if (!response || !response.ok) return;
+    let saved = null;
+    try { saved = await response.json(); } catch (e) { return; }
+    if (!saved || !Array.isArray(saved.ops)) return;
+    state.ops = saved.ops;
+    removedIds = removedIds.filter((id) => !removedNow.includes(String(id)));
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+    paint();
+  }).catch(() => {});
+}
+function ymd(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+function startOfDay(date) { const next = new Date(date); next.setHours(0, 0, 0, 0); return next; }
+function endOfDay(date) { const next = new Date(date); next.setHours(23, 59, 59, 999); return next; }
+function weekSunday(date) {
+  const next = startOfDay(date);
+  next.setDate(next.getDate() - next.getDay());
+  return next;
+}
+function parseYmd(value) {
+  const parts = String(value || '').split('-').map(Number);
+  if (parts.length !== 3 || parts.some((part) => !part)) return null;
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+function bounds() {
+  const now = new Date();
+  if (DAY_KEYS.includes(state.dateRange)) {
+    const day = weekSunday(now);
+    day.setDate(day.getDate() + DAY_KEYS.indexOf(state.dateRange));
+    return { start: startOfDay(day), end: endOfDay(day) };
+  }
+  if (state.dateRange === 'week') {
+    const start = weekSunday(now);
+    const saturday = new Date(start);
+    saturday.setDate(start.getDate() + 6);
+    return { start, end: now < endOfDay(saturday) ? endOfDay(now) : endOfDay(saturday) };
+  }
+  if (state.dateRange === 'lastWeek') {
+    const start = weekSunday(now);
+    start.setDate(start.getDate() - 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { start, end: endOfDay(end) };
+  }
+  if (state.dateRange === 'month') return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: endOfDay(now) };
+  if (state.dateRange === 'lastMonth') {
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), 0);
+    return { start, end: endOfDay(end) };
+  }
+  if (state.dateRange === 'threeMonths') return { start: new Date(now.getFullYear(), now.getMonth() - 3, 1), end: endOfDay(now) };
+  if (state.dateRange === 'all') return { start: new Date(0), end: new Date(now.getFullYear() + 10, 11, 31) };
+  const start = parseYmd(state.customStart) || startOfDay(now);
+  const end = parseYmd(state.customEnd) || startOfDay(now);
+  return { start: startOfDay(start), end: endOfDay(end) };
+}
+function periodLabel() {
+  const { start, end } = bounds();
+  const fmt = (date) => date.toLocaleDateString('pt-BR');
+  return ymd(start) === ymd(end) ? fmt(start) : `${fmt(start)} até ${fmt(end)}`;
+}
+function inPeriod(op) {
+  const date = new Date(op.date);
+  if (Number.isNaN(date.getTime())) return state.dateRange === 'all';
+  const { start, end } = bounds();
+  return date >= start && date <= end;
+}
+function periodOps() {
+  return state.ops.filter((op) => inPeriod(op) && ((op.module === 'montante' ? 'montante' : 'contas') === screen));
+}
+function renderDays() {
+  const order = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'week', 'lastWeek', 'month', 'lastMonth', 'threeMonths', 'all', 'custom'];
+  document.getElementById('day-buttons').innerHTML = order.map((key) =>
+    `<button class="day ${state.dateRange === key ? 'on' : ''}" type="button" data-range="${key}">${RANGE_LABELS[key]}</button>`
+  ).join('');
+  const custom = document.getElementById('custom-dates');
+  custom.hidden = false;
+  const startInput = document.getElementById('custom-start');
+  const endInput = document.getElementById('custom-end');
+  if (state.dateRange === 'custom') {
+    startInput.value = state.customStart || '';
+    endInput.value = state.customEnd || '';
+  } else {
+    const period = bounds();
+    startInput.value = ymd(period.start);
+    endInput.value = ymd(period.end);
+  }
+  document.getElementById('period-label').textContent = periodLabel();
+}
+function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+function depositSum(count, start, end) {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  const a = Number(start);
+  const b = Number(end);
+  if (!n) return 0;
+  if (a === b) return n * a;
+  const len = Math.abs(b - a) + 1;
+  const cyc = Math.floor(n / len);
+  const rem = n % len;
+  const ciclo = (len * (a + b)) / 2;
+  const resto = rem <= 0 ? 0 : (a <= b ? rem * a + ((rem - 1) * rem) / 2 : rem * a - ((rem - 1) * rem) / 2);
+  return round2(cyc * ciclo + resto);
+}
+function calc(draft) {
+  if (screen === 'montante') {
+    const deposit = round2(moneyNumber(draft.montante));
+    const taxa = Number(draft.taxa) || 0;
+    const fromSite = siteReady ? montanteDiscountPercent(draft.date, deposit) : null;
+    const discount = fromSite != null ? fromSite : (Number(draft.discount) || 0);
+    const subtotal = deposit * (taxa / 100);
+    const blogger = round2(Math.max(0, subtotal - subtotal * (discount / 100)));
+    const withdrawal = round2(draft.withdrawal);
+    const gross = round2((withdrawal + blogger) - deposit);
+    const rate = Math.max(0, Number(state.rate) || 0);
+    const raw = round2((gross * rate) / 100);
+    const commission = gross >= 0 ? Math.abs(raw) : raw;
+    const net = round2(gross - commission);
+    return { deposit, blogger, withdrawal, gross, commission, net, price: taxa, discount };
+  }
+  const range = findRange(draft.range);
+  const canSum = range && range.start != null && range.end != null && Number.isFinite(Number(range.start)) && Number.isFinite(Number(range.end));
+  const deposit = canSum ? depositSum(draft.qty, range.start, range.end) : 0;
+  const price = range && Number.isFinite(Number(range.price)) ? Number(range.price) : 0;
+  const fromSite = siteReady
+    ? siteDiscountPercent(draft.date || (document.getElementById('date') && document.getElementById('date').value), range)
+    : null;
+  const discount = fromSite != null
+    ? fromSite
+    : (draft.discount != null ? (Number(draft.discount) || 0) : discountForQty(draft.qty));
+  const subtotal = price * (Number(draft.qty) || 0);
+  const blogger = discount == null ? 0 : round2(Math.max(0, subtotal - subtotal * (discount / 100)));
+  const withdrawal = round2(draft.withdrawal);
+  const gross = round2((withdrawal + blogger) - deposit);
+  const rate = Math.max(0, Number(state.rate) || 0);
+  const raw = round2((gross * rate) / 100);
+  const commission = gross >= 0 ? Math.abs(raw) : raw;
+  const net = round2(gross - commission);
+  return { deposit, blogger, withdrawal, gross, commission, net, price, discount };
+}
+function moneyNumber(value) {
+  return Number(String(value || '').trim().replace(',', '.')) || 0;
+}
+function sumSaques() {
+  return round2(saques.reduce((acc, item) => acc + moneyNumber(item), 0));
+}
+function draftFromForm() {
+  const typed = moneyNumber(document.getElementById('withdrawal').value);
+  const sideHas = saques.some((item) => String(item).trim() !== '');
+  return {
+    range: document.getElementById('range').value,
+    qty: Number(document.getElementById('qty').value) || 0,
+    discount: Number(document.getElementById('discount').value) || 0,
+    withdrawal: sideHas ? sumSaques() : typed,
+    montante: document.getElementById('montante') ? document.getElementById('montante').value : '',
+    taxa: selectedTaxa(),
+  };
+}
+function cls(n) { return n < 0 ? 'neg' : 'pos'; }
+function renderCards() {
+  const totals = periodOps().reduce((acc, op) => {
+    acc.invested += op.deposit;
+    acc.returned += op.withdrawal + op.blogger;
+    acc.blogger += op.blogger;
+    acc.commission += op.commission;
+    acc.gross += op.gross;
+    acc.net += op.net;
+    return acc;
+  }, { invested: 0, returned: 0, blogger: 0, commission: 0, gross: 0, net: 0 });
+  const cards = [
+    [screen === 'montante' ? 'Montante' : 'Investido', totals.invested, 'red'],
+    ['Retornado', totals.returned, 'emerald'],
+    ['Blogueiras', totals.blogger, 'blue'],
+    ['Comissão', totals.commission, 'zinc'],
+    ['Lucro bruto', totals.gross, totals.gross >= 0 ? 'blue' : 'red'],
+    ['Lucro líquido', totals.net, totals.net >= 0 ? 'emerald' : 'red'],
+  ];
+  document.getElementById('cards').innerHTML = cards.map(([label, value, color]) =>
+    `<article class="card ${color}"><div class="label">${label}</div><div class="value">${money.format(value)}</div></article>`
+  ).join('');
+}
+let rangeGroup = '';
+let rangeOpen = false;
+function rangeTitle(item) {
+  return `${item.group || 'Faixa'} · ${item.name} · ${money.format(Number(item.price) || 0)}`;
+}
+function rangeSources() {
+  return siteRanges.length ? siteRanges.map(asFormRange).filter(Boolean) : state.ranges;
+}
+function rangeMenuTitle(item) {
+  const nome = String(item.nome || item.name || '').trim();
+  const group = String(item.group || '').trim();
+  if (!group || group === 'Faixa') return nome;
+  const escaped = group.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return nome.replace(new RegExp('\\s+' + escaped + '\\s*$', 'i'), '').trim() || nome;
+}
+function rangeMenuLabel(item) {
+  const title = rangeMenuTitle(item);
+  const price = Number(item.price);
+  if (!Number.isFinite(price)) return title;
+  return title + ' (' + money.format(price) + '/un)';
+}
+function renderRanges() {
+  const hidden = document.getElementById('range');
+  const source = rangeSources();
+  const order = [];
+  const buckets = new Map();
+  source.forEach((item) => {
+    const group = item.group || 'Faixa';
+    if (!buckets.has(group)) {
+      buckets.set(group, []);
+      order.push(group);
+    }
+    buckets.get(group).push(item);
+  });
+  const selected = source.find((item) => item.id === hidden.value) || null;
+  if (!rangeGroup || !buckets.has(rangeGroup)) rangeGroup = (selected && selected.group) || order[0] || '';
+  const items = buckets.get(rangeGroup) || [];
+  document.getElementById('range-groups').innerHTML = order.map((group) =>
+    `<button type="button" class="range-chip${group === rangeGroup ? ' on' : ''}" data-range-group="${escapeHtml(group)}">${escapeHtml(group)}</button>`
+  ).join('');
+  const trigger = document.getElementById('range-trigger');
+  trigger.classList.toggle('open', rangeOpen);
+  trigger.classList.toggle('empty', !selected);
+  document.getElementById('range-label').textContent = selected ? rangeMenuLabel(selected) : 'Escolha uma faixa';
+  const menu = document.getElementById('range-menu');
+  menu.hidden = !rangeOpen;
+  menu.innerHTML = items.length
+    ? items.map((item) => `<button type="button" class="range-opt${item.id === hidden.value ? ' on' : ''}" data-range-id="${escapeHtml(item.id)}">${escapeHtml(rangeMenuLabel(item))}</button>`).join('')
+    : '<div class="range-empty">Nenhuma faixa neste grupo.</div>';
+  if (selected) document.getElementById('range-error').hidden = true;
+}
+function filledLinks() {
+  return houseLinks.map((item) => String(item || '').trim()).filter(Boolean);
+}
+function renderLinks() {
+  const extras = houseLinks.slice(1).map((value, index) => `
+    <div class="link-row">
+      <input data-link="${index + 1}" placeholder="https://" value="${escapeHtml(value)}" />
+      <button type="button" data-drop-link="${index + 1}" title="Remover">×</button>
+    </div>
+  `).join('');
+  document.getElementById('links').innerHTML = `
+    <div class="link-row">
+      <input data-link="0" placeholder="https://" value="${escapeHtml(houseLinks[0] || '')}" />
+      <button class="link-plus" type="button" id="add-link" title="Adicionar outro link">+</button>
+    </div>
+    ${houseLinks.length > 1 ? `<div class="extra-links"><p>Outros links da casa</p>${extras}</div>` : ''}
+  `;
+}
+function renderSaques() {
+  document.getElementById('saques').innerHTML = saques.map((value, index) => `
+    <div class="saque-row">
+      <input data-saque="${index}" inputmode="decimal" placeholder="0,00" value="${escapeHtml(value)}" />
+      ${saques.length > 1 ? `<button type="button" data-remove="${index}">×</button>` : ''}
+    </div>
+  `).join('');
+}
+function focusSaque(index) {
+  const input = document.querySelector('#saques input[data-saque="' + index + '"]');
+  if (!input) return;
+  input.focus();
+  const length = input.value.length;
+  try { input.setSelectionRange(length, length); } catch (e) {}
+}
+function applyAutoDiscount() {
+  const input = document.getElementById('discount');
+  if (screen === 'montante') {
+    const percent = siteReady ? montanteDiscountPercent(document.getElementById('date').value, moneyNumber(document.getElementById('montante').value)) : null;
+    if (percent == null) {
+      if (input.readOnly) input.value = '';
+      input.readOnly = false;
+    } else {
+      input.readOnly = true;
+      input.value = percent;
+    }
+    paintSiteNote();
+    return;
+  }
+  if (!siteReady) {
+    input.readOnly = false;
+    input.value = discountForQty(Number(document.getElementById('qty').value) || 0);
+    paintSiteNote();
+    return;
+  }
+  const range = findRange(document.getElementById('range').value);
+  const percent = siteDiscountPercent(document.getElementById('date').value, range);
+  if (percent == null) {
+    if (input.readOnly) input.value = '';
+    input.readOnly = false;
+    paintSiteNote();
+    return;
+  }
+  input.readOnly = true;
+  input.value = percent;
+  paintSiteNote();
+}
+function renderPreview() {
+  const result = calc(draftFromForm());
+  const lines = [
+    ['Desconto', result.discount == null ? '—' : result.discount + '%'],
+    [screen === 'montante' ? 'Montante' : 'Depósito', result.deposit],
+    ['Saque', result.withdrawal],
+    ['Compra (Blogueira)', result.blogger],
+    ['Lucro bruto', result.gross],
+    ['Comissão ' + state.rate + '%', result.commission],
+  ];
+  document.getElementById('preview').innerHTML = lines.map(([label, value]) =>
+    `<div class="line"><span>${label}</span><strong class="${typeof value === 'number' ? cls(value) : ''}">${typeof value === 'number' ? money.format(value) : value}</strong></div>`
+  ).join('') + `<div class="line big"><span>Lucro líquido</span><strong class="${cls(result.net)}">${money.format(result.net)}</strong></div>`;
+}
+function renderTable() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const list = periodOps().filter((op) => {
+    const links = (Array.isArray(op.links) ? op.links : [op.link]).join(' ');
+    const blob = `${op.client} ${op.operator} ${links}`.toLowerCase();
+    return !q || blob.includes(q);
+  });
+  document.getElementById('rows').innerHTML = list.map((op) => `
+    <tr class="${op.verificado ? 'audited' : ''}">
+      <td><button class="audit-btn${op.verificado ? ' on' : ''}" data-audit="${op.id}" type="button" title="${op.verificado ? 'Remover verificação' : 'Marcar como verificada'}">${op.verificado ? CHECK_ICON : SQUARE_ICON}</button>${op.panelId ? '<div class="hint">no painel</div>' : ''}</td>
+      <td>${op.dateLabel}</td>
+      <td>${escapeHtml(op.client)}<div class="hint">${escapeHtml(op.rangeLabel || op.range)}</div><div class="hint">${(Array.isArray(op.links) ? op.links : [op.link]).filter(Boolean).map(escapeHtml).join('<br>')}</div></td>
+      <td>${escapeHtml(op.operator || '—')}</td>
+      <td class="num">${op.qty}</td>
+      <td class="num">${op.discount == null ? '—' : (Number(op.discount) || 0) + '%'}</td>
+      <td class="num">${money.format(op.deposit)}</td>
+      <td class="num">${money.format(op.withdrawal)}</td>
+      <td class="num">${money.format(op.blogger)}</td>
+      <td class="num ${cls(op.gross)}">${money.format(op.gross)}</td>
+      <td class="num">${money.format(op.commission)}</td>
+      <td class="num ${cls(op.net)}">${money.format(op.net)}</td>
+      <td>
+        <button class="icon-btn copy-btn" data-copy="${op.id}" type="button">Copiar</button>
+        <button class="icon-btn" data-edit="${op.id}" type="button">Editar</button>
+        <button class="icon-btn" data-del="${op.id}" type="button">Apagar</button>
+      </td>
+    </tr>
+  `).join('') || `<tr><td colspan="13" style="text-align:center;color:#a1a1aa;padding:28px">Nenhuma operação neste período.</td></tr>`;
+}
+const SQUARE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>';
+const CHECK_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/><path d="m9 11 3 3L22 4"/></svg>';
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+function paint() { renderDays(); renderCards(); renderRanges(); renderLinks(); renderSaques(); renderPreview(); renderTable(); }
+function nowValue() {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
+document.getElementById('date').value = nowValue();
+document.getElementById('form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (screen === 'contas' && !document.getElementById('range').value) {
+    document.getElementById('range-error').hidden = false;
+    rangeOpen = true;
+    renderRanges();
+    return;
+  }
+  const typedClient = document.getElementById('client').value.trim();
+  const typedPhone = document.getElementById('phone').value.trim();
+  const resolved = siteClientsOk ? resolveSiteClient(typedClient, typedPhone) : { create: true, name: typedClient, phone: typedPhone };
+  if (resolved.error) {
+    copyNote(resolved.error);
+    return;
+  }
+  const siteClient = resolved.client || null;
+  const chosen = screen === 'montante' ? null : findRange(document.getElementById('range').value);
+  if (screen === 'contas' && siteRanges.length && (!chosen || !siteRanges.some((item) => item.id === chosen.id))) {
+    copyNote('Essa faixa não é a do site. Não registrei com outro nome.');
+    return;
+  }
+  if (screen === 'contas' && siteReady && siteDiscountPercent(document.getElementById('date').value, chosen) == null) {
+    const typedDiscount = document.getElementById('discount').value.trim();
+    if (typedDiscount === '' || !Number.isFinite(Number(typedDiscount))) {
+      copyNote('A sincronização do desconto não foi feita porque não há desconto configurado. Configure manualmente.');
+      return;
+    }
+  }
+  const result = calc(draftFromForm());
+  const previous = editing ? state.ops.find((item) => item.id === editing) : null;
+  const op = {
+    id: editing || String(Date.now()),
+    verificado: !!(previous && previous.verificado),
+    panelId: (previous && previous.panelId) || '',
+    panelSentAt: (previous && previous.panelSentAt) || '',
+    date: document.getElementById('date').value,
+    dateLabel: new Date(document.getElementById('date').value).toLocaleString('pt-BR'),
+    client: siteClient ? siteClient.name : (resolved.name || typedClient),
+    operator: (previous && previous.operator) || accountName || '',
+    links: filledLinks(),
+    link: filledLinks()[0] || '',
+    phone: siteClient ? sitePhoneOf(siteClient) : typedPhone,
+    module: screen,
+    range: screen === 'montante' ? '' : document.getElementById('range').value,
+    rangeLabel: screen === 'montante'
+      ? (rateList().find((item) => item.id === document.getElementById('taxa').value) ? rateLabel(rateList().find((item) => item.id === document.getElementById('taxa').value)) : '')
+      : (chosen && (chosen.nome || chosen.name) ? (chosen.nome || chosen.name) : rangeTitle(chosen || { name: '' })),
+    taxa: screen === 'montante' ? selectedTaxa() : 0,
+    qty: Number(document.getElementById('qty').value) || 0,
+    ...result,
+    saques: saques.map((item) => String(item)),
+  };
+  if (editing) state.ops = state.ops.map((item) => item.id === editing ? op : item);
+  else state.ops.unshift(op);
+  editing = null;
+  document.getElementById('save').textContent = 'Registrar operação';
+  document.getElementById('cancel-edit').hidden = true;
+  document.getElementById('form').reset();
+  document.getElementById('date').value = nowValue();
+  document.getElementById('qty').value = 1;
+  document.getElementById('operator').value = accountName;
+  applyAutoDiscount();
+  saques = [''];
+  houseLinks = [''];
+  save();
+  paint();
+});
+document.getElementById('saques').addEventListener('input', (event) => {
+  const index = event.target.dataset.saque;
+  if (index == null) return;
+  saques[index] = event.target.value;
+  document.getElementById('withdrawal').value = sumSaques() ? String(sumSaques()) : '';
+  renderPreview();
+});
+document.getElementById('saques').addEventListener('click', (event) => {
+  const index = event.target.dataset.remove;
+  if (index == null) return;
+  saques.splice(Number(index), 1);
+  if (!saques.length) saques = [''];
+  document.getElementById('withdrawal').value = sumSaques() ? String(sumSaques()) : '';
+  paint();
+});
+document.getElementById('saques').addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  const index = event.target.dataset.saque;
+  if (index == null) return;
+  event.preventDefault();
+  const current = Number(index);
+  saques[current] = event.target.value;
+  const last = current >= saques.length - 1;
+  if (last && String(event.target.value || '').trim() !== '') saques.push('');
+  document.getElementById('withdrawal').value = sumSaques() ? String(sumSaques()) : '';
+  renderSaques();
+  renderPreview();
+  focusSaque(last ? saques.length - 1 : current + 1);
+});
+document.getElementById('add-saque').addEventListener('click', () => {
+  saques.push('');
+  renderSaques();
+  focusSaque(saques.length - 1);
+});
+document.getElementById('links-box').addEventListener('input', (event) => {
+  const index = event.target.dataset.link;
+  if (index == null) return;
+  houseLinks[Number(index)] = event.target.value;
+});
+document.getElementById('links-box').addEventListener('click', (event) => {
+  if (event.target.id === 'add-link') {
+    houseLinks.push('');
+    renderLinks();
+    return;
+  }
+  const index = event.target.dataset.dropLink;
+  if (index == null) return;
+  houseLinks.splice(Number(index), 1);
+  if (!houseLinks.length) houseLinks = [''];
+  renderLinks();
+});
+['range', 'discount'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', renderPreview);
+});
+document.getElementById('range').addEventListener('change', () => { applyAutoDiscount(); renderPreview(); });
+document.getElementById('range-box').addEventListener('click', (event) => {
+  const groupBtn = event.target.closest('[data-range-group]');
+  if (groupBtn) {
+    rangeGroup = groupBtn.getAttribute('data-range-group') || '';
+    rangeOpen = true;
+    renderRanges();
+    return;
+  }
+  if (event.target.closest('#range-trigger')) {
+    rangeOpen = !rangeOpen;
+    renderRanges();
+    return;
+  }
+  const opt = event.target.closest('[data-range-id]');
+  if (!opt) return;
+  const hidden = document.getElementById('range');
+  hidden.value = opt.getAttribute('data-range-id') || '';
+  rangeOpen = false;
+  renderRanges();
+  hidden.dispatchEvent(new Event('change'));
+});
+document.addEventListener('mousedown', (event) => {
+  if (!rangeOpen || document.getElementById('range-box').contains(event.target)) return;
+  rangeOpen = false;
+  renderRanges();
+});
+document.getElementById('date').addEventListener('input', () => { applyAutoDiscount(); renderPreview(); });
+document.getElementById('withdrawal').addEventListener('input', () => {
+  saques = [document.getElementById('withdrawal').value];
+  renderSaques();
+  renderPreview();
+});
+document.getElementById('qty').addEventListener('input', () => {
+  applyAutoDiscount();
+  renderPreview();
+});
+document.getElementById('q').addEventListener('input', renderTable);
+document.getElementById('client').addEventListener('input', syncPhoneFromChosenClient);
+document.getElementById('client').addEventListener('change', syncPhoneFromChosenClient);
+const PANEL_RANGE_NAMES = {
+  'grupo 01|10|11|5': '10 a 11 Grupo 01',
+  'grupo 01|10|12|6': '10 a 12 Grupo 01',
+  'grupo 01|10|13|7': '10 a 13',
+  'grupo 01|11|13|8': '11 a 13 Grupo 01',
+  'grupo 01|11|14|9': '11 a 14 Grupo 01',
+  'grupo 01|12|15|10': '12 a 15 GRUPO 01',
+  'grupo 01|12|18|11': '12 a 18 Grupo 01',
+  'grupo 02|10|10|6': '10  Grupo 02',
+  'grupo 02|10|11|7': '10 a 11 Grupo 02',
+  'grupo 02|10|12|8': '10 a 12  Grupo 02',
+  'grupo 02|12|15|11': '12 a 15',
+  'grupo 02|13|18|12': '13 a 18',
+  'grupo 03|10|10|7': '10 Grupo 03',
+  'grupo 03|10|11|8': '10 A 11 Grupo 03',
+  'grupo 03|11|12|9': '11 a 12  Grupo 03',
+  'grupo 03|11|13|10': '11 A 13 Grupo 03',
+  'grupo 03|12|15|11': '12 a 15',
+  'grupo 03|13|16|12': '13 a 16',
+  'grupo 03|14|18|13': '14 a 18',
+};
+function panelRangeName(range) {
+  if (!range) return '';
+  const group = String(range.group || '').replace(/\s+/g, ' ').trim();
+  const start = Number(range.start);
+  const end = Number(range.end);
+  const price = Number(range.price) || 0;
+  const known = PANEL_RANGE_NAMES[[group.toLowerCase(), start, end, price].join('|')];
+  if (known) return known;
+  const span = start === end ? String(start) : start + ' a ' + end;
+  return group ? span + ' ' + group : span;
+}
+function panelDate(value) {
+  const text = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) return text.slice(0, 16);
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return '';
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+function copyNote(text) {
+  const note = document.getElementById('copy-note');
+  if (note) note.textContent = text;
+}
+async function copyForPanel(op) {
+  const resolved = siteClientsOk ? resolveSiteClient(op.client, op.phone) : { create: true, name: String(op.client || '').replace(/\s+/g, ' ').trim(), phone: op.phone || '' };
+  const range = siteRangeForOp(op);
+  const sitePercent = range ? siteDiscountPercent(op.date, range) : null;
+  const percent = sitePercent != null ? sitePercent : (op.discount != null && op.discount !== '' ? Number(op.discount) : null);
+  if (resolved.error || !resolved.client && !resolved.name || !range || !range.nome || percent == null || !Number.isFinite(percent)) {
+    copyNote(resolved.error || 'O site não devolveu a faixa. Não copiei com outro nome.');
+    return 'blocked';
+  }
+  const clientName = resolved.client ? resolved.client.name : resolved.name;
+  const phone = resolved.client ? sitePhoneOf(resolved.client) : (resolved.phone || '');
+  const links = (Array.isArray(op.links) ? op.links : [op.link]).map((item) => String(item || '').trim()).filter(Boolean);
+  const text = JSON.stringify({
+    __dfsOpClipboard: 1,
+    module: 'contas',
+    date: panelDate(op.date),
+    accountName: clientName,
+    phone,
+    houseLink: links[0] || '',
+    houseLinks: links.length ? links : [''],
+    requestedAccounts: Number(op.qty) || 0,
+    clearedAccounts: 0,
+    withdrawnAccounts: 0,
+    deposit: Number(op.deposit) || 0,
+    withdrawal: Number(op.withdrawal) || 0,
+    blogger: Number(op.blogger) || 0,
+    bankAccountId: '',
+    notes: '',
+    depositRange: range.nome,
+    rollover: '',
+    promocao: false,
+    copiedAt: new Date().toISOString(),
+  });
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', 'readonly');
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    document.body.appendChild(area);
+    area.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    area.remove();
+    return ok;
+  }
+}
+document.getElementById('rows').addEventListener('click', (event) => {
+  const audit = event.target.closest('[data-audit]');
+  if (audit) {
+    const id = audit.dataset.audit;
+    state.ops = state.ops.map((item) => item.id === id ? { ...item, verificado: !item.verificado } : item);
+    save();
+    renderTable();
+    return;
+  }
+  const del = event.target.closest('[data-del]');
+  const edit = event.target.closest('[data-edit]');
+  const copy = event.target.closest('[data-copy]');
+  if (copy) {
+    const op = state.ops.find((item) => item.id === copy.dataset.copy);
+    if (!op) return;
+    copyForPanel(op).then((ok) => {
+      if (ok === 'blocked') return;
+      copyNote(ok
+        ? 'Copiado. No painel, abra Nova Operação de Contas e clique em Colar.'
+        : 'Não consegui copiar. Clique em Copiar de novo.');
+    });
+    return;
+  }
+  if (del) {
+    removedIds.push(String(del.dataset.del));
+    state.ops = state.ops.filter((item) => item.id !== del.dataset.del);
+    save();
+    paint();
+  }
+  if (edit) {
+    const op = state.ops.find((item) => item.id === edit.dataset.edit);
+    if (!op) return;
+    editing = op.id;
+    document.getElementById('date').value = op.date;
+    document.getElementById('client').value = op.client;
+    document.getElementById('operator').value = accountName;
+    houseLinks = (Array.isArray(op.links) && op.links.length ? op.links : [op.link || '']).slice();
+    document.getElementById('phone').value = op.phone || '';
+    phoneFilledFromSite = '';
+    syncPhoneFromChosenClient();
+    if (!matchSiteClient(op.client)) document.getElementById('phone').value = op.phone || '';
+    const siteRange = siteRangeForOp(op);
+    document.getElementById('range').value = siteRange ? siteRange.id : op.range;
+    const pickedRange = findRange(document.getElementById('range').value);
+    if (pickedRange && pickedRange.group) rangeGroup = pickedRange.group;
+    rangeOpen = false;
+    if (op.module === 'montante') {
+      document.getElementById('montante').value = op.deposit ? String(op.deposit).replace('.', ',') : '';
+      const rate = rateList().find((item) => Number(item.taxa) === Number(op.taxa));
+      if (rate) document.getElementById('taxa').value = rate.id;
+      renderTaxas();
+    }
+    document.getElementById('qty').value = op.qty;
+    applyAutoDiscount();
+    document.getElementById('withdrawal').value = op.withdrawal;
+    saques = Array.isArray(op.saques) && op.saques.length ? op.saques.map((item) => String(item)) : [String(op.withdrawal || '')];
+    renderSaques();
+    renderLinks();
+    renderRanges();
+    document.getElementById('save').textContent = 'Salvar edição';
+    document.getElementById('cancel-edit').hidden = false;
+    renderPreview();
+    const formTop = document.getElementById('form');
+    if (formTop && formTop.scrollIntoView) formTop.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
+document.getElementById('cancel-edit').addEventListener('click', () => {
+  editing = null;
+  document.getElementById('form').reset();
+  document.getElementById('date').value = nowValue();
+  document.getElementById('qty').value = 1;
+  document.getElementById('operator').value = accountName;
+  applyAutoDiscount();
+  saques = [''];
+  houseLinks = [''];
+  document.getElementById('save').textContent = 'Registrar operação';
+  document.getElementById('cancel-edit').hidden = true;
+  paint();
+});
+document.getElementById('open-config').addEventListener('click', () => {
+  document.getElementById('cfg-rate').value = state.rate;
+  document.getElementById('tier1-min').value = state.tier1.min;
+  document.getElementById('tier1-pct').value = state.tier1.percent;
+  document.getElementById('tier2-min').value = state.tier2.min;
+  document.getElementById('tier2-pct').value = state.tier2.percent;
+  document.getElementById('range-editor').innerHTML = state.ranges.map((item, index) => rangeRow(item, index)).join('');
+  document.getElementById('modal').classList.add('open');
+});
+function rangeRow(item, index) {
+  const options = groups.map((group) => `<option ${item.group === group ? 'selected' : ''}>${group}</option>`).join('');
+  return `<div class="range-row">
+    <select data-field="group" data-i="${index}">${options}</select>
+    <input data-field="name" data-i="${index}" value="${escapeHtml(item.name)}" placeholder="De 10 a 11" />
+    <input data-field="start" data-i="${index}" type="number" value="${item.start}" />
+    <input data-field="end" data-i="${index}" type="number" value="${item.end}" />
+    <input data-field="price" data-i="${index}" type="number" step="0.01" value="${item.price}" />
+    <button type="button" data-drop="${index}">×</button>
+  </div>`;
+}
+document.getElementById('add-range').addEventListener('click', () => {
+  readRanges();
+  state.ranges.push({ id: 'extra-' + Date.now(), group: 'Grupo 01', name: 'Nova faixa', start: 10, end: 11, price: 0 });
+  document.getElementById('range-editor').innerHTML = state.ranges.map((item, index) => rangeRow(item, index)).join('');
+});
+document.getElementById('range-editor').addEventListener('click', (event) => {
+  if (event.target.dataset.drop == null) return;
+  readRanges();
+  state.ranges.splice(Number(event.target.dataset.drop), 1);
+  document.getElementById('range-editor').innerHTML = state.ranges.map((item, index) => rangeRow(item, index)).join('');
+});
+function readRanges() {
+  const next = [];
+  document.querySelectorAll('#range-editor .range-row').forEach((row) => {
+    const data = {};
+    row.querySelectorAll('input, select').forEach((input) => { data[input.dataset.field] = input.value; });
+    const previous = state.ranges[next.length];
+    next.push({
+      id: previous && previous.id ? previous.id : 'extra-' + Date.now() + '-' + next.length,
+      group: data.group || 'Grupo 01',
+      name: data.name.trim(),
+      start: Number(data.start),
+      end: Number(data.end),
+      price: Number(data.price) || 0,
+    });
+  });
+  state.ranges = next.filter((item) => item.name);
+}
+document.getElementById('save-config').addEventListener('click', () => {
+  state.rate = Number(document.getElementById('cfg-rate').value) || 0;
+  state.tier1 = { min: Number(document.getElementById('tier1-min').value) || 0, percent: Number(document.getElementById('tier1-pct').value) || 0 };
+  state.tier2 = { min: Number(document.getElementById('tier2-min').value) || 0, percent: Number(document.getElementById('tier2-pct').value) || 0 };
+  readRanges();
+  state.ops = state.ops.map((op) => {
+    const result = calc(op);
+    const range = state.ranges.find((item) => item.id === op.range);
+    return { ...op, ...result, rangeLabel: range ? rangeTitle(range) : op.rangeLabel };
+  });
+  save();
+  document.getElementById('modal').classList.remove('open');
+  paint();
+});
+document.getElementById('close-config').addEventListener('click', () => document.getElementById('modal').classList.remove('open'));
+document.getElementById('day-buttons').addEventListener('click', (event) => {
+  const range = event.target.dataset.range;
+  if (!range) return;
+  state.dateRange = range;
+  if (range === 'custom' && !state.customStart) {
+    const today = ymd(new Date());
+    state.customStart = today;
+    state.customEnd = today;
+  }
+  if (range !== 'custom') {
+    const period = bounds();
+    state.customStart = ymd(period.start);
+    state.customEnd = ymd(period.end);
+  }
+  rememberView();
+  save();
+  paint();
+});
+document.getElementById('day-prev').addEventListener('click', () => shiftDay(-1));
+document.getElementById('day-next').addEventListener('click', () => shiftDay(1));
+function shiftDay(step) {
+  const next = new Date(bounds().start);
+  next.setDate(next.getDate() + step);
+  state.dateRange = 'custom';
+  state.customStart = ymd(next);
+  state.customEnd = ymd(next);
+  rememberView();
+  save();
+  paint();
+}
+document.getElementById('custom-start').addEventListener('change', (event) => {
+  state.dateRange = 'custom';
+  state.customStart = event.target.value;
+  if (!state.customEnd || state.customEnd < state.customStart) state.customEnd = event.target.value;
+  rememberView();
+  save();
+  paint();
+});
+document.getElementById('custom-end').addEventListener('change', (event) => {
+  state.dateRange = 'custom';
+  state.customEnd = event.target.value;
+  if (!state.customStart || state.customStart > state.customEnd) state.customStart = event.target.value;
+  rememberView();
+  save();
+  paint();
+});
+document.getElementById('export-pdf').addEventListener('click', () => {
+  const ops = periodOps();
+  const totals = ops.reduce((acc, op) => {
+    acc.invested += op.deposit;
+    acc.returned += op.withdrawal + op.blogger;
+    acc.blogger += op.blogger;
+    acc.commission += op.commission;
+    acc.gross += op.gross;
+    acc.net += op.net;
+    acc.qty += Number(op.qty) || 0;
+    return acc;
+  }, { invested: 0, returned: 0, blogger: 0, commission: 0, gross: 0, net: 0, qty: 0 });
+  const issued = new Date().toLocaleString('pt-BR');
+  const lines = ops.map((op) => `<tr>
+    <td>${escapeHtml(op.dateLabel)}</td>
+    <td>${escapeHtml(op.client)}<div class="sub">${(Array.isArray(op.links) ? op.links : [op.link]).filter(Boolean).map(escapeHtml).join('<br>')}</div></td>
+    <td>${escapeHtml(op.operator || '—')}</td>
+    <td>${escapeHtml(op.rangeLabel || op.range)}</td>
+    <td class="num">${op.qty}</td>
+    <td class="num">${Number(op.discount) || 0}%</td>
+    <td class="num">${money.format(op.deposit)}</td>
+    <td class="num">${money.format(op.withdrawal)}</td>
+    <td class="num">${money.format(op.blogger)}</td>
+    <td class="num">${money.format(op.gross)}</td>
+    <td class="num">${money.format(op.commission)}</td>
+    <td class="num">${money.format(op.net)}</td>
+  </tr>`).join('');
+  const tierNote = `Desconto 1: acima de ${state.tier1.min || 0} contas, ${state.tier1.percent || 0}%. Desconto 2: acima de ${state.tier2.min || 0} contas, ${state.tier2.percent || 0}%.`;
+  document.getElementById('proof').innerHTML = `
+    <div class="kicker">Elite CPA System</div>
+    <h1>Operações · Contas</h1>
+    <p class="sub">Emitido em ${issued}. ${periodLabel()}. ${ops.length} operações. Comissão ${state.rate}%. ${tierNote}</p>
+    <section class="cards">
+      <article class="card red"><div class="label">Investido</div><div class="value">${money.format(totals.invested)}</div></article>
+      <article class="card emerald"><div class="label">Retornado</div><div class="value">${money.format(totals.returned)}</div></article>
+      <article class="card blue"><div class="label">Blogueiras</div><div class="value">${money.format(totals.blogger)}</div></article>
+      <article class="card zinc"><div class="label">Comissão</div><div class="value">${money.format(totals.commission)}</div></article>
+      <article class="card ${totals.gross >= 0 ? 'blue' : 'red'}"><div class="label">Lucro bruto</div><div class="value">${money.format(totals.gross)}</div></article>
+      <article class="card ${totals.net >= 0 ? 'emerald' : 'red'}"><div class="label">Lucro líquido</div><div class="value">${money.format(totals.net)}</div></article>
+    </section>
+    <section class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th><th>Cliente</th><th>Operador</th><th>Faixa</th>
+            <th class="num">Contas</th><th class="num">Desconto</th><th class="num">Depósito</th><th class="num">Saque</th>
+            <th class="num">Compra</th><th class="num">Lucro bruto</th><th class="num">Comissão</th><th class="num">Lucro líquido</th>
+          </tr>
+        </thead>
+        <tbody>${lines || '<tr><td colspan="12">Nenhuma operação lançada.</td></tr>'}</tbody>
+      </table>
+    </section>
+  `;
+  window.print();
+});
+document.getElementById('export-json').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'contas-operacoes.json';
+  link.click();
+});
+function companySlug(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const match = text.match(/login\/([^/?#\s]+)/i);
+  if (match) return decodeURIComponent(match[1]);
+  if (/^https?:\/\//i.test(text)) {
+    try {
+      const parts = new URL(text).pathname.split('/').filter(Boolean);
+      const last = parts[parts.length - 1] || '';
+      return last === 'login' ? '' : last;
+    } catch (e) { return ''; }
+  }
+  return text.replace(/^\/+|\/+$/g, '');
+}
+let captchaLoading = null;
+function loadCaptcha(key) {
+  if (window.grecaptcha && window.grecaptcha.execute) return Promise.resolve();
+  if (captchaLoading) return captchaLoading;
+  captchaLoading = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://www.google.com/recaptcha/api.js?render=' + encodeURIComponent(key);
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => {
+      captchaLoading = null;
+      reject(new Error('Não carregou a proteção do Google.'));
+    };
+    document.head.appendChild(script);
+  });
+  return captchaLoading;
+}
+async function loginCaptcha() {
+  const cfg = await panelJson('/painel/captcha');
+  if (!cfg.enabled || !cfg.siteKey) return '';
+  await loadCaptcha(cfg.siteKey);
+  const grecaptcha = window.grecaptcha;
+  if (!grecaptcha) throw new Error('A proteção do Google não carregou.');
+  return new Promise((resolve, reject) => {
+    grecaptcha.ready(() => {
+      grecaptcha.execute(cfg.siteKey, { action: 'login' }).then(resolve).catch(() => {
+        reject(new Error('O Google não confirmou a entrada a partir deste programa.'));
+      });
+    });
+  });
+}
+function panelDocId() {
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+async function panelJson(url, body) {
+  const response = await fetch(url, {
+    method: body ? 'POST' : 'GET',
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || 'O painel não respondeu.');
+  return data;
+}
+function operationForPanel(op) {
+  const resolved = siteClientsOk ? resolveSiteClient(op.client, op.phone) : null;
+  const client = resolved && resolved.client;
+  const range = siteRangeForOp(op);
+  const sitePercent = range ? siteDiscountPercent(op.date, range) : null;
+  const percent = sitePercent != null ? sitePercent : (op.discount != null && op.discount !== '' ? Number(op.discount) : null);
+  if (!resolved || resolved.error || (!resolved.client && !resolved.name) || !range || !range.nome || percent == null || !Number.isFinite(percent) || !Number.isFinite(Number(range.price))) return null;
+  const clientName = client ? client.name : resolved.name;
+  const phone = client ? sitePhoneOf(client) : (resolved.phone || '');
+  const links = (Array.isArray(op.links) ? op.links : [op.link]).map((item) => String(item || '').trim()).filter(Boolean);
+  const date = panelDate(op.date);
+  const qty = Number(op.qty) || 0;
+  const subtotal = Number(range.price) * qty;
+  const blogger = round2(Math.max(0, subtotal - subtotal * (percent / 100)));
+  const deposit = Number(op.deposit) || 0;
+  const withdrawal = Number(op.withdrawal) || 0;
+  const gross = round2((withdrawal + blogger) - deposit);
+  const rate = Math.max(0, Number(state.rate) || 0);
+  const raw = round2((gross * rate) / 100);
+  const commission = gross >= 0 ? Math.abs(raw) : raw;
+  const net = round2(gross - commission);
+  return {
+    date,
+    createdAt: date,
+    accountName: clientName,
+    phone,
+    houseLink: links[0] || '',
+    houseLinks: links.length ? links : [''],
+    requestedAccounts: Number(op.qty) || 0,
+    clearedAccounts: 0,
+    withdrawnAccounts: 0,
+    deposit,
+    withdrawal,
+    blogger,
+    commission,
+    commissionAbatement: 0,
+    commissionRate: rate,
+    grossProfit: gross,
+    netProfit: net,
+    bankAccountId: '',
+    notes: '',
+    depositRange: range.nome,
+    rollover: '',
+    promocao: false,
+    verificado: !!op.verificado,
+    discountApplied: percent,
+    clientId: client ? client.id : '',
+    clientName,
+    clientPhone: phone,
+  };
+}
+let panelCompanies = [];
+function closePanel() {
+  const modal = document.getElementById('panel-modal');
+  modal.classList.remove('open');
+  modal.classList.remove('gate');
+}
+async function fillPanelCompanies(session) {
+  const box = document.getElementById('panel-company-box');
+  const select = document.getElementById('panel-company');
+  panelCompanies = [];
+  if (session.companyId) {
+    box.hidden = true;
+    return;
+  }
+  const listed = await panelJson('/painel/chamar', { path: 'auth/me', json: {} });
+  const links = (listed.profile && listed.profile.companyLinks) || [];
+  links.forEach((link) => {
+    if (link && link.companyId) panelCompanies.push({ id: link.companyId, name: link.companyName || link.name || link.companyId });
+  });
+  if (!panelCompanies.length) {
+    const found = await panelJson('/painel/chamar', { path: 'query', json: { collection: 'companies', filters: [], limit: 0 } });
+    (found.docs || []).forEach((doc) => {
+      const data = doc.data || {};
+      panelCompanies.push({ id: doc.id, name: data.name || data.tradeName || doc.id });
+    });
+  }
+  if (panelCompanies.length === 1) {
+    await panelJson('/painel/empresa', { companyId: panelCompanies[0].id, companyName: panelCompanies[0].name });
+    session.companyId = panelCompanies[0].id;
+    session.companyName = panelCompanies[0].name;
+    box.hidden = true;
+    return;
+  }
+  select.innerHTML = panelCompanies.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('');
+  box.hidden = panelCompanies.length === 0;
+}
+async function openPanel(options) {
+  const modal = document.getElementById('panel-modal');
+  modal.classList.add('open');
+  const login = document.getElementById('panel-login');
+  const ready = document.getElementById('panel-ready');
+  const keepLogin = !!(options && options.login);
+  let session = { ok: false };
+  try { session = await panelJson('/painel/status'); } catch (e) { session = { ok: false }; }
+  document.getElementById('panel-close').hidden = !session.ok;
+  if (!session.ok) {
+    login.hidden = false;
+    ready.hidden = true;
+    document.getElementById('panel-help').textContent = 'O link abre o login do painel. Quando a entrada termina, o programa volta sozinho com o seu nome, os clientes e as faixas.';
+    return;
+  }
+  if (keepLogin) {
+    login.hidden = false;
+    document.getElementById('panel-help').textContent = 'Você já está em ' + (session.name || session.email || 'uma conta') + '. Entre de novo pelo link ou continue. Sincronizar manda as operações deste período e puxa o cadastro.';
+  } else {
+    login.hidden = true;
+  }
+  ready.hidden = false;
+  try { await fillPanelCompanies(session); } catch (e) {
+    copyNote(e.message);
+  }
+  try { await loadAccount(); } catch (e) {}
+  const pending = periodOps().filter((op) => !op.panelId);
+  const done = periodOps().length - pending.length;
+  document.getElementById('panel-who').textContent = accountName || session.name || session.email || 'Conectado no painel.';
+  document.getElementById('panel-count').textContent = pending.length
+    ? `${pending.length} operações deste período vão para o site na sincronização.${done ? ` ${done} já estão no site.` : ''}`
+    : 'Esse período já está no site. A sincronização puxa o cadastro de novo.';
+  document.getElementById('panel-go').disabled = false;
+}
+document.getElementById('send-panel').addEventListener('click', () => { syncNow(); });
+document.getElementById('panel-close').addEventListener('click', closePanel);
+document.getElementById('panel-close-2').addEventListener('click', closePanel);
+function panelOrigin(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  try {
+    const url = new URL(/^https?:\/\//i.test(text) ? text : 'https://' + text);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return '';
+    return url.origin;
+  } catch (e) {
+    return '';
+  }
+}
+function panelLoginUrl(value) {
+  const origin = panelOrigin(value);
+  if (!origin) return '';
+  const slug = companySlug(value);
+  return slug ? origin + '/#/login/' + encodeURIComponent(slug) : origin + '/#/login';
+}
+document.getElementById('panel-login').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const raw = document.getElementById('panel-slug').value;
+  const origin = panelOrigin(raw);
+  const page = panelLoginUrl(raw);
+  const help = document.getElementById('panel-help');
+  if (!origin || !page) {
+    help.textContent = 'O link do painel não serve. Use o endereço do site, com https.';
+    return;
+  }
+  try { await panelJson('/painel/site', { origin }); }
+  catch (e) {
+    help.textContent = e.message || 'Não guardei o link do site.';
+    return;
+  }
+  try { await panelJson('/painel/lembrar', { save: document.getElementById('save-login').checked }); } catch (e) {}
+  const bridge = window.chrome && window.chrome.webview;
+  if (bridge) {
+    try { bridge.postMessage(JSON.stringify({ kind: 'login', url: page, save: document.getElementById('save-login').checked })); } catch (e) {}
+  }
+  window.location.href = page;
+});
+document.getElementById('panel-logout').addEventListener('click', async () => {
+  const bridge = window.chrome && window.chrome.webview;
+  if (bridge) {
+    try { bridge.postMessage(JSON.stringify({ kind: 'sair' })); } catch (e) {}
+  }
+  await panelJson('/painel/sair', {});
+  accountName = '';
+  currentUserId = '';
+  siteReady = false;
+  siteClientsOk = false;
+  siteClients = [];
+  siteRanges = [];
+  siteCampaigns = [];
+  const list = document.getElementById('site-clients');
+  if (list) list.innerHTML = '';
+  state = blankState();
+  access = { contas: true, montante: false };
+  document.getElementById('pick-modal').classList.remove('open');
+  showAccount(null);
+  setScreen('contas');
+  document.getElementById('panel-modal').classList.add('gate');
+  openPanel();
+});
+async function syncNow() {
+  let session = { ok: false };
+  try { session = await panelJson('/painel/status'); } catch (e) { session = { ok: false }; }
+  if (!session.ok) {
+    document.getElementById('panel-modal').classList.add('gate');
+    await openPanel();
+    return;
+  }
+  const modal = document.getElementById('panel-modal');
+  if (!modal.classList.contains('open')) modal.classList.add('open');
+  const button = document.getElementById('panel-go');
+  const header = document.getElementById('send-panel');
+  const select = document.getElementById('panel-company');
+  if (!document.getElementById('panel-company-box').hidden && select.value) {
+    const chosen = panelCompanies.find((item) => item.id === select.value) || { id: select.value, name: select.value };
+    await panelJson('/painel/empresa', { companyId: chosen.id, companyName: chosen.name });
+  }
+  const pending = periodOps().filter((op) => !op.panelId);
+  button.disabled = true;
+  header.disabled = true;
+  let sent = 0;
+  try {
+    await save();
+    await loadAccount();
+    for (let index = 0; index < pending.length; index += 8) {
+      const slice = pending.slice(index, index + 8);
+      const items = slice.map((op) => ({ localId: op.id, panelId: panelDocId(), data: operationForPanel(op) }));
+      document.getElementById('panel-count').textContent = pending.length
+        ? `Enviando ${sent + slice.length} de ${pending.length}...`
+        : 'Puxando o cadastro do site...';
+      const result = await panelJson('/painel/enviar', { items });
+      const ids = new Map((result.sent || []).map((item) => [item.localId, item.panelId]));
+      state.ops = state.ops.map((op) => ids.has(op.id) ? { ...op, panelId: ids.get(op.id), panelSentAt: new Date().toISOString() } : op);
+      save();
+      sent += ids.size;
+    }
+    paint();
+    try { await loadAccount(); } catch (err) {}
+    const text = sent
+      ? `${sent} operações foram para o site, com a data e o horário de cada uma.`
+      : 'Cadastro do site atualizado. Nada novo para enviar.';
+    document.getElementById('panel-count').textContent = text;
+    copyNote(text);
+    closePanel();
+  } catch (e) {
+    document.getElementById('panel-count').textContent = e.message;
+    copyNote(e.message);
+  }
+  button.disabled = false;
+  header.disabled = false;
+}
+document.getElementById('panel-go').addEventListener('click', () => { syncNow(); });
+document.getElementById('pick-contas').addEventListener('click', () => {
+  document.getElementById('pick-modal').classList.remove('open');
+  setScreen('contas');
+});
+document.getElementById('pick-montante').addEventListener('click', () => {
+  document.getElementById('pick-modal').classList.remove('open');
+  setScreen('montante');
+});
+document.getElementById('go-contas').addEventListener('click', () => setScreen('contas'));
+document.getElementById('go-montante').addEventListener('click', () => setScreen('montante'));
+document.getElementById('montante').addEventListener('input', () => {
+  const qty = qtyForMontante(moneyNumber(document.getElementById('montante').value));
+  if (qty) document.getElementById('qty').value = qty;
+  applyAutoDiscount();
+  renderPreview();
+});
+document.getElementById('taxa').addEventListener('change', () => { applyAutoDiscount(); renderPreview(); });
+document.getElementById('taxa-box').addEventListener('click', (event) => {
+  if (event.target.closest('#taxa-trigger')) {
+    taxaOpen = !taxaOpen;
+    renderTaxas();
+    return;
+  }
+  const opt = event.target.closest('[data-taxa-id]');
+  if (!opt) return;
+  document.getElementById('taxa').value = opt.getAttribute('data-taxa-id') || '';
+  taxaOpen = false;
+  renderTaxas();
+  document.getElementById('taxa').dispatchEvent(new Event('change'));
+});
+document.addEventListener('mousedown', (event) => {
+  const box = document.getElementById('taxa-box');
+  if (!taxaOpen || !box || box.contains(event.target)) return;
+  taxaOpen = false;
+  renderTaxas();
+});
+document.getElementById('pull-site').addEventListener('click', async () => {
+  const button = document.getElementById('pull-site');
+  let session = { ok: false };
+  try { session = await panelJson('/painel/status'); } catch (e) { session = { ok: false }; }
+  if (!session.ok) {
+    document.getElementById('panel-modal').classList.add('gate');
+    await openPanel({ login: true });
+    return;
+  }
+  button.disabled = true;
+  try {
+    const result = await panelJson('/painel/puxar', {
+      from: document.getElementById('pull-from').value,
+      to: document.getElementById('pull-to').value,
+      module: screen,
+    });
+    const response = await fetch('/dados/operacoes.json', { cache: 'no-store' });
+    if (response.ok) {
+      state = normalize(await response.json());
+      usingFile = true;
+    }
+    paint();
+    copyNote(result.message || 'Puxado do site.');
+  } catch (e) {
+    copyNote(e.message || 'Não puxei do site.');
+  }
+  button.disabled = false;
+});
+async function boot() {
+  let session = { ok: false };
+  try { session = await panelJson('/painel/status'); } catch (e) { session = { ok: false }; }
+  currentUserId = session.userId || '';
+  let saved = null;
+  if (currentUserId) {
+    try {
+      const response = await fetch('/dados/operacoes.json', { cache: 'no-store' });
+      if (response.ok) {
+        saved = await response.json();
+        usingFile = true;
+      }
+    } catch (e) {}
+  }
+  const fromFile = currentUserId && saved && Array.isArray(saved.ops) ? normalize(saved) : null;
+  const fromBrowser = readLocal(currentUserId);
+  state = fromFile || (currentUserId && fromBrowser.ops.length ? fromBrowser : blankState());
+  if (currentUserId) restoreView(currentUserId);
+  try { if (currentUserId) localStorage.setItem(storageKey(currentUserId), JSON.stringify(state)); } catch (e) {}
+  document.getElementById('date').value = nowValue();
+  applyAutoDiscount();
+  paint();
+  await loadAccount();
+  try {
+    const site = await panelJson('/painel/site');
+    const input = document.getElementById('panel-slug');
+    if (input && site.origin) input.value = site.origin;
+  } catch (e) {}
+  const flag = new URLSearchParams(location.search).get('painel');
+  if (flag) history.replaceState({}, '', '/');
+  const today = ymd(new Date());
+  if (!document.getElementById('pull-from').value) document.getElementById('pull-from').value = today;
+  if (!document.getElementById('pull-to').value) document.getElementById('pull-to').value = today;
+  if (session.ok && (session.remember || flag === '1')) {
+    closePanel();
+    offerScreen(session);
+    if (flag === '0') copyNote('A entrada no site não completou. Abra o login de novo.');
+    return;
+  }
+  document.getElementById('panel-modal').classList.add('gate');
+  await openPanel({ login: true });
+  if (flag === '0') document.getElementById('panel-help').textContent = 'A entrada no site não completou. Abra o login de novo.';
+}
+boot();
+</script>
+</body>
+</html>

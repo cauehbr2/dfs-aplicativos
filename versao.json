@@ -1,0 +1,38 @@
+﻿{
+    "calculadora":  {
+                        "version":  1,
+                        "files":  [
+                                      "app-versao.txt",
+                                      "calculadora-app.mjs",
+                                      "Calculadora.deps.json",
+                                      "Calculadora.dll",
+                                      "Calculadora.exe",
+                                      "calculadora.html",
+                                      "Calculadora.runtimeconfig.json",
+                                      "Microsoft.Web.WebView2.Core.dll",
+                                      "Microsoft.Web.WebView2.WinForms.dll",
+                                      "Microsoft.Web.WebView2.Wpf.dll",
+                                      "WebView2Loader.dll",
+                                      "runtimes/win-x64/native/WebView2Loader.dll"
+                                  ]
+                    },
+    "operacoes":  {
+                      "version":  1,
+                      "files":  [
+                                    "app-versao.txt",
+                                    "contas-operacoes.html",
+                                    "icone.ico",
+                                    "Microsoft.Web.WebView2.Core.dll",
+                                    "Microsoft.Web.WebView2.WinForms.dll",
+                                    "Microsoft.Web.WebView2.Wpf.dll",
+                                    "operacoes-app.mjs",
+                                    "Operacoes.deps.json",
+                                    "Operacoes.dll",
+                                    "Operacoes.exe",
+                                    "Operacoes.runtimeconfig.json",
+                                    "painel-cartao.js",
+                                    "WebView2Loader.dll",
+                                    "runtimes/win-x64/native/WebView2Loader.dll"
+                                ]
+                  }
+}

@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Calculadora</title>
+<style>
+  :root { --bg:#09090b; --line:#27272a; --muted:#a1a1aa; --text:#fafafa; --emerald:#34d399; --blue:#2563eb; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body { margin:0; background:#09090b; color:var(--text); font-family:"Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width:980px; margin:0 auto; padding:28px 18px 70px; }
+  h1 { margin:0; font-size:28px; }
+  .sub { color:var(--muted); margin:6px 0 16px; font-size:13px; }
+  .top { display:flex; justify-content:space-between; gap:12px; align-items:flex-end; }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  button, input, select, textarea { font:inherit; color:inherit; }
+  .tabs button, .primary, .ghost { height:40px; border-radius:12px; padding:0 14px; cursor:pointer; font-weight:800; }
+  .gear { width:36px; height:36px; min-width:36px; padding:0; border-radius:10px; border:1px solid #3f3f46; background:#27272a; color:#e4e4e7; display:grid; place-items:center; cursor:pointer; }
+  .gear:hover { background:#3f3f46; }
+  .gear svg { width:18px; height:18px; display:block; }
+  .stage { perspective:1400px; }
+  .panel { transform-style:preserve-3d; backface-visibility:hidden; transition:transform .42s cubic-bezier(.2,.7,.2,1), opacity .42s; }
+  .panel.flip-out-left { transform:rotateY(-88deg); opacity:.15; transform-origin:left center; }
+  .panel.flip-out-right { transform:rotateY(88deg); opacity:.15; transform-origin:right center; }
+  .panel.flip-in-left { transform:rotateY(-88deg); opacity:.15; transform-origin:left center; }
+  .panel.flip-in-right { transform:rotateY(88deg); opacity:.15; transform-origin:right center; }
+  .tabs button { background:#18181b; border:1px solid var(--line); color:#d4d4d8; }
+  .tabs button.on { background:#2563eb; color:#fff; border-color:transparent; }
+  .primary { background:var(--emerald); color:#052e16; border:0; }
+  .ghost { background:#27272a; border:1px solid #3f3f46; }
+  .panel { background:#111113; border:1px solid var(--line); border-radius:22px; padding:18px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  label { display:block; margin-bottom:6px; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  input, select, textarea { width:100%; height:44px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
+  textarea { height:280px; padding:12px; resize:vertical; white-space:pre-wrap; line-height:1.45; }
+  input:focus, select:focus, textarea:focus { outline:2px solid rgba(37,99,235,.45); border-color:#2563eb; }
+  .line { display:flex; justify-content:space-between; margin-top:10px; }
+  .big { color:var(--emerald); font-size:22px; font-weight:800; }
+  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+  .hint { color:var(--muted); font-size:12px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { height:36px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; padding:0 10px; cursor:pointer; font-weight:700; }
+  .chip.on { background:#2563eb; border-color:transparent; }
+  .pix-card { border:1px solid var(--line); border-radius:14px; padding:10px; margin-bottom:8px; display:grid; gap:8px; }
+  .band { display:grid; grid-template-columns:1fr 1fr 1fr 40px; gap:8px; margin-bottom:8px; align-items:end; }
+  .band button { height:44px; border-radius:12px; border:1px solid #3f3f46; background:#27272a; cursor:pointer; }
+  .checks { display:flex; gap:12px; align-items:center; font-size:13px; }
+  .checks label { margin:0; letter-spacing:0; text-transform:none; font-size:13px; color:#e4e4e7; }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; padding:18px; }
+  .modal.open { display:flex; }
+  .sheet { width:min(760px,100%); max-height:88vh; overflow:auto; background:#18181b; border:1px solid var(--line); border-radius:20px; padding:16px; }
+  .values { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .values span { background:#18181b; border:1px solid var(--line); border-radius:12px; padding:8px 12px; font-weight:800; }
+  .hidden { display:none !important; }
+  .menu { display:grid; gap:6px; margin-top:8px; }
+  .menu button { height:40px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; text-align:left; padding:0 12px; cursor:pointer; font-weight:700; }
+  .menu button.on { background:#2563eb; border-color:transparent; }
+  .credit { margin: 18px 0 0; text-align: right; font-size: 11px; color: #52525b; }
+  @media (max-width:800px) {
+    .grid { grid-template-columns:1fr; }
+    .wrap { padding:10px 14px 8px; }
+    h1 { font-size:22px; }
+    .sub { display:none; }
+    textarea { height:96px; }
+    .panel { padding:12px; }
+    .credit { margin-top:8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Calculadora</h1>
+      <p class="sub" id="company-line">Entre para puxar faixa, taxa e Pix da empresa.</p>
+    </div>
+    <button class="ghost" id="logout" type="button">Sair</button>
+    <button class="gear" id="open-config" type="button" title="Pix e desconto" aria-label="Pix e desconto"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.1 7.1 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.88a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.64.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.58-.22 1.12-.54 1.63-.94l2.39.96c.24.1.51 0 .64-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></button>
+  </div>
+  <div class="tabs">
+    <button type="button" class="on" data-tab="contas">Contas</button>
+    <button type="button" data-tab="montante">Montante</button>
+    <button type="button" data-tab="divisao">Divisão</button>
+  </div>
+
+  <div class="stage">
+  <section class="panel" id="tab-contas">
+    <div class="grid">
+      <div>
+        <label>Faixa de depósito</label>
+        <div class="chips" id="faixa-grupos"></div>
+        <button type="button" class="ghost" id="faixa-trigger" style="width:100%;margin-top:8px;text-align:left">Escolha uma faixa</button>
+        <div id="faixa-menu" class="menu hidden"></div>
+        <input type="hidden" id="faixa" />
+        <div class="fields" style="margin-top:12px">
+          <div><label>Qnt. contas</label><input id="qtd-contas" type="number" min="1" step="1" value="5" /></div>
+          <div><label>Desconto do dia %</label><input id="desc-contas" type="number" min="0" step="0.01" value="0" /><p class="hint">Puxa o desconto do grupo da faixa. Dá para alterar. Apagar deixa 0.</p></div>
+        </div>
+        <label style="margin-top:12px">Chave Pix do depósito</label>
+        <select id="pix-contas"></select>
+        <div class="line"><span>Total</span><strong class="big" id="total-contas"></strong></div>
+      </div>
+      <div>
+        <label>Texto do orçamento</label>
+        <textarea id="texto-contas" readonly></textarea>
+        <div class="actions"><button class="primary" id="copy-contas" type="button">Copiar orçamento</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel hidden" id="tab-montante">
+    <div class="grid">
+      <div>
+        <label>Valor montante (R$)</label>
+        <input id="montante" type="number" min="0" step="0.01" value="200" />
+        <label style="margin-top:12px">Taxa</label>
+        <div class="chips" id="taxas"></div>
+        <div class="fields" style="margin-top:12px">
+          <div><label>Qnt. contas</label><input id="qtd-montante" type="number" min="1" step="1" /></div>
+          <div><label>Desconto do dia %</label><input id="desc-montante" type="number" min="0" step="0.01" value="0" /><p class="hint">Puxa o desconto do valor. Dá para alterar. Apagar deixa 0.</p></div>
+        </div>
+        <label style="margin-top:12px">Chave Pix do depósito</label>
+        <select id="pix-montante"></select>
+        <div class="line"><span>Total</span><strong class="big" id="total-montante"></strong></div>
+      </div>
+      <div>
+        <label>Texto do orçamento</label>
+        <textarea id="texto-montante" readonly></textarea>
+        <div class="actions"><button class="primary" id="copy-montante" type="button">Copiar orçamento</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel hidden" id="tab-divisao">
+    <div class="fields">
+      <div><label>Valor total</label><input id="split-total" type="number" min="1" step="1" /></div>
+      <div><label>Quantidade de contas</label><input id="split-count" type="number" min="1" step="1" value="4" /></div>
+      <div><label>Mínimo por conta</label><input id="split-min" type="number" min="5" step="1" value="5" /></div>
+    </div>
+    <p class="hint">Nenhum valor fica abaixo de R$ 5. A diferença entre eles é de no mínimo R$ 5. A soma continua o total.</p>
+    <div class="actions">
+      <button class="ghost" id="split-reset" type="button">Limpar</button>
+      <button class="primary" id="split-go" type="button">Dividir</button>
+    </div>
+    <div class="values" id="split-values"></div>
+    <div id="split-sum"></div>
+  </section>
+  </div>
+  <p class="credit">Criado por Cauê BR</p>
+</div>
+
+<div class="modal open" id="login-gate">
+  <div class="sheet">
+    <h2 style="margin:0 0 8px">Entrar</h2>
+    <p class="hint">A calculadora puxa faixa, taxa do Montante, desconto e Pix da empresa do link. O padrão é a Elite. Dá para trocar o link.</p>
+    <label style="margin-top:12px">Link da empresa</label>
+    <input id="login-slug" value="elite" />
+    <label style="margin-top:12px">E-mail</label>
+    <input id="login-email" type="email" />
+    <label style="margin-top:12px">Senha</label>
+    <input id="login-pass" type="password" />
+    <p class="hint" id="login-error"></p>
+    <div class="actions"><button class="primary" id="login-go" type="button">Entrar</button></div>
+  </div>
+</div>
+<div class="modal" id="modal">
+  <div class="sheet">
+    <p class="hint" id="site-note" hidden>Faixa, desconto e Pix desta tela vêm da empresa em que você entrou.</p>
+    <h2 style="margin:0 0 8px">Chaves Pix</h2>
+    <p class="hint">Marque Contas, Montante ou as duas. A aba usa a chave marcada e preenche o orçamento.</p>
+    <div class="fields" style="margin-top:12px">
+      <div><label>Tipo</label><select id="novo-tipo"><option>CPF</option><option>CNPJ</option><option>Telefone</option><option>E-mail</option><option>Aleatória</option></select></div>
+      <div><label>Chave</label><input id="novo-chave" /></div>
+      <div><label>Nome</label><input id="novo-nome" /></div>
+      <div><label>Banco</label><input id="novo-banco" /></div>
+    </div>
+    <div class="checks" style="margin:10px 0">
+      <label><input type="checkbox" id="novo-contas" checked style="width:auto;height:auto" /> Contas</label>
+      <label><input type="checkbox" id="novo-montante" checked style="width:auto;height:auto" /> Montante</label>
+    </div>
+    <button class="primary" id="add-pix" type="button">Adicionar chave</button>
+    <div id="pix-list" style="margin-top:14px"></div>
+    <h2 style="margin:18px 0 8px">Desconto do dia</h2>
+    <p class="hint">Contas: cada grupo tem as próprias faixas de quantidade. Sem faixa, o desconto daquele grupo fica 0. Se duas faixas servirem, vale a que começa no número mais alto. No orçamento o número continua editável.</p>
+    <div id="group-bands"></div>
+    <h3 style="margin:14px 0 8px;font-size:13px">Montante</h3>
+    <div id="bands-montante"></div>
+    <button class="ghost" id="add-band-montante" type="button">+ Faixa de montante</button>
+    <div class="actions">
+      <button class="primary" id="save-discount" type="button">Salvar desconto do dia</button>
+      <button class="ghost" id="close-config" type="button">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const KEY = 'dfs-calculadora-pix';
+const ranges = [
+  ['Grupo 01', '10 a 11', 5], ['Grupo 01', '10 a 12', 6], ['Grupo 01', '10 a 13', 7], ['Grupo 01', '11 a 13', 8], ['Grupo 01', '11 a 14', 9], ['Grupo 01', '12 a 15', 10], ['Grupo 01', '12 a 18', 11],
+  ['Grupo 02', '10', 6], ['Grupo 02', '10 a 11', 7], ['Grupo 02', '10 a 12', 8], ['Grupo 02', '11 a 13', 9], ['Grupo 02', '11 a 14', 10], ['Grupo 02', '12 a 15', 11], ['Grupo 02', '13 a 18', 12],
+  ['Grupo 03', '10', 7], ['Grupo 03', '10 a 11', 8], ['Grupo 03', '11 a 12', 9], ['Grupo 03', '11 a 13', 10], ['Grupo 03', '12 a 15', 11], ['Grupo 03', '13 a 16', 12], ['Grupo 03', '14 a 18', 13],
+].map((item, index) => ({ id: 'r' + index, group: item[0], name: item[1], price: item[2] }));
+const rates = [
+  { id: '1.5', label: '1,5 x 15%', taxa: 15 },
+  { id: '2', label: '2 x 20%', taxa: 20 },
+  { id: '2.5', label: '2,5 x 25%', taxa: 25 },
+  { id: '3', label: '3 x 35%', taxa: 35 },
+  { id: '4', label: '4 x 45%', taxa: 45 },
+];
+const rules = [[200,1],[300,2],[400,2],[500,3],[600,3],[700,4],[800,5],[900,5],[1000,6]];
+let pixKeys = [];
+let campaigns = [];
+let siteOn = false;
+let faixaGroup = '';
+let faixaOpen = false;
+let rateId = '1.5';
+let pixContas = '';
+let pixMontante = '';
+let usingFile = false;
+const GROUPS = ['Grupo 01', 'Grupo 02', 'Grupo 03'];
+function blankDiscount() {
+  return { contas: { 'Grupo 01': [], 'Grupo 02': [], 'Grupo 03': [] }, montante: [] };
+}
+let discountDay = blankDiscount();
+
+function snapshot() {
+  return {
+    pixKeys,
+    rateId,
+    pixContas,
+    pixMontante,
+    faixa: document.getElementById('faixa').value,
+    qtdContas: document.getElementById('qtd-contas').value,
+    montante: document.getElementById('montante').value,
+    qtdMontante: document.getElementById('qtd-montante').value,
+    discountDay,
+  };
+}
+function discountFor(list, value) {
+  const matched = (list || []).filter((band) => {
+    const from = Number(band.from) || 0;
+    const to = Number(band.to) || 0;
+    if (!(to > 0) || to + 1e-9 < from) return false;
+    return value + 1e-9 >= from && value <= to + 1e-9;
+  });
+  if (!matched.length) return 0;
+  matched.sort((a, b) => (Number(b.from) || 0) - (Number(a.from) || 0));
+  return Number(matched[0].percent) || 0;
+}
+const DAY_KEYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+function sameGroup(a, b) {
+  const left = String(a || '').trim().toLowerCase();
+  const right = String(b || '').trim().toLowerCase();
+  if (left === right) return true;
+  const numA = left.match(/^(?:grupo|lista)\s+(\d+)$/);
+  const numB = right.match(/^(?:grupo|lista)\s+(\d+)$/);
+  return !!(numA && numB && numA[1] === numB[1]);
+}
+function campaignWindow(campaign, parts) {
+  const startDate = String(campaign.startDate || '').trim();
+  const endDate = String(campaign.endDate || '').trim();
+  if (startDate && parts.day < startDate) return false;
+  if (endDate && parts.day > endDate) return false;
+  const startTime = String(campaign.startTime || '').trim();
+  const endTime = String(campaign.endTime || '').trim();
+  if (startTime && endTime && (parts.time < startTime || parts.time > endTime)) return false;
+  const days = Array.isArray(campaign.weekDays) ? campaign.weekDays : [];
+  if (days.length && !days.includes(parts.week)) return false;
+  return true;
+}
+function liveCampaign(module) {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const parts = {
+    day: now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()),
+    time: pad(now.getHours()) + ':' + pad(now.getMinutes()),
+    week: DAY_KEYS[now.getDay()],
+  };
+  const live = campaigns.filter((campaign) => {
+    if (campaign.status !== 'Ativa' && campaign.status !== 'Agendada') return false;
+    if (!campaignWindow(campaign, parts)) return false;
+    const rules = Array.isArray(campaign.groupDiscounts) ? campaign.groupDiscounts : [];
+    if (module === 'contas') {
+      if (rules.some((rule) => String(rule.module || '').toLowerCase() === 'contas')) return true;
+      if ((Number(campaign.discountContas) || 0) > 0) return true;
+      if (campaign.category === 'Montantes') return false;
+      return true;
+    }
+    if (rules.some((rule) => /montante/.test(String(rule.module || '').toLowerCase()))) return true;
+    if ((Number(campaign.discountMontantes) || 0) > 0) return true;
+    if (campaign.category === 'Contas') return false;
+    return true;
+  });
+  live.sort((a, b) => (a.panelKind === 'semanal' ? 1 : 0) - (b.panelKind === 'semanal' ? 1 : 0));
+  return live[0] || null;
+}
+function campaignContas(group) {
+  const campaign = liveCampaign('contas');
+  if (!campaign) return null;
+  const rules = (campaign.groupDiscounts || []).filter((rule) => String(rule.module || '').toLowerCase() === 'contas');
+  if (!rules.length) return Number(campaign.discountContas) || 0;
+  const exact = rules.find((rule) => {
+    const raw = String(rule.group || '').trim().toLowerCase();
+    const all = !raw || raw === 'todos' || raw === 'todos os grupos' || raw === 'all';
+    return !all && sameGroup(rule.group, group);
+  });
+  if (exact) return Number(exact.percent) || 0;
+  const all = rules.find((rule) => {
+    const raw = String(rule.group || '').trim().toLowerCase();
+    return !raw || raw === 'todos' || raw === 'todos os grupos' || raw === 'all';
+  });
+  return all ? Number(all.percent) || 0 : 0;
+}
+function campaignMontante(value) {
+  const campaign = liveCampaign('montante');
+  if (!campaign || !(Number(value) > 0)) return null;
+  const rules = (campaign.groupDiscounts || []).filter((rule) => /montante/.test(String(rule.module || '').toLowerCase()));
+  if (!rules.length) return Number(campaign.discountMontantes) || 0;
+  const matched = rules.filter((rule) => {
+    const limit = Number(rule.montante);
+    if (!Number.isFinite(limit) || limit <= 0) return true;
+    return String(rule.montanteCompare || '') === 'abaixo' ? value <= limit + 1e-9 : value + 1e-9 >= limit;
+  });
+  if (!matched.length) return 0;
+  matched.sort((a, b) => (Number(b.percent) || 0) - (Number(a.percent) || 0));
+  return Number(matched[0].percent) || 0;
+}
+function discountContas(group, qty) {
+  if (siteOn) {
+    const percent = campaignContas(group);
+    if (percent != null) return percent;
+  }
+  return discountFor(discountDay.contas[group] || [], qty);
+}
+function discountMontante(value) {
+  if (siteOn) {
+    const percent = campaignMontante(value);
+    if (percent != null) return percent;
+  }
+  return value > 0 ? discountFor(discountDay.montante, value) : 0;
+}
+function asBand(band) {
+  return { from: Number(band && band.from) || 0, to: Number(band && band.to) || 0, percent: Number(band && band.percent) || 0 };
+}
+function asBands(list) { return Array.isArray(list) ? list.map(asBand) : []; }
+function bandRow(band, module) {
+  const moneyBand = module === 'montante';
+  const fromLabel = moneyBand ? 'De R$' : 'De (contas)';
+  const toLabel = moneyBand ? 'Até R$' : 'Até (contas)';
+  return `<div class="band">
+    <div><label>${fromLabel}</label><input data-from type="number" min="0" step="1" value="${band.from}" /></div>
+    <div><label>${toLabel}</label><input data-to type="number" min="0" step="1" value="${band.to}" /></div>
+    <div><label>Desconto %</label><input data-pct type="number" min="0" step="0.01" value="${band.percent}" /></div>
+    <button type="button" data-drop-band="${module}" title="Remover">×</button>
+  </div>`;
+}
+function renderBands() {
+  document.getElementById('group-bands').innerHTML = GROUPS.map((group) => {
+    const rows = (discountDay.contas[group] || []).map((band) => bandRow(band, group)).join('');
+    return `<h3 style="margin:14px 0 8px;font-size:13px">${group}</h3><div data-group="${group}">${rows || '<p class="hint">Sem desconto neste grupo.</p>'}</div><button class="ghost" type="button" data-add-group="${group}">+ Faixa do ${group}</button>`;
+  }).join('');
+  document.getElementById('bands-montante').innerHTML = discountDay.montante.map((band) => bandRow(band, 'montante')).join('');
+}
+function readRows(box) {
+  if (!box) return [];
+  return Array.from(box.querySelectorAll('.band')).map((row) => ({
+    from: Number(row.querySelector('[data-from]').value) || 0,
+    to: Number(row.querySelector('[data-to]').value) || 0,
+    percent: Number(row.querySelector('[data-pct]').value) || 0,
+  }));
+}
+function readGroup(group) {
+  return readRows(document.querySelector('#group-bands [data-group="' + group + '"]'));
+}
+function readBands(module) {
+  return readRows(document.getElementById('bands-' + module));
+}
+function pullBandsFromForm() {
+  GROUPS.forEach((group) => { discountDay.contas[group] = readGroup(group); });
+  discountDay.montante = readBands('montante');
+}
+function savePix() {
+  const data = snapshot();
+  localStorage.setItem(KEY, JSON.stringify(data));
+  if (!usingFile) return;
+  fetch('/dados/calculadora.json', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(() => {});
+}
+function plain(value) { return (Number(value) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function pad(value) { return String(Number(value) || 0).padStart(2, '0'); }
+function stamp() {
+  const date = new Date();
+  const day = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+  const time = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(date);
+  return `Gerado em: ${day} às ${time}`;
+}
+function keysFor(module) {
+  return pixKeys.filter((item) => module === 'contas' ? item.contas : item.montante);
+}
+function pick(module, current) {
+  const list = keysFor(module);
+  if (list.some((item) => item.id === current)) return current;
+  return list[0] ? list[0].id : '';
+}
+function keyById(id) { return pixKeys.find((item) => item.id === id) || null; }
+function faixaLabel(range) {
+  return `${range.name} ${range.group} (${money.format(range.price)}/un)`;
+}
+function rulePair(rule) {
+  if (Array.isArray(rule)) return { montante: Number(rule[0]) || 0, qtd: Number(rule[1]) || 0 };
+  return { montante: Number(rule.montante) || 0, qtd: Number(rule.qtdContas) || 0 };
+}
+function qtdFromMontante(value) {
+  const sorted = rules.map(rulePair);
+  if (!(value > 0)) return 1;
+  let matched = null;
+  for (const rule of sorted) if (value + 1e-9 >= rule.montante) matched = rule;
+  if (!matched) return 1;
+  const last = sorted[sorted.length - 1];
+  if (value <= last.montante + 1e-9) return matched.qtd;
+  const prev = sorted[sorted.length - 2];
+  const extra = Math.floor((value - last.montante) / (last.montante - prev.montante));
+  return last.qtd + extra * ((last.qtd - prev.qtd) || 1);
+}
+function messageContas(pix, range, qtd, desconto, total) {
+  const tipo = pix ? pix.tipo : 'Não informada';
+  const chave = pix ? pix.chave : 'Não informada';
+  const nome = pix ? pix.nome : 'Não informada';
+  const banco = pix ? pix.banco : 'Não informada';
+  return `*ORÇAMENTO CONTAS*
+
+Chave Pix - ${tipo}
+Chave: \`\`\`${chave}\`\`\`
+Nome: ${nome}
+Banco: ${banco}
+
+Faixa: ${faixaLabel(range)}
+Qnt. contas: ${pad(qtd)}
+Desconto: ${desconto}%
+
+✅ *Total: R$ ${plain(total)}*
+
+*MARCAR ESTA MENSAGEM COM O COMPROVANTE*
+
+${stamp()}`;
+}
+function messageMontante(pix, montante, qtd, taxa, desconto, total) {
+  const tipo = pix ? pix.tipo : 'Não informada';
+  const chave = pix ? pix.chave : 'Não informada';
+  const nome = pix ? pix.nome : 'Não informada';
+  const banco = pix ? pix.banco : 'Não informada';
+  return `*ORÇAMENTO MONTANTE*
+
+Chave Pix - ${tipo}
+Chave: \`\`\`${chave}\`\`\`
+Nome: ${nome}
+Banco: ${banco}
+
+Montante: R$ ${plain(montante)}
+Qnt. contas: ${pad(qtd)}
+Taxa: ${taxa}%
+Desconto: ${desconto}%
+
+✅ *Total: R$ ${plain(total)}*
+
+*MARCAR ESTA MENSAGEM COM O COMPROVANTE*
+
+${stamp()}`;
+}
+function faixaLabelOf(item) {
+  return item.name + ' (' + money.format(item.price) + '/un)';
+}
+function renderRanges() {
+  const hidden = document.getElementById('faixa');
+  const order = [];
+  const buckets = new Map();
+  ranges.forEach((item) => {
+    const group = item.group || 'Faixa';
+    if (!buckets.has(group)) {
+      buckets.set(group, []);
+      order.push(group);
+    }
+    buckets.get(group).push(item);
+  });
+  const selected = ranges.find((item) => item.id === hidden.value) || null;
+  if (!faixaGroup || !buckets.has(faixaGroup)) faixaGroup = (selected && selected.group) || order[0] || '';
+  const items = buckets.get(faixaGroup) || [];
+  document.getElementById('faixa-grupos').innerHTML = order.map((group) =>
+    `<button type="button" class="chip${group === faixaGroup ? ' on' : ''}" data-faixa-group="${group}">${group}</button>`
+  ).join('');
+  document.getElementById('faixa-trigger').textContent = selected ? faixaLabelOf(selected) : 'Escolha uma faixa';
+  const menu = document.getElementById('faixa-menu');
+  menu.classList.toggle('hidden', !faixaOpen);
+  menu.innerHTML = items.map((item) =>
+    `<button type="button" class="${item.id === hidden.value ? 'on' : ''}" data-faixa-id="${item.id}">${faixaLabelOf(item)}</button>`
+  ).join('') || '<p class="hint">Nenhuma faixa neste grupo.</p>';
+}
+function renderPixSelects() {
+  pixContas = pick('contas', pixContas);
+  pixMontante = pick('montante', pixMontante);
+  const fill = (id, module, selected) => {
+    const list = keysFor(module);
+    const select = document.getElementById(id);
+    select.innerHTML = list.length
+      ? list.map((item) => `<option value="${item.id}">${item.nome} - ${item.tipo} - ${item.banco}</option>`).join('')
+      : '<option value="">Nenhuma chave para esta aba</option>';
+    if (selected) select.value = selected;
+  };
+  fill('pix-contas', 'contas', pixContas);
+  fill('pix-montante', 'montante', pixMontante);
+}
+function selectedRange() {
+  return ranges.find((item) => item.id === document.getElementById('faixa').value) || null;
+}
+function applyAutoContas() {
+  const range = selectedRange();
+  if (!range) return;
+  const qtd = Number(document.getElementById('qtd-contas').value) || 0;
+  document.getElementById('desc-contas').value = discountContas(range.group, qtd);
+}
+function applyAutoMontante() {
+  const montante = Number(document.getElementById('montante').value) || 0;
+  document.getElementById('desc-montante').value = discountMontante(montante);
+}
+function renderContas() {
+  const range = selectedRange();
+  const qtd = Number(document.getElementById('qtd-contas').value) || 0;
+  const desconto = Number(document.getElementById('desc-contas').value) || 0;
+  const subtotal = range ? range.price * qtd : 0;
+  const total = Math.max(0, subtotal - subtotal * (desconto / 100));
+  document.getElementById('total-contas').textContent = money.format(total);
+  document.getElementById('texto-contas').value = range ? messageContas(keyById(pixContas), range, qtd, desconto, total) : '';
+}
+function renderRates() {
+  document.getElementById('taxas').innerHTML = rates.map((rate) =>
+    `<button type="button" class="chip ${rate.id === rateId ? 'on' : ''}" data-rate="${rate.id}">${rate.label}</button>`
+  ).join('');
+}
+function renderMontante() {
+  const montante = Number(document.getElementById('montante').value) || 0;
+  const taxa = (rates.find((item) => item.id === rateId) || rates[0]).taxa;
+  const desconto = Number(document.getElementById('desc-montante').value) || 0;
+  const qtd = qtdFromMontante(montante);
+  if (document.activeElement !== document.getElementById('qtd-montante')) document.getElementById('qtd-montante').value = qtd;
+  const subtotal = montante * (taxa / 100);
+  const total = Math.max(0, subtotal - subtotal * (desconto / 100));
+  document.getElementById('total-montante').textContent = money.format(total);
+  document.getElementById('texto-montante').value = messageMontante(keyById(pixMontante), montante, Number(document.getElementById('qtd-montante').value) || qtd, taxa, desconto, total);
+}
+function renderPixList() {
+  document.getElementById('pix-list').innerHTML = pixKeys.map((item) => `
+    <div class="pix-card">
+      <strong>${item.nome || 'Sem nome'} · ${item.tipo}</strong>
+      <span>${item.chave} · ${item.banco}</span>
+      <span class="hint">${item.contas ? 'Contas' : ''}${item.contas && item.montante ? ' · ' : ''}${item.montante ? 'Montante' : ''}</span>
+      <button class="ghost" type="button" data-remove="${item.id}">Remover</button>
+    </div>`).join('') || '<p class="hint">Nenhuma chave ainda.</p>';
+}
+function paint() { renderPixSelects(); renderContas(); renderMontante(); }
+const TAB_ORDER = ['contas', 'montante', 'divisao'];
+let currentTab = 'contas';
+let flipping = false;
+let pendingTab = '';
+function showTab(name) {
+  if (!name || name === currentTab) return;
+  if (flipping) { pendingTab = name; return; }
+  const from = document.getElementById('tab-' + currentTab);
+  const to = document.getElementById('tab-' + name);
+  const forward = TAB_ORDER.indexOf(name) > TAB_ORDER.indexOf(currentTab);
+  flipping = true;
+  document.querySelectorAll('.tabs button').forEach((item) => item.classList.toggle('on', item.dataset.tab === name));
+  from.classList.add(forward ? 'flip-out-left' : 'flip-out-right');
+  window.setTimeout(() => {
+    from.classList.remove('flip-out-left', 'flip-out-right');
+    from.classList.add('hidden');
+    to.classList.remove('hidden');
+    to.classList.add(forward ? 'flip-in-right' : 'flip-in-left');
+    to.offsetWidth;
+    to.classList.remove('flip-in-right', 'flip-in-left');
+    currentTab = name;
+    window.setTimeout(() => {
+      flipping = false;
+      const next = pendingTab;
+      pendingTab = '';
+      if (next && next !== currentTab) showTab(next);
+    }, 420);
+  }, 260);
+}
+document.querySelectorAll('.tabs button').forEach((button) => button.addEventListener('click', () => showTab(button.dataset.tab)));
+document.getElementById('faixa-grupos').addEventListener('click', (event) => {
+  const group = event.target.dataset.faixaGroup;
+  if (!group) return;
+  faixaGroup = group;
+  faixaOpen = true;
+  renderRanges();
+});
+document.getElementById('faixa-trigger').addEventListener('click', () => {
+  faixaOpen = !faixaOpen;
+  renderRanges();
+});
+document.getElementById('faixa-menu').addEventListener('click', (event) => {
+  const id = event.target.dataset.faixaId;
+  if (!id) return;
+  document.getElementById('faixa').value = id;
+  faixaOpen = false;
+  renderRanges();
+  applyAutoContas();
+  renderContas();
+});
+document.getElementById('qtd-contas').addEventListener('input', () => { applyAutoContas(); renderContas(); });
+document.getElementById('desc-contas').addEventListener('input', renderContas);
+document.getElementById('pix-contas').addEventListener('change', (event) => { pixContas = event.target.value; renderContas(); });
+document.getElementById('taxas').addEventListener('click', (event) => {
+  if (!event.target.dataset.rate) return;
+  rateId = event.target.dataset.rate;
+  renderRates();
+  renderMontante();
+});
+document.getElementById('montante').addEventListener('input', () => { applyAutoMontante(); renderMontante(); });
+document.getElementById('qtd-montante').addEventListener('input', renderMontante);
+document.getElementById('desc-montante').addEventListener('input', renderMontante);
+document.getElementById('pix-montante').addEventListener('change', (event) => { pixMontante = event.target.value; renderMontante(); });
+async function copy(id, button) {
+  const text = document.getElementById(id).value;
+  try { await navigator.clipboard.writeText(text); } catch (e) { document.getElementById(id).select(); document.execCommand('copy'); }
+  button.textContent = 'Copiado';
+  setTimeout(() => { button.textContent = 'Copiar orçamento'; }, 1200);
+}
+document.getElementById('copy-contas').addEventListener('click', (event) => copy('texto-contas', event.target));
+document.getElementById('copy-montante').addEventListener('click', (event) => copy('texto-montante', event.target));
+document.getElementById('open-config').addEventListener('click', () => {
+  document.getElementById('site-note').hidden = !siteOn;
+  renderPixList();
+  renderBands();
+  document.getElementById('modal').classList.add('open');
+});
+document.getElementById('save-discount').addEventListener('click', () => {
+  pullBandsFromForm();
+  savePix();
+  applyAutoContas();
+  applyAutoMontante();
+  paint();
+});
+document.getElementById('add-band-montante').addEventListener('click', () => {
+  pullBandsFromForm();
+  discountDay.montante.push({ from: 0, to: 0, percent: 0 });
+  renderBands();
+});
+document.getElementById('modal').addEventListener('click', (event) => {
+  const add = event.target.dataset.addGroup;
+  if (add) {
+    pullBandsFromForm();
+    discountDay.contas[add].push({ from: 0, to: 0, percent: 0 });
+    renderBands();
+    return;
+  }
+  const module = event.target.dataset.dropBand;
+  if (!module) return;
+  const row = event.target.closest('.band');
+  pullBandsFromForm();
+  if (module === 'montante') {
+    const box = document.getElementById('bands-montante');
+    const index = Array.from(box.children).indexOf(row);
+    discountDay.montante.splice(index, 1);
+  } else if (discountDay.contas[module]) {
+    const box = document.querySelector('#group-bands [data-group="' + module + '"]');
+    const index = Array.from(box.querySelectorAll('.band')).indexOf(row);
+    discountDay.contas[module].splice(index, 1);
+  }
+  renderBands();
+});
+document.getElementById('close-config').addEventListener('click', () => document.getElementById('modal').classList.remove('open'));
+document.getElementById('add-pix').addEventListener('click', () => {
+  const chave = document.getElementById('novo-chave').value.trim();
+  const nome = document.getElementById('novo-nome').value.trim();
+  if (!chave || !nome) return;
+  pixKeys.push({
+    id: String(Date.now()),
+    tipo: document.getElementById('novo-tipo').value,
+    chave,
+    nome,
+    banco: document.getElementById('novo-banco').value.trim(),
+    contas: document.getElementById('novo-contas').checked,
+    montante: document.getElementById('novo-montante').checked,
+  });
+  document.getElementById('novo-chave').value = '';
+  document.getElementById('novo-nome').value = '';
+  document.getElementById('novo-banco').value = '';
+  savePix();
+  renderPixList();
+  paint();
+});
+document.getElementById('pix-list').addEventListener('click', (event) => {
+  if (!event.target.dataset.remove) return;
+  pixKeys = pixKeys.filter((item) => item.id !== event.target.dataset.remove);
+  savePix();
+  renderPixList();
+  paint();
+});
+
+const MIN_REAIS = 5;
+function randomSplit(total, count, minimum) {
+  const mandatory = (MIN_REAIS * count * (count - 1)) / 2;
+  let left = total - count * minimum - mandatory;
+  if (left < 0) return null;
+  const gaps = Array.from({ length: count }, () => 0);
+  let guard = 0;
+  const extra = left;
+  while (left > 0 && guard < extra * 40 + 80) {
+    guard += 1;
+    const index = Math.floor(Math.random() * count);
+    const weight = count - index;
+    if (weight > left) continue;
+    gaps[index] += 1;
+    left -= weight;
+  }
+  if (left > 0) gaps[count - 1] += left;
+  const values = [];
+  let level = 0;
+  for (let index = 0; index < count; index += 1) {
+    level += gaps[index];
+    values.push(minimum + level + MIN_REAIS * index);
+  }
+  if (values.reduce((sum, value) => sum + value, 0) !== total) return null;
+  for (let i = values.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const current = values[i];
+    values[i] = values[j];
+    values[j] = current;
+  }
+  return values;
+}
+document.getElementById('split-go').addEventListener('click', () => {
+  const total = Math.round(Number(document.getElementById('split-total').value));
+  const count = Number(document.getElementById('split-count').value);
+  const minimum = Math.max(5, Math.round(Number(document.getElementById('split-min').value) || 5));
+  const box = document.getElementById('split-values');
+  const sum = document.getElementById('split-sum');
+  if (!total || !Number.isInteger(count) || count < 1 || minimum * count > total) {
+    box.innerHTML = '';
+    sum.innerHTML = '<p class="hint">Confira o total, a quantidade e o mínimo.</p>';
+    return;
+  }
+  const values = count === 1 ? [total] : randomSplit(total, count, minimum);
+  if (!values) {
+    box.innerHTML = '';
+    sum.innerHTML = '<p class="hint">Não dá para dividir com diferença mínima de R$ 5 acima do mínimo.</p>';
+    return;
+  }
+  box.innerHTML = values.map((value) => `<span>${money.format(value)}</span>`).join('');
+  sum.innerHTML = `<div class="line"><span>Soma</span><strong class="big">${money.format(values.reduce((acc, value) => acc + value, 0))}</strong></div>`;
+});
+document.getElementById('split-reset').addEventListener('click', () => {
+  document.getElementById('split-total').value = '';
+  document.getElementById('split-values').innerHTML = '';
+  document.getElementById('split-sum').innerHTML = '';
+});
+
+function applySaved(data) {
+  if (!data || typeof data !== 'object') return;
+  if (Array.isArray(data)) {
+    pixKeys = data;
+    return;
+  }
+  if (Array.isArray(data.pixKeys)) pixKeys = data.pixKeys;
+  if (data.rateId) rateId = data.rateId;
+  if (data.pixContas) pixContas = data.pixContas;
+  if (data.pixMontante) pixMontante = data.pixMontante;
+  if (data.faixa) document.getElementById('faixa').value = data.faixa;
+  if (data.qtdContas) document.getElementById('qtd-contas').value = data.qtdContas;
+  if (data.montante) document.getElementById('montante').value = data.montante;
+  if (data.qtdMontante) document.getElementById('qtd-montante').value = data.qtdMontante;
+  if (data.discountDay && typeof data.discountDay === 'object') {
+    const saved = data.discountDay;
+    discountDay = blankDiscount();
+    if (Array.isArray(saved.contas)) {
+      const shared = asBands(saved.contas);
+      GROUPS.forEach((group) => { discountDay.contas[group] = shared.map((band) => ({ ...band })); });
+    } else if (saved.contas && typeof saved.contas === 'object') {
+      GROUPS.forEach((group) => { discountDay.contas[group] = asBands(saved.contas[group]); });
+    }
+    discountDay.montante = asBands(saved.montante);
+  }
+}
+function applyCatalog(catalog) {
+  if (!catalog || !catalog.ok) return;
+  siteOn = true;
+  if (Array.isArray(catalog.ranges) && catalog.ranges.length) ranges = catalog.ranges;
+  if (Array.isArray(catalog.rates) && catalog.rates.length) {
+    rates = catalog.rates;
+    if (!rates.some((item) => item.id === rateId)) rateId = rates[0].id;
+  }
+  if (Array.isArray(catalog.rules) && catalog.rules.length) rules = catalog.rules;
+  if (Array.isArray(catalog.pix)) pixKeys = catalog.pix;
+  campaigns = Array.isArray(catalog.campaigns) ? catalog.campaigns : [];
+  const line = document.getElementById('company-line');
+  if (line) line.textContent = catalog.companyName ? 'Empresa: ' + catalog.companyName : 'Cadastro do site';
+}
+let captchaLoading = null;
+function loadCaptcha(key) {
+  if (window.grecaptcha && window.grecaptcha.execute) return Promise.resolve();
+  if (captchaLoading) return captchaLoading;
+  captchaLoading = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://www.google.com/recaptcha/api.js?render=' + encodeURIComponent(key);
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => { captchaLoading = null; reject(new Error('Não carregou a proteção do Google.')); };
+    document.head.appendChild(script);
+  });
+  return captchaLoading;
+}
+async function loginCaptcha() {
+  const cfg = await fetch('/painel/captcha').then((response) => response.json());
+  if (!cfg.enabled || !cfg.siteKey) return '';
+  await loadCaptcha(cfg.siteKey);
+  if (!window.grecaptcha) throw new Error('A proteção do Google não carregou.');
+  return new Promise((resolve, reject) => {
+    window.grecaptcha.ready(() => {
+      window.grecaptcha.execute(cfg.siteKey, { action: 'login' }).then(resolve).catch(() => reject(new Error('O Google não confirmou a entrada.')));
+    });
+  });
+}
+async function enterApp() {
+  const session = await fetch('/painel/status').then((response) => response.json());
+  const gate = document.getElementById('login-gate');
+  if (!session.ok) {
+    gate.classList.add('open');
+    return;
+  }
+  gate.classList.remove('open');
+  const line = document.getElementById('company-line');
+  if (line && session.companyName) line.textContent = 'Empresa: ' + session.companyName;
+  let catalog = null;
+  try { catalog = await fetch('/site/catalogo').then((response) => response.json()); } catch (e) {}
+  if (catalog && catalog.message && !catalog.ok && line) line.textContent = catalog.message;
+  applyCatalog(catalog);
+  renderRanges();
+  renderRates();
+  applyAutoContas();
+  applyAutoMontante();
+  paint();
+}
+document.getElementById('login-go').addEventListener('click', async () => {
+  const error = document.getElementById('login-error');
+  error.textContent = 'Entrando...';
+  try {
+    const recaptchaToken = await loginCaptcha();
+    const response = await fetch('/painel/entrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: document.getElementById('login-email').value,
+        password: document.getElementById('login-pass').value,
+        companySlug: document.getElementById('login-slug').value || 'elite',
+        recaptchaToken,
+      }),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.ok) {
+      error.textContent = json.message || 'Não entrou.';
+      return;
+    }
+    error.textContent = '';
+    await enterApp();
+  } catch (e) {
+    error.textContent = e.message || 'Não entrou.';
+  }
+});
+document.getElementById('logout').addEventListener('click', async () => {
+  await fetch('/painel/sair', { method: 'POST' });
+  siteOn = false;
+  document.getElementById('company-line').textContent = 'Entre para puxar faixa, taxa e Pix da empresa.';
+  document.getElementById('login-gate').classList.add('open');
+});
+async function boot() {
+  renderRanges();
+  let data = null;
+  try {
+    const response = await fetch('/dados/calculadora.json');
+    if (response.ok) {
+      data = await response.json();
+      usingFile = true;
+    }
+  } catch (e) {}
+  if (!data) {
+    try { data = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  }
+  applySaved(data);
+  renderRanges();
+  renderRates();
+  await enterApp();
+}
+boot();
+</script>
+</body>
+</html>
