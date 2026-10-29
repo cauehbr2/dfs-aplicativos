@@ -36,12 +36,13 @@
   .primary { background:var(--emerald); color:#052e16; border:0; }
   .ghost { background:#27272a; border:1px solid #3f3f46; }
   .grid {
-    display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.05fr);
-    gap:16px; align-items:stretch; height:100%; width:100%;
+    display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.15fr);
+    gap:20px; align-items:stretch; height:100%; width:100%;
     overflow:hidden;
   }
-  .form-col { display:flex; flex-direction:column; gap:10px; min-width:0; overflow:hidden; }
+  .form-col { display:flex; flex-direction:column; gap:10px; min-width:0; overflow:hidden; height:100%; }
   .form-block { display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .form-foot { margin-top:auto; flex-shrink:0; padding-top:8px; display:flex; flex-direction:column; gap:10px; }
   .budget-col { display:flex; flex-direction:column; gap:8px; min-width:0; min-height:0; height:100%; overflow:hidden; padding-bottom:4px; }
   .budget-col .actions { padding-right:4px; }
   .fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
@@ -91,7 +92,7 @@
   .credit .app-version { color: #71717a; font-weight: 700; letter-spacing: .04em; }
   .top, .tabs { flex-shrink:0; }
   .fila-slot {
-    margin-top:14px; padding-top:12px; border-top:1px solid #27272a;
+    margin-top:0; padding-top:0; border-top:0;
     display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   }
   .fila-dock { position:relative; width:auto; height:auto; }
@@ -203,7 +204,6 @@
           <div class="form-block">
             <label>Desconto do dia %</label>
             <input id="desc-contas" type="number" min="0" step="0.01" value="0" />
-            <p class="hint">Puxa o desconto do grupo da faixa. Dá para alterar.</p>
           </div>
         </div>
         <div class="pix-box">
@@ -211,15 +211,17 @@
           <select class="pix-select" id="pix-contas"></select>
           <div class="pix-meta" id="pix-contas-meta"><span class="tag">PIX</span><span class="key" id="pix-contas-hint">—</span></div>
         </div>
-        <div class="line"><span>Total</span><strong class="big" id="total-contas"></strong></div>
-        <div class="fila-slot" id="fila-slot-contas">
-          <button type="button" class="fila-stop" id="stop-fila-alert">Parar alerta</button>
-          <div class="fila-dock" id="fila-dock">
-            <button type="button" class="fila-fab" id="open-fila" title="Abrir fila do site">
-              <span class="dot" aria-hidden="true"></span>
-              <span class="ico" aria-hidden="true">👥</span>
-              <span class="lbl">Fila</span>
-            </button>
+        <div class="form-foot">
+          <div class="line"><span>Total</span><strong class="big" id="total-contas"></strong></div>
+          <div class="fila-slot" id="fila-slot-contas">
+            <button type="button" class="fila-stop" id="stop-fila-alert">Parar alerta</button>
+            <div class="fila-dock" id="fila-dock">
+              <button type="button" class="fila-fab" id="open-fila" title="Abrir fila do site">
+                <span class="dot" aria-hidden="true"></span>
+                <span class="ico" aria-hidden="true">👥</span>
+                <span class="lbl">Fila</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -247,7 +249,6 @@
           <div class="form-block">
             <label>Desconto do dia %</label>
             <input id="desc-montante" type="number" min="0" step="0.01" value="0" />
-            <p class="hint">Puxa o desconto do valor. Dá para alterar.</p>
           </div>
         </div>
         <div class="pix-box">
@@ -255,8 +256,10 @@
           <select class="pix-select" id="pix-montante"></select>
           <div class="pix-meta" id="pix-montante-meta"><span class="tag">PIX</span><span class="key" id="pix-montante-hint">—</span></div>
         </div>
-        <div class="line"><span>Total</span><strong class="big" id="total-montante"></strong></div>
-        <div class="fila-slot" id="fila-slot-montante"></div>
+        <div class="form-foot">
+          <div class="line"><span>Total</span><strong class="big" id="total-montante"></strong></div>
+          <div class="fila-slot" id="fila-slot-montante"></div>
+        </div>
       </div>
       <div class="budget-col">
         <label>Texto do orçamento</label>
