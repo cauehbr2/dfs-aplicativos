@@ -1,4 +1,4 @@
 ﻿# Versões
 
-- Calculadora: 1.0.35 — janela bem mais larga, sem rolagem no meio; Fila abre de verdade (sem fechar na hora).
+- Calculadora: 1.0.36 — botões menores; Divisão em branco; Fila em janela ao lado.
 - Operações: 1.0.14 — captcha alinhado à Calculadora.

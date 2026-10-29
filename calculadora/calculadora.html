@@ -15,17 +15,17 @@
     display:flex; flex-direction:column; gap:12px;
     overflow:hidden;
   }
-  h1 { margin:0; font-size:26px; }
+  h1 { margin:0; font-size:22px; }
   .sub { color:var(--muted); margin:6px 0 0; font-size:12px; line-height:1.35; }
   .top { display:flex; justify-content:space-between; gap:12px; align-items:flex-end; }
-  .tabs { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:0; }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:0; }
   button, input, select, textarea { font:inherit; color:inherit; }
-  .tabs button, .primary, .ghost { height:40px; border-radius:12px; padding:0 14px; cursor:pointer; font-weight:800; }
+  .tabs button, .primary, .ghost { height:34px; border-radius:10px; padding:0 12px; cursor:pointer; font-weight:800; font-size:13px; }
   .stage { perspective:1400px; flex:1; min-height:0; overflow:hidden; width:100%; }
   .panel {
     height:100%; width:100%; overflow:hidden; transform-style:preserve-3d; backface-visibility:hidden;
     transition:transform .42s cubic-bezier(.2,.7,.2,1), opacity .42s;
-    background:#111113; border:1px solid var(--line); border-radius:22px; padding:18px 20px 22px;
+    background:#111113; border:1px solid var(--line); border-radius:18px; padding:14px 16px 16px;
   }
   .panel.flip-out-left { transform:rotateY(-88deg); opacity:.15; transform-origin:left center; }
   .panel.flip-out-right { transform:rotateY(88deg); opacity:.15; transform-origin:right center; }
@@ -36,20 +36,20 @@
   .primary { background:var(--emerald); color:#052e16; border:0; }
   .ghost { background:#27272a; border:1px solid #3f3f46; }
   .grid {
-    display:grid; grid-template-columns:minmax(420px, 1fr) minmax(460px, 1.2fr);
-    gap:22px; align-items:stretch; height:100%; width:100%;
+    display:grid; grid-template-columns:minmax(360px, 1fr) minmax(400px, 1.15fr);
+    gap:16px; align-items:stretch; height:100%; width:100%;
     overflow:hidden;
   }
-  .form-col { display:flex; flex-direction:column; gap:12px; min-width:0; overflow:hidden; height:100%; }
-  .form-block { display:flex; flex-direction:column; gap:8px; min-width:0; }
+  .form-col { display:flex; flex-direction:column; gap:10px; min-width:0; overflow:hidden; height:100%; }
+  .form-block { display:flex; flex-direction:column; gap:6px; min-width:0; }
   .form-foot {
-    margin-top:auto; flex-shrink:0; padding-top:12px; display:flex; flex-direction:column; gap:10px; padding-bottom:4px;
+    margin-top:auto; flex-shrink:0; padding-top:10px; display:flex; flex-direction:column; gap:8px; padding-bottom:2px;
   }
-  .budget-col { display:flex; flex-direction:column; gap:10px; min-width:0; min-height:0; height:100%; overflow:hidden; padding-bottom:4px; }
-  .budget-col .actions { padding-right:4px; margin-top:8px; flex-shrink:0; }
-  .fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; }
-  label { display:block; margin:0 0 2px; font-size:11px; font-weight:800; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); }
-  input, select, textarea { width:100%; max-width:100%; height:40px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
+  .budget-col { display:flex; flex-direction:column; gap:8px; min-width:0; min-height:0; height:100%; overflow:hidden; padding-bottom:2px; }
+  .budget-col .actions { padding-right:4px; margin-top:6px; flex-shrink:0; }
+  .fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
+  label { display:block; margin:0 0 2px; font-size:10px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
+  input, select, textarea { width:100%; max-width:100%; height:34px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; padding:0 10px; font-size:13px; }
   textarea { flex:1; min-height:0; height:auto; padding:12px; resize:none; white-space:pre-wrap; line-height:1.4; overflow:auto; }
   input:focus, select:focus, textarea:focus { outline:2px solid rgba(37,99,235,.45); border-color:#2563eb; }
   .line { display:flex; justify-content:space-between; align-items:center; margin-top:0; padding:12px 0 4px; border-top:1px solid #27272a; }
@@ -57,12 +57,12 @@
   .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:0; flex-shrink:0; }
   .actions .primary { min-width:160px; }
   .hint { color:var(--muted); font-size:11px; margin:0; line-height:1.35; }
-  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
   #faixa-grupos.chips {
-    display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px; flex-wrap:nowrap;
+    display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; flex-wrap:nowrap;
   }
-  .chip { height:42px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; cursor:pointer; font-weight:700; letter-spacing:.04em; }
-  #faixa-grupos .chip { width:100%; white-space:nowrap; padding:0 10px; font-size:13px; }
+  .chip { height:32px; border-radius:9px; border:1px solid #3f3f46; background:#18181b; padding:0 10px; cursor:pointer; font-weight:700; letter-spacing:.03em; font-size:12px; }
+  #faixa-grupos .chip { width:100%; white-space:nowrap; padding:0 8px; font-size:12px; }
   .chip.on { background:#2563eb; border-color:transparent; }
   .modal { position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; padding:18px; }
   .modal.open { display:flex; }
@@ -76,8 +76,8 @@
   .menu button.on { background:#2563eb; border-color:transparent; }
   .pix-box { display:flex; flex-direction:column; gap:8px; min-width:0; margin-top:6px; margin-bottom:4px; }
   .pix-select {
-    width:100%; height:36px; border-radius:10px; border:1px solid #27272a;
-    background:#18181b; color:#fafafa; padding:0 10px; font-size:13px; font-weight:600;
+    width:100%; height:34px; border-radius:10px; border:1px solid #27272a;
+    background:#18181b; color:#fafafa; padding:0 10px; font-size:12px; font-weight:600;
     cursor:pointer; appearance:auto;
   }
   .pix-select:focus { outline:2px solid rgba(37,99,235,.4); border-color:#2563eb; }
@@ -103,7 +103,7 @@
   }
   .fila-dock { position:relative; width:auto; height:auto; }
   .fila-fab {
-    position:relative; width:auto; min-width:118px; height:46px; padding:0 16px 0 14px; border:0; border-radius:14px;
+    position:relative; width:auto; min-width:96px; height:36px; padding:0 12px 0 10px; border:0; border-radius:11px;
     background:
       radial-gradient(120% 90% at 20% 15%, rgba(255,255,255,.22), transparent 45%),
       linear-gradient(145deg, #60a5fa 0%, #2563eb 48%, #1d4ed8 100%);
@@ -115,9 +115,9 @@
   .fila-fab:hover { filter:brightness(1.08); transform: translateY(-1px); }
   .fila-fab:active { transform: translateY(2px) scale(.98); }
   .fila-fab.bounce { animation: filaBounce .45s cubic-bezier(.2,.9,.25,1.25) both; }
-  .fila-fab .ico { font-size:18px; line-height:1; filter: drop-shadow(0 2px 4px rgba(0,0,0,.25)); }
+  .fila-fab .ico { font-size:15px; line-height:1; filter: drop-shadow(0 2px 4px rgba(0,0,0,.25)); }
   .fila-fab .lbl {
-    font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; opacity:.98;
+    font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; opacity:.98;
   }
   .fila-fab .dot {
     position:absolute; top:7px; right:8px;
@@ -146,8 +146,8 @@
     display:block; background:#fca5a5; animation:none;
   }
   .fila-stop {
-    height:40px; padding:0 12px; border:1px solid rgba(252,165,165,.35);
-    border-radius:12px; background:rgba(127,29,29,.95); color:#fecaca; font-weight:800;
+    height:34px; padding:0 10px; border:1px solid rgba(252,165,165,.35);
+    border-radius:10px; background:rgba(127,29,29,.95); color:#fecaca; font-weight:800; font-size:12px;
     cursor:pointer; display:none; gap:6px; align-items:center;
   }
   .fila-stop.on { display:inline-flex; }
@@ -277,9 +277,9 @@
 
   <section class="panel hidden" id="tab-divisao">
     <div class="fields">
-      <div><label>Valor total</label><input id="split-total" type="number" min="1" step="1" /></div>
-      <div><label>Quantidade de contas</label><input id="split-count" type="number" min="1" step="1" value="4" /></div>
-      <div><label>Mínimo por conta</label><input id="split-min" type="number" min="5" step="1" value="5" /></div>
+      <div><label>Valor total</label><input id="split-total" type="number" min="1" step="1" value="" /></div>
+      <div><label>Quantidade de contas</label><input id="split-count" type="number" min="1" step="1" value="" /></div>
+      <div><label>Mínimo por conta</label><input id="split-min" type="number" min="5" step="1" value="" /></div>
     </div>
     <p class="hint">Nenhum valor fica abaixo de R$ 5. A diferença entre eles é de no mínimo R$ 5. A soma continua o total.</p>
     <div class="actions">
@@ -810,6 +810,8 @@ document.getElementById('split-go').addEventListener('click', () => {
 });
 document.getElementById('split-reset').addEventListener('click', () => {
   document.getElementById('split-total').value = '';
+  document.getElementById('split-count').value = '';
+  document.getElementById('split-min').value = '';
   document.getElementById('split-values').innerHTML = '';
   document.getElementById('split-sum').innerHTML = '';
 });
