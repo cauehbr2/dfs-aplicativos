@@ -638,8 +638,9 @@ function applyCatalog(catalog) {
   if (line) {
     const pixCount = pixKeys.length;
     line.textContent = (catalog.companyName ? 'Empresa: ' + catalog.companyName : 'Cadastro do site')
-      + (pixCount ? ' · ' + pixCount + ' Pix' : ' · Pix do site');
+      + (pixCount ? (' · ' + pixCount + ' Pix') : ' · sem chave Pix');
   }
+  renderPixSelects();
 }
 function panelOrigin(value) {
   const text = String(value || '').trim();

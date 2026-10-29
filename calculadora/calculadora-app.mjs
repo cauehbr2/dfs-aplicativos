@@ -185,73 +185,101 @@ function rateLabel(item) {
   const base = mult.toLocaleString('pt-BR') + ' x ' + taxa.toLocaleString('pt-BR') + '%';
   return item.observacao ? base + ' · ' + item.observacao : base;
 }
-function pixFlag(value) {
-  return value === true || value === 1 || value === '1' || String(value || '').toLowerCase() === 'true';
+function pixOff(value) {
+  return value === false || value === 0 || value === '0' || String(value || '').toLowerCase() === 'false';
+}
+function pixChaveOf(item) {
+  return String(
+    (item && (item.chave || item.pixChave || item.key || item.valor || item.value)) || ''
+  ).trim();
 }
 function pixRow(item, id) {
-  const chave = String(item.chave || '').trim();
-  if (!chave || item.ativa === false) return null;
-  const contas = item.exibirContas == null ? true : pixFlag(item.exibirContas);
-  const montante = item.exibirMontante == null ? true : pixFlag(item.exibirMontante);
+  if (!item || typeof item !== 'object') return null;
+  const chave = pixChaveOf(item);
+  if (!chave) return null;
+  // Igual ao painel: inativa some; se o módulo não estiver marcado como false, entra.
+  if (pixOff(item.ativa)) return null;
+  const contas = !pixOff(item.exibirContas);
+  const montante = !pixOff(item.exibirMontante);
   if (!contas && !montante) return null;
+  const nome = String(item.nomeCompleto || item.nome || item.nomeTitular || item.titular || '').trim();
+  const banco = String(item.bancoInstituicao || item.banco || item.instituicao || '').trim();
   return {
-    id: id || item.id || chave,
-    tipo: item.tipoChave || item.tipo || 'CPF',
+    id: String(id || item.id || item.userKeyId || chave),
+    tipo: String(item.tipoChave || item.tipo || 'CPF').trim() || 'CPF',
     chave,
-    nome: String(item.nomeCompleto || item.nome || '').trim(),
-    banco: String(item.bancoInstituicao || item.banco || '').trim(),
+    nome: nome || 'Pix',
+    banco: banco || '—',
     contas,
     montante,
   };
 }
 function userInCompany(user, companyId) {
   if (!companyId) return false;
-  if (String(user.companyId || '') === companyId) return true;
+  const wanted = String(companyId);
+  if (String(user.companyId || '') === wanted) return true;
   const links = Array.isArray(user.companyLinks) ? user.companyLinks : [];
-  return links.some((link) => link && String(link.companyId || '') === companyId);
+  return links.some((link) => link && String(link.companyId || '') === wanted);
+}
+function collectUserPix(user, pushPix) {
+  if (!user) return;
+  const list = Array.isArray(user.pixKeys) ? user.pixKeys : [];
+  if (!list.length && pixChaveOf(user)) {
+    pushPix(pixRow({
+      tipoChave: user.pixTipoChave || user.tipoChave,
+      chave: user.pixChave || user.chave,
+      nome: user.name || user.nome || '',
+      banco: user.pixBanco || user.banco || '',
+      ativa: true,
+      exibirContas: true,
+      exibirMontante: true,
+    }, 'user-' + (user.id || 'me')));
+    return;
+  }
+  list.forEach((item, index) => {
+    pushPix(pixRow(item, 'user-' + (user.id || 'me') + '-' + (item.id || item.chave || index)));
+  });
 }
 async function pullCatalog(session) {
   if (!session || !session.token || !session.companyId) {
     return { ok: false, message: 'Entre com o link da empresa para puxar faixa, taxa e Pix.' };
   }
-  const filters = [{ field: 'companyId', op: '==', value: session.companyId }];
+  const companyId = String(session.companyId);
+  const filters = [{ field: 'companyId', op: '==', value: companyId }];
   const body = { filters, limit: 0, dfs_token: session.token };
-  const budgetId = 'calculator_budget_' + session.companyId;
-  const [rangesRes, campaignsRes, ratesRes, rulesRes, pixRes, usersRes, budgetRes] = await Promise.all([
+  const budgetId = 'calculator_budget_' + companyId;
+  const [rangesRes, campaignsRes, ratesRes, rulesRes, pixRes, pixAllRes, usersRes, meRes, budgetRes] = await Promise.all([
     panelRequest('query', { ...body, collection: 'calculatorRanges' }),
     panelRequest('query', { ...body, collection: 'campaigns' }),
     panelRequest('query', { ...body, collection: 'calculatorMontanteRates' }),
     panelRequest('query', { ...body, collection: 'calculatorMontanteAccountRules' }),
     panelRequest('query', { ...body, collection: 'calculatorPixKeys' }),
+    panelRequest('query', { collection: 'calculatorPixKeys', limit: 0, dfs_token: session.token }),
     panelRequest('query', { collection: 'users', limit: 0, dfs_token: session.token }),
+    session.userId
+      ? panelRequest('read', { collection: 'users', id: session.userId, dfs_token: session.token })
+      : Promise.resolve({ status: 404, json: {} }),
     panelRequest('read', { collection: 'settings', id: budgetId, dfs_token: session.token }),
   ]);
   const pix = [];
   const seen = new Set();
   const pushPix = (row) => {
     if (!row || !row.chave) return;
-    const key = row.tipo + '|' + row.chave;
+    const key = String(row.tipo || '') + '|' + String(row.chave || '');
     if (seen.has(key)) return;
     seen.add(key);
     pix.push(row);
   };
+  const sameCompany = (item) => String((item && item.companyId) || '') === companyId;
   rowsOf(pixRes).forEach((item) => pushPix(pixRow(item, item.id)));
-  rowsOf(usersRes).filter((user) => userInCompany(user, session.companyId)).forEach((user) => {
-    const list = Array.isArray(user.pixKeys) ? user.pixKeys : [];
-    if (!list.length && String(user.pixChave || '').trim()) {
-      pushPix(pixRow({
-        tipoChave: user.pixTipoChave,
-        chave: user.pixChave,
-        nome: user.name || '',
-        banco: user.pixBanco,
-        exibirContas: true,
-        exibirMontante: true,
-      }, 'user-' + user.id));
-      return;
-    }
-    list.forEach((item) => pushPix(pixRow(item, 'user-' + user.id + '-' + (item.id || item.chave))));
-  });
-  pix.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  // Reforço: se o filtro do site falhar, pega a coleção e filtra aqui.
+  rowsOf(pixAllRes).filter(sameCompany).forEach((item) => pushPix(pixRow(item, item.id)));
+  rowsOf(usersRes).filter((user) => userInCompany(user, companyId)).forEach((user) => collectUserPix(user, pushPix));
+  const meDoc = meRes && meRes.json && (meRes.json.data || meRes.json);
+  if (meDoc && typeof meDoc === 'object') {
+    collectUserPix({ id: session.userId, ...meDoc }, pushPix);
+  }
+  pix.sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
   const packed = loadBudgetTemplates();
   const budgetDoc = (budgetRes && budgetRes.json && budgetRes.json.data) || {};
   const budget = {
