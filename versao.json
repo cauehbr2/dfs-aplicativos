@@ -1,6 +1,6 @@
 {
     "calculadora":  {
-                        "version":  "1.0.4",
+                        "version":  "1.0.5",
                         "files":  [
                                       "app-versao.txt",
                                       "budget-templates.json",
@@ -10,6 +10,7 @@
                                       "calculadora.html",
                                       "Calculadora.runtimeconfig.json",
                                       "calculadora-app.mjs",
+                                      "elite-cpa-logo-4.png",
                                       "Microsoft.Web.WebView2.Core.dll",
                                       "Microsoft.Web.WebView2.WinForms.dll",
                                       "Microsoft.Web.WebView2.Wpf.dll",
@@ -18,10 +19,11 @@
                                   ]
                     },
     "operacoes":  {
-                      "version":  "1.0.5",
+                      "version":  "1.0.6",
                       "files":  [
                                     "app-versao.txt",
                                     "contas-operacoes.html",
+                                    "elite-cpa-logo-4.png",
                                     "icone.ico",
                                     "Microsoft.Web.WebView2.Core.dll",
                                     "Microsoft.Web.WebView2.WinForms.dll",
