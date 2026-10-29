@@ -181,7 +181,8 @@
   .custom-dates { display: flex; align-items: center; gap: 8px; }
   .custom-dates input { width: 150px; }
   .period { margin: 0; color: var(--muted); font-size: 12px; width: 100%; }
-  .credit { margin: 8px 0 0; text-align: right; font-size: 11px; color: #52525b; }
+  .credit { margin: 8px 0 0; display:flex; justify-content:space-between; gap:12px; align-items:center; font-size: 11px; color: #52525b; }
+  .credit .app-version { color: #71717a; font-weight: 700; letter-spacing: .04em; }
   body.screen-contas .only-montante { display: none !important; }
   body.screen-montante .only-contas { display: none !important; }
   .mod-switch { display: flex; gap: 6px; margin-top: 10px; }
@@ -382,7 +383,7 @@
       </table>
     </div>
   </section>
-  <p class="credit">Criado por Cauê BR</p>
+  <p class="credit"><span class="app-version" id="app-version">Versão —</span><span>Criado por Cauê BR</span></p>
 </div>
 
 <article id="proof"></article>
@@ -479,6 +480,7 @@ const RANGE_LABELS = {
 };
 let usingFile = false;
 let removedIds = [];
+let saveGeneration = 0;
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const groups = ['Grupo 01', 'Grupo 02', 'Grupo 03'];
 const defaultRanges = [
@@ -984,6 +986,7 @@ function save() {
   try { if (currentUserId) localStorage.setItem(storageKey(currentUserId), JSON.stringify(state)); } catch (e) {}
   if (!usingFile || !Array.isArray(state.ops)) return Promise.resolve();
   const removedNow = removedIds.slice();
+  const mySave = ++saveGeneration;
   return fetch('/dados/operacoes.json', {
     method: 'POST',
     cache: 'no-store',
@@ -994,9 +997,29 @@ function save() {
     let saved = null;
     try { saved = await response.json(); } catch (e) { return; }
     if (!saved || !Array.isArray(saved.ops)) return;
-    state.ops = saved.ops;
-    removedIds = removedIds.filter((id) => !removedNow.includes(String(id)));
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+    if (mySave !== saveGeneration) return;
+    const blocked = new Set(removedIds.map(String));
+    state.ops = saved.ops.filter((op) => !(op && op.id != null && blocked.has(String(op.id))));
+    if (Array.isArray(saved.removedIds) && saved.removedIds.length) {
+      const known = new Set(removedIds.map(String));
+      saved.removedIds.forEach((id) => {
+        const key = String(id);
+        if (key && !known.has(key)) {
+          known.add(key);
+          removedIds.push(key);
+        }
+      });
+    }
+    removedIds = removedIds.filter((id) => {
+      const key = String(id);
+      if (!removedNow.includes(key)) return true;
+      return state.ops.some((op) => String(op.id) === key);
+    });
+    if (saved.dateRange && RANGE_LABELS[saved.dateRange]) state.dateRange = saved.dateRange;
+    if (saved.customStart != null) state.customStart = saved.customStart;
+    if (saved.customEnd != null) state.customEnd = saved.customEnd;
+    if (Number(saved.viewStamp) > 0) state.viewStamp = Number(saved.viewStamp);
+    try { localStorage.setItem(storageKey(currentUserId), JSON.stringify(state)); } catch (e) {}
     paint();
   }).catch(() => {});
 }
@@ -2214,7 +2237,19 @@ document.getElementById('pull-site').addEventListener('click', async () => {
   }
   button.disabled = false;
 });
+async function loadAppVersion() {
+  const el = document.getElementById('app-version');
+  if (!el) return;
+  try {
+    const data = await fetch('/app/versao', { cache: 'no-store' }).then((response) => response.json());
+    const version = String((data && data.version) || '').trim();
+    el.textContent = version ? 'Versão ' + version : 'Versão —';
+  } catch (e) {
+    el.textContent = 'Versão —';
+  }
+}
 async function boot() {
+  loadAppVersion();
   let session = { ok: false };
   try { session = await panelJson('/painel/status'); } catch (e) { session = { ok: false }; }
   currentUserId = session.userId || '';

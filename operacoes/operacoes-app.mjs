@@ -13,7 +13,16 @@ const rememberFile = path.join(dataDir, 'lembrar-login.json');
 const siteFile = path.join(dataDir, 'painel-site.json');
 const defaultOrigin = 'https://renovanow.online';
 const htmlFile = path.join(dir, 'contas-operacoes.html');
+const versionFile = path.join(dir, 'app-versao.txt');
 const logoFile = path.join(dir, '..', '..', 'releases', 'elite-cpa-logo-4.png');
+function readAppVersion() {
+  try {
+    const text = fs.readFileSync(versionFile, 'utf8').trim().replace(/^\uFEFF/, '');
+    return text || '0';
+  } catch (e) {
+    return '0';
+  }
+}
 function readOrigin() {
   try {
     const saved = JSON.parse(fs.readFileSync(siteFile, 'utf8'));
@@ -195,8 +204,21 @@ function opIdentity(op) {
   const qty = Math.round(Number(op.qty != null ? op.qty : op.requestedAccounts) || 0);
   return 'k:' + [client, date, deposit, qty].join('|');
 }
+function normalizeRemovedIds(...lists) {
+  const seen = new Set();
+  const out = [];
+  lists.forEach((list) => {
+    (Array.isArray(list) ? list : []).forEach((id) => {
+      const key = String(id == null ? '' : id).trim();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push(key);
+    });
+  });
+  return out.slice(-5000);
+}
 function mergeOps(diskOps, incomingOps, removedIds) {
-  const removed = new Set((Array.isArray(removedIds) ? removedIds : []).map((id) => 'id:' + String(id)));
+  const removed = new Set(normalizeRemovedIds(removedIds).map((id) => 'id:' + id));
   const incomingList = (Array.isArray(incomingOps) ? incomingOps : []).filter((op) => op && typeof op === 'object');
   const diskList = (Array.isArray(diskOps) ? diskOps : []).filter((op) => op && typeof op === 'object');
   const incomingByKey = new Map();
@@ -227,7 +249,8 @@ function mergeOps(diskOps, incomingOps, removedIds) {
 function mergeState(disk, incoming) {
   const base = disk && typeof disk === 'object' ? disk : { ops: [] };
   const body = incoming && typeof incoming === 'object' ? incoming : {};
-  const merged = mergeOps(base.ops, body.ops, body.removedIds);
+  const removedIds = normalizeRemovedIds(base.removedIds, body.removedIds);
+  const merged = mergeOps(base.ops, body.ops, removedIds);
   const next = merged.stale ? { ...body, ...base, ops: merged.ops } : { ...base, ...body, ops: merged.ops };
   const incomingStamp = Number(body.viewStamp) || 0;
   const diskStamp = Number(base.viewStamp) || 0;
@@ -244,7 +267,7 @@ function mergeState(disk, incoming) {
     next.screen = base.screen;
     next.viewStamp = diskStamp;
   }
-  delete next.removedIds;
+  next.removedIds = removedIds;
   return next;
 }
 function opDay(op) {
@@ -260,11 +283,11 @@ function listDays(ops) {
   return days;
 }
 function withoutRemoved(ops, removedIds) {
-  const removed = new Set((Array.isArray(removedIds) ? removedIds : []).map((id) => String(id)));
+  const removed = new Set(normalizeRemovedIds(removedIds));
   return (Array.isArray(ops) ? ops : []).filter((op) => !(op && op.id != null && removed.has(String(op.id))));
 }
 function retainDiskOps(diskOps, nextOps, removedIds) {
-  const removed = new Set((Array.isArray(removedIds) ? removedIds : []).map((id) => String(id)));
+  const removed = new Set(normalizeRemovedIds(removedIds));
   const ops = [];
   const seen = new Set();
   const push = (op) => {
@@ -294,7 +317,7 @@ function backupIsRicher(backupOps, currentOps) {
   return (backupOps || []).length > (currentOps || []).length;
 }
 function daysLost(beforeOps, afterOps, removedIds) {
-  const removed = new Set((Array.isArray(removedIds) ? removedIds : []).map((id) => String(id)));
+  const removed = new Set(normalizeRemovedIds(removedIds));
   const afterDays = listDays(afterOps);
   const lost = [];
   listDays(beforeOps).forEach((day) => {
@@ -341,22 +364,29 @@ function commitJson(data, target = dataFile, removedIds = []) {
   fs.mkdirSync(folder, { recursive: true });
   const diskOps = fs.existsSync(target) ? readJsonOps(target) : [];
   const backupOps = fs.existsSync(backupFile) ? readJsonOps(backupFile) : [];
-  const healed = floorOps(diskOps, backupOps, Array.isArray(data.ops) ? data.ops : [], removedIds);
-  const protectedOps = withoutRemoved(diskOps, removedIds).concat(opsOfMissingDays(withoutRemoved(backupOps, removedIds), withoutRemoved(diskOps, removedIds)));
-  const lost = daysLost(protectedOps, healed, removedIds);
+  let diskRemoved = [];
+  try {
+    const current = JSON.parse(fs.readFileSync(target, 'utf8'));
+    diskRemoved = current && Array.isArray(current.removedIds) ? current.removedIds : [];
+  } catch (e) { diskRemoved = []; }
+  const tombstones = normalizeRemovedIds(diskRemoved, data && data.removedIds, removedIds);
+  const healed = floorOps(diskOps, backupOps, Array.isArray(data.ops) ? data.ops : [], tombstones);
+  const protectedOps = withoutRemoved(diskOps, tombstones).concat(opsOfMissingDays(withoutRemoved(backupOps, tombstones), withoutRemoved(diskOps, tombstones)));
+  const lost = daysLost(protectedOps, healed, tombstones);
   if (lost.length) {
     throw new Error('A gravação tiraria o dia ' + lost.join(', ') + '. O arquivo ficou como estava.');
   }
-  const payload = { ...data, ops: healed };
+  const payload = { ...data, ops: healed, removedIds: tombstones };
   fs.writeFileSync(tmp, JSON.stringify(payload));
   if (fs.existsSync(target)) {
-    const diskKept = withoutRemoved(diskOps, removedIds);
-    const backupKept = withoutRemoved(backupOps, removedIds);
+    const diskKept = withoutRemoved(diskOps, tombstones);
+    const backupKept = withoutRemoved(backupOps, tombstones);
     let snapshot = null;
     const keepRichBackup = backupIsRicher(backupKept, diskKept) && fs.existsSync(backupFile);
     try { snapshot = JSON.parse(fs.readFileSync(keepRichBackup ? backupFile : target, 'utf8')); } catch (e) { snapshot = null; }
     if (snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)) {
       snapshot.ops = keepRichBackup ? backupKept : diskKept;
+      snapshot.removedIds = tombstones;
       fs.writeFileSync(backupFile, JSON.stringify(snapshot));
     }
   }
@@ -380,12 +410,12 @@ function persistState(incoming, target) {
   if (!incoming || typeof incoming !== 'object' || !Array.isArray(incoming.ops)) return null;
   const loaded = readOpsFile(file);
   if (!loaded.ok) return null;
-  const removedIds = Array.isArray(incoming.removedIds) ? incoming.removedIds : [];
   const backupOps = readJsonOps(path.join(path.dirname(file), 'operacoes.antes.json'));
+  const removedIds = normalizeRemovedIds(loaded.data.removedIds, incoming.removedIds);
   const baseOps = floorOps(loaded.data.ops || [], backupOps, [], removedIds);
-  const next = mergeState({ ...loaded.data, ops: baseOps }, incoming);
+  const next = mergeState({ ...loaded.data, ops: baseOps, removedIds }, { ...incoming, removedIds });
   next.ops = floorOps(loaded.data.ops || [], backupOps, next.ops, removedIds);
-  delete next.removedIds;
+  next.removedIds = removedIds;
   return commitJson(next, file, removedIds);
 }
 function writeOps(state) {
@@ -1712,6 +1742,10 @@ const server = http.createServer((req, res) => {
     res.end(fs.readFileSync(logoFile));
     return;
   }
+  if (url === '/app/versao' && req.method === 'GET') {
+    sendJson(res, 200, { version: readAppVersion() });
+    return;
+  }
   if ((url === '/' || url === '/contas-operacoes.html') && req.method === 'GET') {
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
@@ -1874,6 +1908,50 @@ function selfTest() {
   if (!aposDelete || semUm.ops.some((op) => op.id === umId.id) || doSabado(semUm) !== doSabado(copiado)) {
     throw new Error('delete explícito não ficou só naquele id');
   }
+  const depoisSemTombstone = persistState({
+    ...semUm,
+    dateRange: 'seg',
+    viewStamp: Date.now(),
+    ops: semUm.ops.filter((op) => op.id !== umId.id),
+    removedIds: [],
+  }, copyFile);
+  const seguiuApagado = JSON.parse(fs.readFileSync(copyFile, 'utf8'));
+  if (!depoisSemTombstone || seguiuApagado.ops.some((op) => op.id === umId.id)) {
+    throw new Error('apagar voltou no save seguinte sem removedIds');
+  }
+  if (seguiuApagado.dateRange !== 'seg') throw new Error('filtro do dia não gravou no save seguinte');
+  const domDir = fs.mkdtempSync(path.join(process.env.TEMP || process.env.TMP || path.dirname(dataFile), 'dfs-teste-domingo-'));
+  const domFile = path.join(domDir, 'operacoes.json');
+  const domBase = {
+    rate: 20,
+    dateRange: 'dom',
+    viewStamp: 1,
+    ops: [
+      { id: 'dom1', client: 'A', date: '2026-10-25T01:00', deposit: 10, qty: 1 },
+      { id: 'qui1', client: 'B', date: '2026-10-29T12:00', deposit: 20, qty: 2 },
+    ],
+  };
+  fs.writeFileSync(domFile, JSON.stringify(domBase));
+  fs.writeFileSync(path.join(domDir, 'operacoes.antes.json'), JSON.stringify({
+    ...domBase,
+    ops: [...domBase.ops, { id: 'old', client: 'C', date: '2026-10-20T10:00', deposit: 1, qty: 1 }],
+  }));
+  persistState({
+    ...domBase,
+    ops: domBase.ops.filter((op) => op.id !== 'dom1'),
+    removedIds: ['dom1'],
+    viewStamp: 2,
+  }, domFile);
+  persistState({
+    ...JSON.parse(fs.readFileSync(domFile, 'utf8')),
+    dateRange: 'qui',
+    viewStamp: 3,
+    removedIds: [],
+  }, domFile);
+  const domCurado = JSON.parse(fs.readFileSync(domFile, 'utf8'));
+  if (domCurado.ops.some((op) => op.id === 'dom1')) throw new Error('domingo apagado voltou pelo backup');
+  if (domCurado.dateRange !== 'qui') throw new Error('troca de Dom para Qui não ficou');
+  fs.rmSync(domDir, { recursive: true, force: true });
   const danoDir = fs.mkdtempSync(path.join(process.env.TEMP || process.env.TMP || path.dirname(dataFile), 'dfs-teste-backup-'));
   const danoFile = path.join(danoDir, 'operacoes.json');
   fs.copyFileSync(dataFile, path.join(danoDir, 'operacoes.antes.json'));

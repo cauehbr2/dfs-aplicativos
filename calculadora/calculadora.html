@@ -57,7 +57,8 @@
   .menu { display:grid; gap:6px; margin-top:8px; }
   .menu button { height:40px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; text-align:left; padding:0 12px; cursor:pointer; font-weight:700; }
   .menu button.on { background:#2563eb; border-color:transparent; }
-  .credit { margin: 18px 0 0; text-align: right; font-size: 11px; color: #52525b; }
+  .credit { margin: 18px 0 0; display:flex; justify-content:space-between; gap:12px; align-items:center; font-size: 11px; color: #52525b; }
+  .credit .app-version { color: #71717a; font-weight: 700; letter-spacing: .04em; }
   @media (max-width:800px) {
     .grid { grid-template-columns:1fr; }
     .wrap { padding:10px 14px 8px; }
@@ -148,7 +149,7 @@
     <div id="split-sum"></div>
   </section>
   </div>
-  <p class="credit">Criado por Cauê BR</p>
+  <p class="credit"><span class="app-version" id="app-version">Versão —</span><span>Criado por Cauê BR</span></p>
 </div>
 
 <div class="modal open" id="login-gate">
@@ -879,8 +880,20 @@ document.getElementById('logout').addEventListener('click', async () => {
   document.getElementById('company-line').textContent = 'Entre para puxar faixa, taxa e Pix da empresa.';
   document.getElementById('login-gate').classList.add('open');
 });
+async function loadAppVersion() {
+  const el = document.getElementById('app-version');
+  if (!el) return;
+  try {
+    const data = await fetch('/app/versao', { cache: 'no-store' }).then((response) => response.json());
+    const version = String((data && data.version) || '').trim();
+    el.textContent = version ? 'Versão ' + version : 'Versão —';
+  } catch (e) {
+    el.textContent = 'Versão —';
+  }
+}
 async function boot() {
   renderRanges();
+  loadAppVersion();
   let data = null;
   try {
     const response = await fetch('/dados/calculadora.json');

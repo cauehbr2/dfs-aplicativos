@@ -11,11 +11,21 @@ const catalogFile = path.join(dataDir, 'catalogo.json');
 const sessionFile = path.join(dataDir, 'painel-sessao.json');
 const siteFile = path.join(dataDir, 'painel-site.json');
 const htmlFile = path.join(codeDir, 'calculadora.html');
+const versionFile = path.join(codeDir, 'app-versao.txt');
 const defaultOrigin = 'https://renovanow.online';
 const port = 8765;
 
 fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(dataFile)) fs.writeFileSync(dataFile, '{}\n');
+
+function readAppVersion() {
+  try {
+    const text = fs.readFileSync(versionFile, 'utf8').trim().replace(/^\uFEFF/, '');
+    return text || '0';
+  } catch (e) {
+    return '0';
+  }
+}
 
 function readOrigin() {
   try {
@@ -349,6 +359,10 @@ const server = http.createServer((req, res) => {
       try { sendJson(res, 200, JSON.parse(fs.readFileSync(catalogFile, 'utf8'))); }
       catch (e) { sendJson(res, 200, { ok: false, message: 'O site não devolveu o cadastro.' }); }
     });
+    return;
+  }
+  if (url === '/app/versao' && req.method === 'GET') {
+    sendJson(res, 200, { version: readAppVersion() });
     return;
   }
   if ((url === '/' || url === '/calculadora.html') && req.method === 'GET') {
