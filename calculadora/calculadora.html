@@ -680,7 +680,7 @@ function askHostCaptcha(origin, siteKey) {
     } catch (e) {
       finish('', 'Não pedi a proteção do Google.');
     }
-    setTimeout(() => finish('', 'O Google não confirmou a entrada a tempo.'), 25000);
+    setTimeout(() => finish('', 'O Google não confirmou a entrada a tempo.'), 45000);
   });
 }
 async function loginCaptcha(origin) {
