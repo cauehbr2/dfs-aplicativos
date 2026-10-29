@@ -56,7 +56,7 @@
     .grid { grid-template-columns:1fr; }
     .wrap { padding:10px 14px 8px; }
     h1 { font-size:22px; }
-    .sub { display:none; }
+    .sub { margin:4px 0 10px; font-size:12px; }
     textarea { height:96px; }
     .panel { padding:12px; }
     .credit { margin-top:8px; }
@@ -93,6 +93,7 @@
         </div>
         <label style="margin-top:12px">Chave Pix do depósito</label>
         <select id="pix-contas"></select>
+        <p class="hint" id="pix-contas-hint"></p>
         <div class="line"><span>Total</span><strong class="big" id="total-contas"></strong></div>
       </div>
       <div>
@@ -428,13 +429,20 @@ function renderPixSelects() {
     const list = keysFor(module);
     const select = document.getElementById(id);
     select.innerHTML = list.length
-      ? list.map((item) => `<option value="${escapeOpt(item.id)}">${escapeOpt(item.nome)} - ${escapeOpt(item.tipo)} - ${escapeOpt(item.banco)}</option>`).join('')
+      ? list.map((item) => `<option value="${escapeOpt(item.id)}">${escapeOpt(item.nome)} · ${escapeOpt(item.tipo)} · ${escapeOpt(item.banco)}</option>`).join('')
       : '<option value="">Nenhuma chave Pix desta empresa</option>';
     if (selected) select.value = selected;
     else if (list[0]) select.value = list[0].id;
   };
   fill('pix-contas', 'contas', pixContas);
   fill('pix-montante', 'montante', pixMontante);
+  const hint = document.getElementById('pix-contas-hint');
+  if (hint) {
+    const n = keysFor('contas').length;
+    hint.textContent = n
+      ? (n + ' chave(s) Pix desta empresa')
+      : (siteOn ? 'Nenhuma chave Pix desta empresa na lista da calculadora.' : 'Entre pelo link da empresa para puxar as chaves Pix.');
+  }
   savePrefs();
 }
 function selectedRange() {
@@ -651,9 +659,12 @@ function applyCatalog(catalog) {
   }
   const line = document.getElementById('company-line');
   if (line) {
-    const pixCount = pixKeys.length;
-    line.textContent = (catalog.companyName ? 'Empresa: ' + catalog.companyName : 'Cadastro do site')
-      + (pixCount ? (' · ' + pixCount + ' Pix') : ' · sem chave Pix');
+    const who = String((line.textContent.match(/^Conectado:\s*([^·]+)/) || [])[1] || '').trim();
+    const parts = [];
+    if (who) parts.push('Conectado: ' + who);
+    if (catalog.companyName) parts.push('Empresa: ' + catalog.companyName);
+    parts.push(pixKeys.length ? (pixKeys.length + ' Pix') : 'sem chave Pix');
+    line.textContent = parts.join(' · ');
   }
   renderPixSelects();
 }
@@ -719,6 +730,16 @@ async function restoreLoginLink() {
     if (!input.value) input.value = 'elite';
   }
 }
+function sessionLine(session, catalog) {
+  const who = String((session && session.name) || '').trim();
+  const company = String((catalog && catalog.companyName) || (session && session.companyName) || '').trim();
+  const pixCount = catalog && Array.isArray(catalog.pix) ? catalog.pix.length : null;
+  const parts = [];
+  if (who) parts.push('Conectado: ' + who);
+  if (company) parts.push('Empresa: ' + company);
+  if (pixCount != null) parts.push(pixCount ? (pixCount + ' Pix') : 'sem chave Pix');
+  return parts.join(' · ') || 'Cadastro do site';
+}
 async function enterApp() {
   const session = await fetch('/painel/status').then((response) => response.json());
   const gate = document.getElementById('login-gate');
@@ -729,12 +750,16 @@ async function enterApp() {
   }
   gate.classList.remove('open');
   const line = document.getElementById('company-line');
-  if (line && session.companyName) line.textContent = 'Empresa: ' + session.companyName;
+  if (line) line.textContent = sessionLine(session);
   let catalog = null;
   try {
     catalog = await fetch('/site/catalogo?ts=' + Date.now(), { cache: 'no-store' }).then((response) => response.json());
   } catch (e) {}
-  if (catalog && catalog.message && !catalog.ok && line) line.textContent = catalog.message;
+  if (catalog && catalog.message && !catalog.ok && line) {
+    line.textContent = sessionLine(session) + ' · ' + catalog.message;
+  } else if (line) {
+    line.textContent = sessionLine(session, catalog);
+  }
   applyCatalog(catalog);
   renderRanges();
   renderRates();
