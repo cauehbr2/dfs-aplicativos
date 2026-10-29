@@ -87,119 +87,73 @@
     min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     font-family:ui-monospace, Consolas, monospace; color:#a1a1aa;
   }
-  .credit { margin:0; flex-shrink:0; display:flex; justify-content:space-between; gap:12px; align-items:center; font-size: 11px; color: #52525b; padding-left:88px; }
+  .credit { margin:0; flex-shrink:0; display:flex; justify-content:space-between; gap:12px; align-items:center; font-size: 11px; color: #52525b; }
   .credit .app-version { color: #71717a; font-weight: 700; letter-spacing: .04em; }
   .top, .tabs { flex-shrink:0; }
-  .fila-dock {
-    position:fixed; left:16px; bottom:16px; z-index:40;
-    width:72px; height:72px;
+  .fila-slot {
+    margin-top:14px; padding-top:12px; border-top:1px solid #27272a;
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   }
+  .fila-dock { position:relative; width:auto; height:auto; }
   .fila-fab {
-    position:absolute; inset:0; width:72px; height:72px; padding:0; border:0; border-radius:24px;
+    position:relative; width:auto; min-width:118px; height:46px; padding:0 16px 0 14px; border:0; border-radius:14px;
     background:
-      radial-gradient(120% 90% at 20% 15%, rgba(255,255,255,.28), transparent 45%),
+      radial-gradient(120% 90% at 20% 15%, rgba(255,255,255,.22), transparent 45%),
       linear-gradient(145deg, #60a5fa 0%, #2563eb 48%, #1d4ed8 100%);
     color:#fff; cursor:pointer;
-    box-shadow:
-      0 16px 36px rgba(37,99,235,.48),
-      0 0 0 1px rgba(147,197,253,.35) inset,
-      0 1px 0 rgba(255,255,255,.35) inset;
-    display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
-    animation: filaIdle 2.4s ease-in-out infinite;
-    transform-origin: 50% 85%;
+    box-shadow:0 10px 22px rgba(37,99,235,.35), inset 0 1px 0 rgba(255,255,255,.22);
+    display:inline-flex; flex-direction:row; align-items:center; justify-content:center; gap:8px;
+    transition: transform .12s ease, filter .12s ease;
   }
-  .fila-fab:hover { filter:brightness(1.08); }
-  .fila-fab.bounce {
-    animation: filaBounce .55s cubic-bezier(.2,.9,.25,1.35) both;
-  }
-  .fila-fab .ico {
-    font-size:28px; line-height:1;
-    filter: drop-shadow(0 3px 6px rgba(0,0,0,.28));
-  }
+  .fila-fab:hover { filter:brightness(1.08); transform: translateY(-1px); }
+  .fila-fab:active { transform: translateY(2px) scale(.98); }
+  .fila-fab.bounce { animation: filaBounce .45s cubic-bezier(.2,.9,.25,1.25) both; }
+  .fila-fab .ico { font-size:18px; line-height:1; filter: drop-shadow(0 2px 4px rgba(0,0,0,.25)); }
   .fila-fab .lbl {
-    font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; opacity:.96;
-    text-shadow: 0 1px 2px rgba(0,0,0,.25);
+    font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; opacity:.98;
   }
   .fila-fab .dot {
-    position:absolute; top:9px; right:9px;
-    width:13px; height:13px; border-radius:50%; background:transparent; display:none;
+    position:absolute; top:7px; right:8px;
+    width:10px; height:10px; border-radius:50%; background:transparent; display:none;
   }
   .fila-fab.hot {
     background:
-      radial-gradient(120% 90% at 20% 15%, rgba(255,255,255,.22), transparent 45%),
+      radial-gradient(120% 90% at 20% 15%, rgba(255,255,255,.18), transparent 45%),
       linear-gradient(145deg, #fca5a5 0%, #ef4444 48%, #b91c1c 100%);
-    box-shadow:0 16px 36px rgba(220,38,38,.5), 0 0 0 1px rgba(254,202,202,.35) inset;
+    box-shadow:0 10px 22px rgba(220,38,38,.4), inset 0 1px 0 rgba(255,255,255,.18);
     animation: filaFabPulse 1.05s ease-in-out infinite;
   }
   .fila-fab.hot.bounce, .fila-fab.first-quiet.bounce {
-    animation: filaBounce .55s cubic-bezier(.2,.9,.25,1.35) both;
+    animation: filaBounce .45s cubic-bezier(.2,.9,.25,1.25) both;
   }
   .fila-fab.hot .dot {
     display:block; background:#fecaca;
     animation: filaTremble .28s ease-in-out infinite, filaGlow 1.1s ease-out infinite;
   }
   .fila-fab.first-quiet {
-    background:
-      radial-gradient(120% 90% at 20% 15%, rgba(255,255,255,.14), transparent 45%),
-      linear-gradient(145deg, #b91c1c 0%, #7f1d1d 100%);
-    box-shadow:0 12px 28px rgba(127,29,29,.4);
+    background: linear-gradient(145deg, #b91c1c 0%, #7f1d1d 100%);
+    box-shadow:0 8px 18px rgba(127,29,29,.35);
     animation:none;
   }
   .fila-fab.first-quiet .dot {
     display:block; background:#fca5a5; animation:none;
   }
-  .fila-pop {
-    position:absolute; left:0; bottom:82px; z-index:42;
-    min-width:168px; padding:10px 12px 11px;
-    border-radius:16px;
-    background:rgba(15,23,42,.96);
-    border:1px solid rgba(147,197,253,.35);
-    box-shadow:0 18px 40px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.04) inset;
-    color:#e2e8f0; pointer-events:none;
-    opacity:0; transform: translateY(-18px) scale(.92);
-    display:none;
-  }
-  .fila-pop.on { display:block; animation: filaPopDrop .7s cubic-bezier(.2,.85,.25,1.2) both; }
-  .fila-pop .pop-ico { font-size:20px; display:block; margin-bottom:4px; }
-  .fila-pop .pop-title { font-size:12px; font-weight:800; letter-spacing:.04em; color:#fff; }
-  .fila-pop .pop-sub { font-size:11px; color:#93c5fd; margin-top:2px; }
-  .fila-pop::after {
-    content:""; position:absolute; left:26px; bottom:-7px;
-    width:12px; height:12px; background:rgba(15,23,42,.96);
-    border-right:1px solid rgba(147,197,253,.35);
-    border-bottom:1px solid rgba(147,197,253,.35);
-    transform: rotate(45deg);
-  }
   .fila-stop {
-    position:fixed; left:16px; bottom:100px; z-index:41;
-    height:40px; padding:0 14px; border:1px solid rgba(252,165,165,.35);
-    border-radius:14px; background:rgba(127,29,29,.95); color:#fecaca; font-weight:800;
+    height:40px; padding:0 12px; border:1px solid rgba(252,165,165,.35);
+    border-radius:12px; background:rgba(127,29,29,.95); color:#fecaca; font-weight:800;
     cursor:pointer; display:none; gap:6px; align-items:center;
-    box-shadow:0 10px 24px rgba(127,29,29,.35);
   }
   .fila-stop.on { display:inline-flex; }
   .fila-stop::before { content:"🔕"; font-size:14px; }
-  @keyframes filaIdle {
-    0%, 100% { transform: translateY(0); box-shadow: 0 16px 36px rgba(37,99,235,.48), 0 0 0 1px rgba(147,197,253,.35) inset; }
-    50% { transform: translateY(-4px); box-shadow: 0 22px 40px rgba(37,99,235,.55), 0 0 0 1px rgba(191,219,254,.45) inset; }
-  }
   @keyframes filaBounce {
     0% { transform: translateY(0) scale(1); }
-    28% { transform: translateY(14px) scale(.9); }
-    55% { transform: translateY(-18px) scale(1.08); }
-    75% { transform: translateY(4px) scale(.98); }
+    35% { transform: translateY(6px) scale(.96); }
+    70% { transform: translateY(-8px) scale(1.04); }
     100% { transform: translateY(0) scale(1); }
-  }
-  @keyframes filaPopDrop {
-    0% { opacity:0; transform: translateY(-22px) scale(.88); }
-    35% { opacity:1; transform: translateY(8px) scale(1.02); }
-    55% { opacity:1; transform: translateY(0) scale(1); }
-    78% { opacity:1; transform: translateY(-6px) scale(1); }
-    100% { opacity:0; transform: translateY(-20px) scale(.94); }
   }
   @keyframes filaFabPulse {
     0%, 100% { transform: translateY(0) scale(1); }
-    50% { transform: translateY(-3px) scale(1.05); }
+    50% { transform: translateY(-2px) scale(1.03); }
   }
   @keyframes filaTremble {
     0%, 100% { transform: translate(0,0) rotate(0deg); }
@@ -258,6 +212,16 @@
           <div class="pix-meta" id="pix-contas-meta"><span class="tag">PIX</span><span class="key" id="pix-contas-hint">—</span></div>
         </div>
         <div class="line"><span>Total</span><strong class="big" id="total-contas"></strong></div>
+        <div class="fila-slot" id="fila-slot-contas">
+          <button type="button" class="fila-stop" id="stop-fila-alert">Parar alerta</button>
+          <div class="fila-dock" id="fila-dock">
+            <button type="button" class="fila-fab" id="open-fila" title="Abrir fila do site">
+              <span class="dot" aria-hidden="true"></span>
+              <span class="ico" aria-hidden="true">👥</span>
+              <span class="lbl">Fila</span>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="budget-col">
         <label>Texto do orçamento</label>
@@ -292,6 +256,7 @@
           <div class="pix-meta" id="pix-montante-meta"><span class="tag">PIX</span><span class="key" id="pix-montante-hint">—</span></div>
         </div>
         <div class="line"><span>Total</span><strong class="big" id="total-montante"></strong></div>
+        <div class="fila-slot" id="fila-slot-montante"></div>
       </div>
       <div class="budget-col">
         <label>Texto do orçamento</label>
@@ -317,19 +282,6 @@
   </section>
   </div>
   <p class="credit"><span class="app-version" id="app-version">Versão —</span><span>Criado por Cauê BR</span></p>
-</div>
-<button type="button" class="fila-stop" id="stop-fila-alert">Parar alerta</button>
-<div class="fila-dock">
-  <div class="fila-pop" id="fila-pop" aria-hidden="true">
-    <span class="pop-ico" aria-hidden="true">🕺💃🚶</span>
-    <div class="pop-title">Fila na área</div>
-    <div class="pop-sub">Abrindo ao lado…</div>
-  </div>
-  <button type="button" class="fila-fab" id="open-fila" title="Abrir fila do site">
-    <span class="dot" aria-hidden="true"></span>
-    <span class="ico" aria-hidden="true">👥</span>
-    <span class="lbl">Fila</span>
-  </button>
 </div>
 
 <div class="modal open" id="login-gate">
@@ -709,6 +661,15 @@ const TAB_ORDER = ['contas', 'montante', 'divisao'];
 let currentTab = 'contas';
 let flipping = false;
 let pendingTab = '';
+function parkFilaControls(tab) {
+  const slotId = tab === 'montante' ? 'fila-slot-montante' : 'fila-slot-contas';
+  const slot = document.getElementById(slotId);
+  const dock = document.getElementById('fila-dock');
+  const stop = document.getElementById('stop-fila-alert');
+  if (!slot || !dock) return;
+  if (stop && stop.parentElement !== slot) slot.insertBefore(stop, dock);
+  if (dock.parentElement !== slot) slot.appendChild(dock);
+}
 function showTab(name) {
   if (!name || name === currentTab) return;
   if (flipping) { pendingTab = name; return; }
@@ -726,6 +687,7 @@ function showTab(name) {
     to.offsetWidth;
     to.classList.remove('flip-in-right', 'flip-in-left');
     currentTab = name;
+    if (name === 'contas' || name === 'montante') parkFilaControls(name);
     window.setTimeout(() => {
       flipping = false;
       const next = pendingTab;
@@ -1161,33 +1123,33 @@ function paintFilaAlertUi(isFirst, alerting) {
   fab.classList.toggle('first-quiet', !!(isFirst && !alerting));
   stop.classList.toggle('on', !!(isFirst && alerting));
 }
+function openFilaNow() {
+  const payload = JSON.stringify({ kind: 'fila', t: Date.now() });
+  const bridge = window.chrome && window.chrome.webview;
+  let sent = false;
+  if (bridge && typeof bridge.postMessage === 'function') {
+    try { bridge.postMessage(payload); sent = true; } catch (_) {}
+    try { bridge.postMessage({ kind: 'fila', t: Date.now() }); sent = true; } catch (_) {}
+  }
+  // Plano B: o host C# escuta mudança de título.
+  try {
+    const prev = document.title || 'Calculadora';
+    document.title = 'dfs:fila:' + Date.now();
+    setTimeout(() => { try { document.title = prev; } catch (_) {} }, 120);
+  } catch (_) {}
+  if (!sent) {
+    try { window.open('/fila.html', 'dfs-fila', 'width=420,height=760'); } catch (_) {}
+  }
+}
 document.getElementById('open-fila').addEventListener('click', () => {
   const fab = document.getElementById('open-fila');
-  const pop = document.getElementById('fila-pop');
   if (fab) {
     fab.classList.remove('bounce');
     void fab.offsetWidth;
     fab.classList.add('bounce');
-    setTimeout(() => fab.classList.remove('bounce'), 600);
+    setTimeout(() => fab.classList.remove('bounce'), 450);
   }
-  if (pop) {
-    pop.classList.remove('on');
-    void pop.offsetWidth;
-    pop.classList.add('on');
-    setTimeout(() => pop.classList.remove('on'), 720);
-  }
-  const openFila = () => {
-    const bridge = window.chrome && window.chrome.webview;
-    if (bridge && typeof bridge.postMessage === 'function') {
-      try { bridge.postMessage({ kind: 'fila' }); }
-      catch (e1) {
-        try { bridge.postMessage(JSON.stringify({ kind: 'fila' })); } catch (e2) {}
-      }
-      return;
-    }
-    window.open('/fila.html', 'dfs-fila', 'width=420,height=760');
-  };
-  setTimeout(openFila, 280);
+  openFilaNow();
 });
 document.getElementById('stop-fila-alert').addEventListener('click', () => {
   ensureFilaAudio();
