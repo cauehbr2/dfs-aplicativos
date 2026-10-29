@@ -16,9 +16,6 @@
   .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
   button, input, select, textarea { font:inherit; color:inherit; }
   .tabs button, .primary, .ghost { height:40px; border-radius:12px; padding:0 14px; cursor:pointer; font-weight:800; }
-  .gear { width:36px; height:36px; min-width:36px; padding:0; border-radius:10px; border:1px solid #3f3f46; background:#27272a; color:#e4e4e7; display:grid; place-items:center; cursor:pointer; }
-  .gear:hover { background:#3f3f46; }
-  .gear svg { width:18px; height:18px; display:block; }
   .stage { perspective:1400px; }
   .panel { transform-style:preserve-3d; backface-visibility:hidden; transition:transform .42s cubic-bezier(.2,.7,.2,1), opacity .42s; }
   .panel.flip-out-left { transform:rotateY(-88deg); opacity:.15; transform-origin:left center; }
@@ -43,11 +40,6 @@
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
   .chip { height:36px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; padding:0 10px; cursor:pointer; font-weight:700; }
   .chip.on { background:#2563eb; border-color:transparent; }
-  .pix-card { border:1px solid var(--line); border-radius:14px; padding:10px; margin-bottom:8px; display:grid; gap:8px; }
-  .band { display:grid; grid-template-columns:1fr 1fr 1fr 40px; gap:8px; margin-bottom:8px; align-items:end; }
-  .band button { height:44px; border-radius:12px; border:1px solid #3f3f46; background:#27272a; cursor:pointer; }
-  .checks { display:flex; gap:12px; align-items:center; font-size:13px; }
-  .checks label { margin:0; letter-spacing:0; text-transform:none; font-size:13px; color:#e4e4e7; }
   .modal { position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; padding:18px; }
   .modal.open { display:flex; }
   .sheet { width:min(760px,100%); max-height:88vh; overflow:auto; background:#18181b; border:1px solid var(--line); border-radius:20px; padding:16px; }
@@ -78,7 +70,6 @@
       <p class="sub" id="company-line">Entre para puxar faixa, taxa e Pix da empresa.</p>
     </div>
     <button class="ghost" id="logout" type="button">Sair</button>
-    <button class="gear" id="open-config" type="button" title="Pix e desconto" aria-label="Pix e desconto"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.1 7.1 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.88a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.64.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.58-.22 1.12-.54 1.63-.94l2.39.96c.24.1.51 0 .64-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></button>
   </div>
   <div class="tabs">
     <button type="button" class="on" data-tab="contas">Contas</button>
@@ -166,36 +157,6 @@
     <div class="actions"><button class="primary" id="login-go" type="button">Entrar</button></div>
   </div>
 </div>
-<div class="modal" id="modal">
-  <div class="sheet">
-    <p class="hint" id="site-note" hidden>Faixa, desconto e Pix desta tela vêm da empresa em que você entrou.</p>
-    <h2 style="margin:0 0 8px">Chaves Pix</h2>
-    <p class="hint">Marque Contas, Montante ou as duas. A aba usa a chave marcada e preenche o orçamento.</p>
-    <div class="fields" style="margin-top:12px">
-      <div><label>Tipo</label><select id="novo-tipo"><option>CPF</option><option>CNPJ</option><option>Telefone</option><option>E-mail</option><option>Aleatória</option></select></div>
-      <div><label>Chave</label><input id="novo-chave" /></div>
-      <div><label>Nome</label><input id="novo-nome" /></div>
-      <div><label>Banco</label><input id="novo-banco" /></div>
-    </div>
-    <div class="checks" style="margin:10px 0">
-      <label><input type="checkbox" id="novo-contas" checked style="width:auto;height:auto" /> Contas</label>
-      <label><input type="checkbox" id="novo-montante" checked style="width:auto;height:auto" /> Montante</label>
-    </div>
-    <button class="primary" id="add-pix" type="button">Adicionar chave</button>
-    <div id="pix-list" style="margin-top:14px"></div>
-    <h2 style="margin:18px 0 8px">Desconto do dia</h2>
-    <p class="hint">Contas: cada grupo tem as próprias faixas de quantidade. Sem faixa, o desconto daquele grupo fica 0. Se duas faixas servirem, vale a que começa no número mais alto. No orçamento o número continua editável.</p>
-    <div id="group-bands"></div>
-    <h3 style="margin:14px 0 8px;font-size:13px">Montante</h3>
-    <div id="bands-montante"></div>
-    <button class="ghost" id="add-band-montante" type="button">+ Faixa de montante</button>
-    <div class="actions">
-      <button class="primary" id="save-discount" type="button">Salvar desconto do dia</button>
-      <button class="ghost" id="close-config" type="button">Fechar</button>
-    </div>
-  </div>
-</div>
-
 <script>
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const KEY = 'dfs-calculadora-pix';
@@ -214,6 +175,15 @@ const rates = [
 const rules = [[200,1],[300,2],[400,2],[500,3],[600,3],[700,4],[800,5],[900,5],[1000,6]];
 let pixKeys = [];
 let campaigns = [];
+let budget = {
+  templateIdContas: 'contas-formal',
+  templateIdMontante: 'montante-formal',
+  messageContas: '',
+  messageMontante: '',
+  templateBodies: {},
+  templates: {},
+  defaults: { CONTAS: 'contas-formal', MONTANTE: 'montante-formal' },
+};
 let siteOn = false;
 let faixaGroup = '';
 let faixaOpen = false;
@@ -221,15 +191,8 @@ let rateId = '1.5';
 let pixContas = '';
 let pixMontante = '';
 let usingFile = false;
-const GROUPS = ['Grupo 01', 'Grupo 02', 'Grupo 03'];
-function blankDiscount() {
-  return { contas: { 'Grupo 01': [], 'Grupo 02': [], 'Grupo 03': [] }, montante: [] };
-}
-let discountDay = blankDiscount();
-
 function snapshot() {
   return {
-    pixKeys,
     rateId,
     pixContas,
     pixMontante,
@@ -237,19 +200,7 @@ function snapshot() {
     qtdContas: document.getElementById('qtd-contas').value,
     montante: document.getElementById('montante').value,
     qtdMontante: document.getElementById('qtd-montante').value,
-    discountDay,
   };
-}
-function discountFor(list, value) {
-  const matched = (list || []).filter((band) => {
-    const from = Number(band.from) || 0;
-    const to = Number(band.to) || 0;
-    if (!(to > 0) || to + 1e-9 < from) return false;
-    return value + 1e-9 >= from && value <= to + 1e-9;
-  });
-  if (!matched.length) return 0;
-  matched.sort((a, b) => (Number(b.from) || 0) - (Number(a.from) || 0));
-  return Number(matched[0].percent) || 0;
 }
 const DAY_KEYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
 function sameGroup(a, b) {
@@ -329,61 +280,17 @@ function campaignMontante(value) {
   matched.sort((a, b) => (Number(b.percent) || 0) - (Number(a.percent) || 0));
   return Number(matched[0].percent) || 0;
 }
-function discountContas(group, qty) {
-  if (siteOn) {
-    const percent = campaignContas(group);
-    if (percent != null) return percent;
-  }
-  return discountFor(discountDay.contas[group] || [], qty);
+function discountContas(group) {
+  if (!siteOn) return 0;
+  const percent = campaignContas(group);
+  return percent == null ? 0 : percent;
 }
 function discountMontante(value) {
-  if (siteOn) {
-    const percent = campaignMontante(value);
-    if (percent != null) return percent;
-  }
-  return value > 0 ? discountFor(discountDay.montante, value) : 0;
+  if (!siteOn || !(Number(value) > 0)) return 0;
+  const percent = campaignMontante(value);
+  return percent == null ? 0 : percent;
 }
-function asBand(band) {
-  return { from: Number(band && band.from) || 0, to: Number(band && band.to) || 0, percent: Number(band && band.percent) || 0 };
-}
-function asBands(list) { return Array.isArray(list) ? list.map(asBand) : []; }
-function bandRow(band, module) {
-  const moneyBand = module === 'montante';
-  const fromLabel = moneyBand ? 'De R$' : 'De (contas)';
-  const toLabel = moneyBand ? 'Até R$' : 'Até (contas)';
-  return `<div class="band">
-    <div><label>${fromLabel}</label><input data-from type="number" min="0" step="1" value="${band.from}" /></div>
-    <div><label>${toLabel}</label><input data-to type="number" min="0" step="1" value="${band.to}" /></div>
-    <div><label>Desconto %</label><input data-pct type="number" min="0" step="0.01" value="${band.percent}" /></div>
-    <button type="button" data-drop-band="${module}" title="Remover">×</button>
-  </div>`;
-}
-function renderBands() {
-  document.getElementById('group-bands').innerHTML = GROUPS.map((group) => {
-    const rows = (discountDay.contas[group] || []).map((band) => bandRow(band, group)).join('');
-    return `<h3 style="margin:14px 0 8px;font-size:13px">${group}</h3><div data-group="${group}">${rows || '<p class="hint">Sem desconto neste grupo.</p>'}</div><button class="ghost" type="button" data-add-group="${group}">+ Faixa do ${group}</button>`;
-  }).join('');
-  document.getElementById('bands-montante').innerHTML = discountDay.montante.map((band) => bandRow(band, 'montante')).join('');
-}
-function readRows(box) {
-  if (!box) return [];
-  return Array.from(box.querySelectorAll('.band')).map((row) => ({
-    from: Number(row.querySelector('[data-from]').value) || 0,
-    to: Number(row.querySelector('[data-to]').value) || 0,
-    percent: Number(row.querySelector('[data-pct]').value) || 0,
-  }));
-}
-function readGroup(group) {
-  return readRows(document.querySelector('#group-bands [data-group="' + group + '"]'));
-}
-function readBands(module) {
-  return readRows(document.getElementById('bands-' + module));
-}
-function pullBandsFromForm() {
-  GROUPS.forEach((group) => { discountDay.contas[group] = readGroup(group); });
-  discountDay.montante = readBands('montante');
-}
-function savePix() {
+function savePrefs() {
   const data = snapshot();
   localStorage.setItem(KEY, JSON.stringify(data));
   if (!usingFile) return;
@@ -402,7 +309,7 @@ function stamp() {
   return `Gerado em: ${day} às ${time}`;
 }
 function keysFor(module) {
-  return pixKeys.filter((item) => module === 'contas' ? item.contas : item.montante);
+  return pixKeys.filter((item) => module === 'contas' ? !!item.contas : !!item.montante);
 }
 function pick(module, current) {
   const list = keysFor(module);
@@ -429,50 +336,54 @@ function qtdFromMontante(value) {
   const extra = Math.floor((value - last.montante) / (last.montante - prev.montante));
   return last.qtd + extra * ((last.qtd - prev.qtd) || 1);
 }
+function renderBudgetTemplate(body, vars) {
+  return String(body || '').replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const value = vars[key];
+    return value == null ? '' : String(value);
+  });
+}
+function budgetBody(kind) {
+  const id = kind === 'CONTAS' ? budget.templateIdContas : budget.templateIdMontante;
+  const fallback = (budget.defaults && budget.defaults[kind]) || (kind === 'CONTAS' ? 'contas-formal' : 'montante-formal');
+  const custom = budget.templateBodies && budget.templateBodies[id];
+  if (typeof custom === 'string' && custom.trim()) return custom;
+  const pack = (budget.templates && (budget.templates[id] || budget.templates[fallback])) || null;
+  if (pack && pack.body) return pack.body;
+  return kind === 'CONTAS'
+    ? `💬 *ORÇAMENTO CONTAS*\n\nChave Pix - {{tipoPix}}\nChave: \`\`\`{{chavePix}}\`\`\`\nNome: {{nomeTitular}}\nBanco: {{banco}}\n\nFaixa: {{faixa}}\nQnt. contas: {{qtdContas}}\nDesconto: {{desconto}}%\n\n✅ *Total: R$ {{valorFinal}}*\n\n*MARCAR ESTA MENSAGEM COM O COMPROVANTE*`
+    : `💬 *ORÇAMENTO MONTANTE*\n\nChave Pix - {{tipoPix}}\nChave: \`\`\`{{chavePix}}\`\`\`\nNome: {{nomeTitular}}\nBanco: {{banco}}\n\nMontante: R$ {{montante}}\nQnt. contas: {{qtdContas}}\nTaxa: {{taxa}}%\nDesconto: {{desconto}}%\n\n✅ *Total: R$ {{valorFinal}}*\n\n*MARCAR ESTA MENSAGEM COM O COMPROVANTE*`;
+}
+function appendBudgetFooter(base, extra) {
+  const trimmed = String(extra || '').trim();
+  return trimmed ? base + '\n\n' + trimmed : base;
+}
 function messageContas(pix, range, qtd, desconto, total) {
-  const tipo = pix ? pix.tipo : 'Não informada';
-  const chave = pix ? pix.chave : 'Não informada';
-  const nome = pix ? pix.nome : 'Não informada';
-  const banco = pix ? pix.banco : 'Não informada';
-  return `*ORÇAMENTO CONTAS*
-
-Chave Pix - ${tipo}
-Chave: \`\`\`${chave}\`\`\`
-Nome: ${nome}
-Banco: ${banco}
-
-Faixa: ${faixaLabel(range)}
-Qnt. contas: ${pad(qtd)}
-Desconto: ${desconto}%
-
-✅ *Total: R$ ${plain(total)}*
-
-*MARCAR ESTA MENSAGEM COM O COMPROVANTE*
-
-${stamp()}`;
+  const body = renderBudgetTemplate(budgetBody('CONTAS'), {
+    tipoPix: pix ? pix.tipo : 'Não informada',
+    chavePix: pix ? pix.chave : 'Não informada',
+    nomeTitular: pix ? pix.nome : 'Não informada',
+    banco: pix ? pix.banco : 'Não informada',
+    faixa: range ? faixaLabel(range) : 'Nenhuma',
+    qtdContas: pad(qtd),
+    desconto,
+    valorUnitario: range ? plain(range.price) : '0,00',
+    valorFinal: plain(total),
+  });
+  return appendBudgetFooter(body, budget.messageContas) + '\n\n' + stamp();
 }
 function messageMontante(pix, montante, qtd, taxa, desconto, total) {
-  const tipo = pix ? pix.tipo : 'Não informada';
-  const chave = pix ? pix.chave : 'Não informada';
-  const nome = pix ? pix.nome : 'Não informada';
-  const banco = pix ? pix.banco : 'Não informada';
-  return `*ORÇAMENTO MONTANTE*
-
-Chave Pix - ${tipo}
-Chave: \`\`\`${chave}\`\`\`
-Nome: ${nome}
-Banco: ${banco}
-
-Montante: R$ ${plain(montante)}
-Qnt. contas: ${pad(qtd)}
-Taxa: ${taxa}%
-Desconto: ${desconto}%
-
-✅ *Total: R$ ${plain(total)}*
-
-*MARCAR ESTA MENSAGEM COM O COMPROVANTE*
-
-${stamp()}`;
+  const body = renderBudgetTemplate(budgetBody('MONTANTE'), {
+    tipoPix: pix ? pix.tipo : 'Não informada',
+    chavePix: pix ? pix.chave : 'Não informada',
+    nomeTitular: pix ? pix.nome : 'Não informada',
+    banco: pix ? pix.banco : 'Não informada',
+    montante: plain(montante),
+    qtdContas: pad(qtd),
+    taxa,
+    desconto,
+    valorFinal: plain(total),
+  });
+  return appendBudgetFooter(body, budget.messageMontante) + '\n\n' + stamp();
 }
 function faixaLabelOf(item) {
   return item.name + ' (' + money.format(item.price) + '/un)';
@@ -515,6 +426,7 @@ function renderPixSelects() {
   };
   fill('pix-contas', 'contas', pixContas);
   fill('pix-montante', 'montante', pixMontante);
+  savePrefs();
 }
 function selectedRange() {
   return ranges.find((item) => item.id === document.getElementById('faixa').value) || null;
@@ -522,8 +434,7 @@ function selectedRange() {
 function applyAutoContas() {
   const range = selectedRange();
   if (!range) return;
-  const qtd = Number(document.getElementById('qtd-contas').value) || 0;
-  document.getElementById('desc-contas').value = discountContas(range.group, qtd);
+  document.getElementById('desc-contas').value = discountContas(range.group);
 }
 function applyAutoMontante() {
   const montante = Number(document.getElementById('montante').value) || 0;
@@ -553,15 +464,6 @@ function renderMontante() {
   const total = Math.max(0, subtotal - subtotal * (desconto / 100));
   document.getElementById('total-montante').textContent = money.format(total);
   document.getElementById('texto-montante').value = messageMontante(keyById(pixMontante), montante, Number(document.getElementById('qtd-montante').value) || qtd, taxa, desconto, total);
-}
-function renderPixList() {
-  document.getElementById('pix-list').innerHTML = pixKeys.map((item) => `
-    <div class="pix-card">
-      <strong>${item.nome || 'Sem nome'} · ${item.tipo}</strong>
-      <span>${item.chave} · ${item.banco}</span>
-      <span class="hint">${item.contas ? 'Contas' : ''}${item.contas && item.montante ? ' · ' : ''}${item.montante ? 'Montante' : ''}</span>
-      <button class="ghost" type="button" data-remove="${item.id}">Remover</button>
-    </div>`).join('') || '<p class="hint">Nenhuma chave ainda.</p>';
 }
 function paint() { renderPixSelects(); renderContas(); renderMontante(); }
 const TAB_ORDER = ['contas', 'montante', 'divisao'];
@@ -635,75 +537,6 @@ async function copy(id, button) {
 }
 document.getElementById('copy-contas').addEventListener('click', (event) => copy('texto-contas', event.target));
 document.getElementById('copy-montante').addEventListener('click', (event) => copy('texto-montante', event.target));
-document.getElementById('open-config').addEventListener('click', () => {
-  document.getElementById('site-note').hidden = !siteOn;
-  renderPixList();
-  renderBands();
-  document.getElementById('modal').classList.add('open');
-});
-document.getElementById('save-discount').addEventListener('click', () => {
-  pullBandsFromForm();
-  savePix();
-  applyAutoContas();
-  applyAutoMontante();
-  paint();
-});
-document.getElementById('add-band-montante').addEventListener('click', () => {
-  pullBandsFromForm();
-  discountDay.montante.push({ from: 0, to: 0, percent: 0 });
-  renderBands();
-});
-document.getElementById('modal').addEventListener('click', (event) => {
-  const add = event.target.dataset.addGroup;
-  if (add) {
-    pullBandsFromForm();
-    discountDay.contas[add].push({ from: 0, to: 0, percent: 0 });
-    renderBands();
-    return;
-  }
-  const module = event.target.dataset.dropBand;
-  if (!module) return;
-  const row = event.target.closest('.band');
-  pullBandsFromForm();
-  if (module === 'montante') {
-    const box = document.getElementById('bands-montante');
-    const index = Array.from(box.children).indexOf(row);
-    discountDay.montante.splice(index, 1);
-  } else if (discountDay.contas[module]) {
-    const box = document.querySelector('#group-bands [data-group="' + module + '"]');
-    const index = Array.from(box.querySelectorAll('.band')).indexOf(row);
-    discountDay.contas[module].splice(index, 1);
-  }
-  renderBands();
-});
-document.getElementById('close-config').addEventListener('click', () => document.getElementById('modal').classList.remove('open'));
-document.getElementById('add-pix').addEventListener('click', () => {
-  const chave = document.getElementById('novo-chave').value.trim();
-  const nome = document.getElementById('novo-nome').value.trim();
-  if (!chave || !nome) return;
-  pixKeys.push({
-    id: String(Date.now()),
-    tipo: document.getElementById('novo-tipo').value,
-    chave,
-    nome,
-    banco: document.getElementById('novo-banco').value.trim(),
-    contas: document.getElementById('novo-contas').checked,
-    montante: document.getElementById('novo-montante').checked,
-  });
-  document.getElementById('novo-chave').value = '';
-  document.getElementById('novo-nome').value = '';
-  document.getElementById('novo-banco').value = '';
-  savePix();
-  renderPixList();
-  paint();
-});
-document.getElementById('pix-list').addEventListener('click', (event) => {
-  if (!event.target.dataset.remove) return;
-  pixKeys = pixKeys.filter((item) => item.id !== event.target.dataset.remove);
-  savePix();
-  renderPixList();
-  paint();
-});
 
 const MIN_REAIS = 5;
 function randomSplit(total, count, minimum) {
@@ -764,12 +597,7 @@ document.getElementById('split-reset').addEventListener('click', () => {
 });
 
 function applySaved(data) {
-  if (!data || typeof data !== 'object') return;
-  if (Array.isArray(data)) {
-    pixKeys = data;
-    return;
-  }
-  if (Array.isArray(data.pixKeys)) pixKeys = data.pixKeys;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return;
   if (data.rateId) rateId = data.rateId;
   if (data.pixContas) pixContas = data.pixContas;
   if (data.pixMontante) pixMontante = data.pixMontante;
@@ -777,20 +605,14 @@ function applySaved(data) {
   if (data.qtdContas) document.getElementById('qtd-contas').value = data.qtdContas;
   if (data.montante) document.getElementById('montante').value = data.montante;
   if (data.qtdMontante) document.getElementById('qtd-montante').value = data.qtdMontante;
-  if (data.discountDay && typeof data.discountDay === 'object') {
-    const saved = data.discountDay;
-    discountDay = blankDiscount();
-    if (Array.isArray(saved.contas)) {
-      const shared = asBands(saved.contas);
-      GROUPS.forEach((group) => { discountDay.contas[group] = shared.map((band) => ({ ...band })); });
-    } else if (saved.contas && typeof saved.contas === 'object') {
-      GROUPS.forEach((group) => { discountDay.contas[group] = asBands(saved.contas[group]); });
-    }
-    discountDay.montante = asBands(saved.montante);
-  }
 }
 function applyCatalog(catalog) {
-  if (!catalog || !catalog.ok) return;
+  if (!catalog || !catalog.ok) {
+    siteOn = false;
+    pixKeys = [];
+    campaigns = [];
+    return;
+  }
   siteOn = true;
   if (Array.isArray(catalog.ranges) && catalog.ranges.length) ranges = catalog.ranges;
   if (Array.isArray(catalog.rates) && catalog.rates.length) {
@@ -798,35 +620,75 @@ function applyCatalog(catalog) {
     if (!rates.some((item) => item.id === rateId)) rateId = rates[0].id;
   }
   if (Array.isArray(catalog.rules) && catalog.rules.length) rules = catalog.rules;
-  if (Array.isArray(catalog.pix)) pixKeys = catalog.pix;
+  pixKeys = Array.isArray(catalog.pix) ? catalog.pix : [];
   campaigns = Array.isArray(catalog.campaigns) ? catalog.campaigns : [];
+  if (catalog.budget && typeof catalog.budget === 'object') {
+    budget = {
+      templateIdContas: catalog.budget.templateIdContas || budget.templateIdContas,
+      templateIdMontante: catalog.budget.templateIdMontante || budget.templateIdMontante,
+      messageContas: catalog.budget.messageContas || '',
+      messageMontante: catalog.budget.messageMontante || '',
+      templateBodies: catalog.budget.templateBodies || {},
+      templates: catalog.budget.templates || budget.templates || {},
+      defaults: catalog.budget.defaults || budget.defaults,
+    };
+  }
   const line = document.getElementById('company-line');
-  if (line) line.textContent = catalog.companyName ? 'Empresa: ' + catalog.companyName : 'Cadastro do site';
+  if (line) {
+    const pixCount = pixKeys.length;
+    line.textContent = (catalog.companyName ? 'Empresa: ' + catalog.companyName : 'Cadastro do site')
+      + (pixCount ? ' · ' + pixCount + ' Pix' : ' · Pix do site');
+  }
 }
-let captchaLoading = null;
-function loadCaptcha(key) {
-  if (window.grecaptcha && window.grecaptcha.execute) return Promise.resolve();
-  if (captchaLoading) return captchaLoading;
-  captchaLoading = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://www.google.com/recaptcha/api.js?render=' + encodeURIComponent(key);
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => { captchaLoading = null; reject(new Error('Não carregou a proteção do Google.')); };
-    document.head.appendChild(script);
-  });
-  return captchaLoading;
+function panelOrigin(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  try {
+    const url = new URL(/^https?:\/\//i.test(text) ? text : 'https://' + text);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return '';
+    return url.origin;
+  } catch (e) {
+    return '';
+  }
 }
-async function loginCaptcha() {
-  const cfg = await fetch('/painel/captcha').then((response) => response.json());
-  if (!cfg.enabled || !cfg.siteKey) return '';
-  await loadCaptcha(cfg.siteKey);
-  if (!window.grecaptcha) throw new Error('A proteção do Google não carregou.');
+function askHostCaptcha(origin, siteKey) {
+  const bridge = window.chrome && window.chrome.webview;
+  if (!bridge || typeof bridge.postMessage !== 'function') {
+    return Promise.reject(new Error('Abra pelo app Calculadora para o Google liberar a entrada.'));
+  }
   return new Promise((resolve, reject) => {
-    window.grecaptcha.ready(() => {
-      window.grecaptcha.execute(cfg.siteKey, { action: 'login' }).then(resolve).catch(() => reject(new Error('O Google não confirmou a entrada.')));
-    });
+    const finish = (token, message) => {
+      try { bridge.removeEventListener('message', onMsg); } catch (e) {}
+      if (token) resolve(token);
+      else reject(new Error(message || 'O Google não confirmou a entrada.'));
+    };
+    const onMsg = (event) => {
+      let data = event && event.data;
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch (e) { return; }
+      }
+      if (!data || data.kind !== 'captcha') return;
+      finish(String(data.token || ''), String(data.message || ''));
+    };
+    try { bridge.addEventListener('message', onMsg); } catch (e) {
+      reject(new Error('Abra pelo app Calculadora para o Google liberar a entrada.'));
+      return;
+    }
+    try {
+      bridge.postMessage(JSON.stringify({ kind: 'captcha', origin, siteKey }));
+    } catch (e) {
+      finish('', 'Não pedi a proteção do Google.');
+    }
+    setTimeout(() => finish('', 'O Google não confirmou a entrada a tempo.'), 25000);
   });
+}
+async function loginCaptcha(origin) {
+  const cfg = await fetch('/painel/captcha', { cache: 'no-store' }).then((response) => response.json());
+  if (!cfg.enabled || !cfg.siteKey) return '';
+  const site = panelOrigin(origin) || panelOrigin(cfg.origin) || '';
+  if (!site) throw new Error('O link da empresa não serve. Use o endereço do site, com https.');
+  return askHostCaptcha(site, cfg.siteKey);
 }
 async function enterApp() {
   const session = await fetch('/painel/status').then((response) => response.json());
@@ -839,7 +701,9 @@ async function enterApp() {
   const line = document.getElementById('company-line');
   if (line && session.companyName) line.textContent = 'Empresa: ' + session.companyName;
   let catalog = null;
-  try { catalog = await fetch('/site/catalogo').then((response) => response.json()); } catch (e) {}
+  try {
+    catalog = await fetch('/site/catalogo?ts=' + Date.now(), { cache: 'no-store' }).then((response) => response.json());
+  } catch (e) {}
   if (catalog && catalog.message && !catalog.ok && line) line.textContent = catalog.message;
   applyCatalog(catalog);
   renderRanges();
@@ -852,14 +716,34 @@ document.getElementById('login-go').addEventListener('click', async () => {
   const error = document.getElementById('login-error');
   error.textContent = 'Entrando...';
   try {
-    const recaptchaToken = await loginCaptcha();
+    const link = document.getElementById('login-slug').value || 'elite';
+    const origin = panelOrigin(link);
+    if (/^https?:\/\//i.test(String(link).trim()) && !origin) {
+      error.textContent = 'O link da empresa não serve. Use o endereço do site, com https.';
+      return;
+    }
+    if (origin) {
+      const saved = await fetch('/painel/site', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin }),
+      }).then((response) => response.json().then((json) => ({ ok: response.ok, json })));
+      if (!saved.ok) {
+        error.textContent = (saved.json && saved.json.message) || 'Não guardei o link do site.';
+        return;
+      }
+    }
+    error.textContent = 'Confirmando com o Google...';
+    const recaptchaToken = await loginCaptcha(origin || link);
+    error.textContent = 'Entrando...';
     const response = await fetch('/painel/entrar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: document.getElementById('login-email').value,
         password: document.getElementById('login-pass').value,
-        companySlug: document.getElementById('login-slug').value || 'elite',
+        companySlug: link,
+        origin: origin || '',
         recaptchaToken,
       }),
     });
@@ -877,7 +761,10 @@ document.getElementById('login-go').addEventListener('click', async () => {
 document.getElementById('logout').addEventListener('click', async () => {
   await fetch('/painel/sair', { method: 'POST' });
   siteOn = false;
+  pixKeys = [];
+  campaigns = [];
   document.getElementById('company-line').textContent = 'Entre para puxar faixa, taxa e Pix da empresa.';
+  paint();
   document.getElementById('login-gate').classList.add('open');
 });
 async function loadAppVersion() {

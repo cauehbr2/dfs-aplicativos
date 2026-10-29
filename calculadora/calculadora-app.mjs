@@ -12,8 +12,16 @@ const sessionFile = path.join(dataDir, 'painel-sessao.json');
 const siteFile = path.join(dataDir, 'painel-site.json');
 const htmlFile = path.join(codeDir, 'calculadora.html');
 const versionFile = path.join(codeDir, 'app-versao.txt');
+const templatesFile = path.join(codeDir, 'budget-templates.json');
 const defaultOrigin = 'https://renovanow.online';
 const port = 8765;
+function loadBudgetTemplates() {
+  try {
+    return JSON.parse(fs.readFileSync(templatesFile, 'utf8'));
+  } catch (e) {
+    return { defaults: { CONTAS: 'contas-formal', MONTANTE: 'montante-formal' }, templates: {} };
+  }
+}
 
 fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(dataFile)) fs.writeFileSync(dataFile, '{}\n');
@@ -36,6 +44,26 @@ function readOrigin() {
     return url.origin;
   } catch (e) {
     return defaultOrigin;
+  }
+}
+function writeOrigin(origin) {
+  const url = new URL(String(origin || ''));
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('O link da empresa não serve.');
+  if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') throw new Error('O link da empresa não serve.');
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(siteFile, JSON.stringify({ origin: url.origin }));
+  captchaCache = null;
+}
+function panelOrigin(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  try {
+    const url = new URL(/^https?:\/\//i.test(text) ? text : 'https://' + text);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return '';
+    return url.origin;
+  } catch (e) {
+    return '';
   }
 }
 function readSession() {
@@ -117,10 +145,12 @@ function panelGet(url) {
 let captchaCache = null;
 async function captchaConfig() {
   if (captchaCache) return captchaCache;
-  const json = await panelGet(readOrigin() + '/?dfs_api=site');
+  const origin = readOrigin();
+  const json = await panelGet(origin + '/?dfs_api=site');
   captchaCache = {
     enabled: !!json.recaptchaEnabled && !!json.recaptchaSiteKey,
     siteKey: json.recaptchaSiteKey || '',
+    origin,
   };
   return captchaCache;
 }
@@ -155,17 +185,23 @@ function rateLabel(item) {
   const base = mult.toLocaleString('pt-BR') + ' x ' + taxa.toLocaleString('pt-BR') + '%';
   return item.observacao ? base + ' · ' + item.observacao : base;
 }
+function pixFlag(value) {
+  return value === true || value === 1 || value === '1' || String(value || '').toLowerCase() === 'true';
+}
 function pixRow(item, id) {
   const chave = String(item.chave || '').trim();
   if (!chave || item.ativa === false) return null;
+  const contas = item.exibirContas == null ? true : pixFlag(item.exibirContas);
+  const montante = item.exibirMontante == null ? true : pixFlag(item.exibirMontante);
+  if (!contas && !montante) return null;
   return {
     id: id || item.id || chave,
-    tipo: item.tipoChave || 'CPF',
+    tipo: item.tipoChave || item.tipo || 'CPF',
     chave,
     nome: String(item.nomeCompleto || item.nome || '').trim(),
     banco: String(item.bancoInstituicao || item.banco || '').trim(),
-    contas: item.exibirContas !== false,
-    montante: item.exibirMontante !== false,
+    contas,
+    montante,
   };
 }
 function userInCompany(user, companyId) {
@@ -180,13 +216,15 @@ async function pullCatalog(session) {
   }
   const filters = [{ field: 'companyId', op: '==', value: session.companyId }];
   const body = { filters, limit: 0, dfs_token: session.token };
-  const [rangesRes, campaignsRes, ratesRes, rulesRes, pixRes, usersRes] = await Promise.all([
+  const budgetId = 'calculator_budget_' + session.companyId;
+  const [rangesRes, campaignsRes, ratesRes, rulesRes, pixRes, usersRes, budgetRes] = await Promise.all([
     panelRequest('query', { ...body, collection: 'calculatorRanges' }),
     panelRequest('query', { ...body, collection: 'campaigns' }),
     panelRequest('query', { ...body, collection: 'calculatorMontanteRates' }),
     panelRequest('query', { ...body, collection: 'calculatorMontanteAccountRules' }),
     panelRequest('query', { ...body, collection: 'calculatorPixKeys' }),
     panelRequest('query', { collection: 'users', limit: 0, dfs_token: session.token }),
+    panelRequest('read', { collection: 'settings', id: budgetId, dfs_token: session.token }),
   ]);
   const pix = [];
   const seen = new Set();
@@ -214,11 +252,23 @@ async function pullCatalog(session) {
     list.forEach((item) => pushPix(pixRow(item, 'user-' + user.id + '-' + (item.id || item.chave))));
   });
   pix.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const packed = loadBudgetTemplates();
+  const budgetDoc = (budgetRes && budgetRes.json && budgetRes.json.data) || {};
+  const budget = {
+    templateIdContas: String(budgetDoc.templateIdContas || packed.defaults.CONTAS || 'contas-formal'),
+    templateIdMontante: String(budgetDoc.templateIdMontante || packed.defaults.MONTANTE || 'montante-formal'),
+    messageContas: String(budgetDoc.messageContas || ''),
+    messageMontante: String(budgetDoc.messageMontante || ''),
+    templateBodies: budgetDoc.templateBodies && typeof budgetDoc.templateBodies === 'object' ? budgetDoc.templateBodies : {},
+    templates: packed.templates || {},
+    defaults: packed.defaults || {},
+  };
   const catalog = {
     ok: true,
     companyId: session.companyId,
     companyName: session.companyName || '',
     companySlug: session.companySlug || '',
+    budget,
     ranges: rowsOf(rangesRes).map((item) => ({
       id: item.id,
       group: rangeGroup(item),
@@ -301,7 +351,27 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url === '/painel/captcha' && req.method === 'GET') {
-    captchaConfig().then((cfg) => sendJson(res, 200, cfg)).catch(() => sendJson(res, 200, { enabled: false, siteKey: '' }));
+    captchaConfig().then((cfg) => sendJson(res, 200, cfg)).catch(() => sendJson(res, 200, { enabled: false, siteKey: '', origin: readOrigin() }));
+    return;
+  }
+  if (url === '/painel/site' && req.method === 'GET') {
+    sendJson(res, 200, { origin: readOrigin() });
+    return;
+  }
+  if (url === '/painel/site' && req.method === 'POST') {
+    readBody(req).then((body) => {
+      try {
+        const origin = panelOrigin(body.origin || body.companySlug || body.link || '');
+        if (!origin) {
+          sendJson(res, 400, { message: 'O link da empresa não serve. Use o endereço do site, com https.' });
+          return;
+        }
+        writeOrigin(origin);
+        sendJson(res, 200, { ok: true, origin });
+      } catch (e) {
+        sendJson(res, 400, { message: e.message || 'Não guardei o link do site.' });
+      }
+    }).catch(() => sendJson(res, 400, { message: 'Não li o link do site.' }));
     return;
   }
   if (url === '/painel/status' && req.method === 'GET') {
@@ -316,7 +386,9 @@ const server = http.createServer((req, res) => {
   if (url === '/painel/entrar' && req.method === 'POST') {
     readBody(req).then(async (body) => {
       try {
-        const slug = companySlug(body.companySlug) || 'elite';
+        const origin = panelOrigin(body.origin || body.companySlug || body.link || '');
+        if (origin) writeOrigin(origin);
+        const slug = companySlug(body.companySlug || body.link || '') || 'elite';
         const result = await panelRequest('auth/login', {
           email: String(body.email || '').trim(),
           password: String(body.password || ''),
