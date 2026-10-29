@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Contas — operações</title>
+<title>Operações</title>
 <style>
   :root {
     --bg: #09090b;
@@ -394,18 +394,27 @@
 
 <div class="modal" id="panel-modal">
   <div class="sheet">
-    <h2 style="margin:0 0 8px">Entrar no site</h2>
-    <p class="hint" id="panel-help">O link abre o login do painel. Quando a entrada termina, o programa volta com o seu nome, os clientes e as faixas. O botão Sincronizar manda as operações deste período para o site.</p>
+    <h2 style="margin:0 0 8px">Entrar</h2>
+    <p class="hint" id="panel-help">O login é o mesmo da Calculadora: link da empresa, e-mail e senha. Depois o Sincronizar manda as operações deste período para o site.</p>
     <form id="panel-login">
       <div class="fields" style="margin-top:12px">
         <div class="span2">
-          <label>Link do painel</label>
-          <input id="panel-slug" value="https://renovanow.online" placeholder="https://renovanow.online" />
+          <label>Link da empresa</label>
+          <input id="panel-slug" value="" placeholder="elite ou https://site/#/login/empresa" />
+        </div>
+        <div class="span2">
+          <label>E-mail</label>
+          <input id="panel-email" type="email" autocomplete="username" />
+        </div>
+        <div class="span2">
+          <label>Senha</label>
+          <input id="panel-pass" type="password" autocomplete="current-password" />
         </div>
       </div>
+      <p class="hint" id="panel-login-error" style="min-height:18px"></p>
       <div class="form-actions">
         <button class="ghost" id="panel-close" type="button" hidden>Continuar</button>
-        <button class="primary" type="submit">Entrar no site</button>
+        <button class="primary" type="submit">Entrar</button>
       </div>
       <label class="save-login"><input id="save-login" type="checkbox" /> Salvar este login</label>
     </form>
@@ -1903,36 +1912,43 @@ function companySlug(value) {
   }
   return text.replace(/^\/+|\/+$/g, '');
 }
-let captchaLoading = null;
-function loadCaptcha(key) {
-  if (window.grecaptcha && window.grecaptcha.execute) return Promise.resolve();
-  if (captchaLoading) return captchaLoading;
-  captchaLoading = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://www.google.com/recaptcha/api.js?render=' + encodeURIComponent(key);
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => {
-      captchaLoading = null;
-      reject(new Error('Não carregou a proteção do Google.'));
+function askHostCaptcha(origin, siteKey) {
+  const bridge = window.chrome && window.chrome.webview;
+  if (!bridge || typeof bridge.postMessage !== 'function') {
+    return Promise.reject(new Error('Abra pelo app Operações para o Google liberar a entrada.'));
+  }
+  return new Promise((resolve, reject) => {
+    const finish = (token, message) => {
+      try { bridge.removeEventListener('message', onMsg); } catch (e) {}
+      if (token) resolve(token);
+      else reject(new Error(message || 'O Google não confirmou a entrada.'));
     };
-    document.head.appendChild(script);
+    const onMsg = (event) => {
+      let data = event && event.data;
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch (e) { return; }
+      }
+      if (!data || data.kind !== 'captcha') return;
+      finish(String(data.token || ''), String(data.message || ''));
+    };
+    try { bridge.addEventListener('message', onMsg); } catch (e) {
+      reject(new Error('Abra pelo app Operações para o Google liberar a entrada.'));
+      return;
+    }
+    try {
+      bridge.postMessage(JSON.stringify({ kind: 'captcha', origin, siteKey }));
+    } catch (e) {
+      finish('', 'Não pedi a proteção do Google.');
+    }
+    setTimeout(() => finish('', 'O Google não confirmou a entrada a tempo.'), 45000);
   });
-  return captchaLoading;
 }
-async function loginCaptcha() {
+async function loginCaptcha(origin) {
   const cfg = await panelJson('/painel/captcha');
   if (!cfg.enabled || !cfg.siteKey) return '';
-  await loadCaptcha(cfg.siteKey);
-  const grecaptcha = window.grecaptcha;
-  if (!grecaptcha) throw new Error('A proteção do Google não carregou.');
-  return new Promise((resolve, reject) => {
-    grecaptcha.ready(() => {
-      grecaptcha.execute(cfg.siteKey, { action: 'login' }).then(resolve).catch(() => {
-        reject(new Error('O Google não confirmou a entrada a partir deste programa.'));
-      });
-    });
-  });
+  const site = panelOrigin(origin) || panelOrigin(cfg.origin) || '';
+  if (!site) throw new Error('O link da empresa não serve. Use o endereço do site, com https.');
+  return askHostCaptcha(site, cfg.siteKey);
 }
 function panelDocId() {
   const bytes = new Uint8Array(10);
@@ -2048,12 +2064,12 @@ async function openPanel(options) {
   if (!session.ok) {
     login.hidden = false;
     ready.hidden = true;
-    document.getElementById('panel-help').textContent = 'O link abre o login do painel. Quando a entrada termina, o programa volta sozinho com o seu nome, os clientes e as faixas.';
+    document.getElementById('panel-help').textContent = 'Entre com o link da empresa, e-mail e senha — igual à Calculadora. Depois o programa puxa clientes e faixas sozinho.';
     return;
   }
   if (keepLogin) {
     login.hidden = false;
-    document.getElementById('panel-help').textContent = 'Você já está em ' + (session.name || session.email || 'uma conta') + '. Entre de novo pelo link ou continue. Sincronizar manda as operações deste período e puxa o cadastro.';
+    document.getElementById('panel-help').textContent = 'Você já está em ' + (session.name || session.email || 'uma conta') + '. Entre de novo ou continue. Sincronizar manda as operações deste período e puxa o cadastro.';
   } else {
     login.hidden = true;
   }
@@ -2093,25 +2109,62 @@ function panelLoginUrl(value) {
 }
 document.getElementById('panel-login').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const raw = document.getElementById('panel-slug').value;
-  const origin = panelOrigin(raw);
-  const page = panelLoginUrl(raw);
+  const raw = document.getElementById('panel-slug').value || 'elite';
+  let origin = panelOrigin(raw);
+  // Slug puro (elite) não é host: mantém o origin já salvo no programa.
+  if (origin && !/^https?:\/\//i.test(String(raw).trim()) && !String(raw).includes('.')) origin = '';
   const help = document.getElementById('panel-help');
-  if (!origin || !page) {
-    help.textContent = 'O link do painel não serve. Use o endereço do site, com https.';
-    return;
+  const error = document.getElementById('panel-login-error');
+  error.textContent = 'Entrando...';
+  try {
+    if (/^https?:\/\//i.test(String(raw).trim()) && !origin) {
+      error.textContent = 'O link da empresa não serve. Use o endereço do site, com https.';
+      return;
+    }
+    let siteOrigin = origin;
+    if (origin || raw) {
+      try {
+        const saved = await panelJson('/painel/site', { origin: origin || '', link: String(raw || '').trim() });
+        siteOrigin = saved.origin || origin || siteOrigin;
+      } catch (e) {
+        if (origin) {
+          error.textContent = e.message || 'Não guardei o link do site.';
+          return;
+        }
+        try {
+          const current = await panelJson('/painel/site');
+          siteOrigin = current.origin || '';
+        } catch (err) {}
+      }
+    }
+    if (!siteOrigin) {
+      try {
+        const current = await panelJson('/painel/site');
+        siteOrigin = current.origin || '';
+      } catch (e) {}
+    }
+    try { await panelJson('/painel/lembrar', { save: document.getElementById('save-login').checked }); } catch (e) {}
+    error.textContent = 'Confirmando com o Google...';
+    const recaptchaToken = await loginCaptcha(siteOrigin || origin || raw);
+    error.textContent = 'Entrando...';
+    const session = await panelJson('/painel/entrar', {
+      email: document.getElementById('panel-email').value,
+      password: document.getElementById('panel-pass').value,
+      companySlug: raw,
+      link: raw,
+      origin: origin || '',
+      recaptchaToken,
+    });
+    error.textContent = '';
+    help.textContent = 'Entrada ok. Sincronizar manda as operações deste período para o site.';
+    document.getElementById('panel-pass').value = '';
+    await openPanel();
+    if (session && session.ok) {
+      try { await loadAccount(); } catch (e) {}
+    }
+  } catch (e) {
+    error.textContent = e.message || 'Não entrou.';
   }
-  try { await panelJson('/painel/site', { origin, link: String(raw || '').trim() }); }
-  catch (e) {
-    help.textContent = e.message || 'Não guardei o link do site.';
-    return;
-  }
-  try { await panelJson('/painel/lembrar', { save: document.getElementById('save-login').checked }); } catch (e) {}
-  const bridge = window.chrome && window.chrome.webview;
-  if (bridge) {
-    try { bridge.postMessage(JSON.stringify({ kind: 'login', url: page, save: document.getElementById('save-login').checked })); } catch (e) {}
-  }
-  window.location.href = page;
 });
 async function leaveAccount() {
   const bridge = window.chrome && window.chrome.webview;

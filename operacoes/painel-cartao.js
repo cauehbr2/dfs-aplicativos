@@ -12,13 +12,10 @@
   var box = document.createElement('div');
   box.id = 'dfs-enviar-programa';
   box.innerHTML = ''
-    + '<strong style="display:block;font-size:16px;margin:0 0 6px">Enviar para o painel</strong>'
+    + '<strong style="display:block;font-size:16px;margin:0 0 6px">Operações</strong>'
     + '<p id="dfs-enviar-hint" style="margin:0 0 10px;color:#a1a1aa;font-size:13px;line-height:1.4">Escolha o dia. Cada operação entra com a data e o horário do programa.</p>'
     + '<select id="dfs-enviar-dia" style="width:100%;margin:0 0 10px;padding:8px 10px;border-radius:8px;border:1px solid #3f3f46;background:#09090b;color:#fafafa;font:14px Segoe UI,sans-serif"></select>'
-    + '<div style="display:flex;gap:8px">'
-    + '<button id="dfs-enviar-go" type="button" style="flex:1;padding:10px 12px;border:0;border-radius:10px;background:#34d399;color:#052e16;font:700 14px Segoe UI,sans-serif;cursor:pointer">Enviar</button>'
-    + '<button id="dfs-enviar-voltar" type="button" style="flex:1;padding:10px 12px;border:1px solid #3f3f46;border-radius:10px;background:transparent;color:#fafafa;font:700 14px Segoe UI,sans-serif;cursor:pointer">Voltar para o programa</button>'
-    + '</div>'
+    + '<button id="dfs-enviar-go" type="button" style="width:100%;padding:10px 12px;border:0;border-radius:10px;background:#34d399;color:#052e16;font:700 14px Segoe UI,sans-serif;cursor:pointer">Enviar</button>'
     + '<p id="dfs-enviar-status" style="margin:10px 0 0;min-height:18px;color:#a1a1aa;font-size:13px"></p>';
   box.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;width:360px;padding:16px;border:1px solid #34d399;border-radius:16px;background:#18181b;color:#fafafa;font:14px Segoe UI,sans-serif;box-shadow:0 16px 40px rgba(0,0,0,.45)';
   (document.body || document.documentElement).appendChild(box);
@@ -41,9 +38,6 @@
     var button = document.getElementById('dfs-enviar-go');
     if (status) status.textContent = text || '';
     if (button) button.disabled = false;
-  };
-  document.getElementById('dfs-enviar-voltar').onclick = function () {
-    if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('voltar');
   };
   document.getElementById('dfs-enviar-go').onclick = function () {
     var select = document.getElementById('dfs-enviar-dia');

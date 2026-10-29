@@ -1316,22 +1316,32 @@ const server = http.createServer((req, res) => {
   }
   if (url === '/painel/site' && req.method === 'POST') {
     readBody(req).then((body) => {
-      let origin = '';
+      const raw = String(body.link || body.origin || body.companySlug || '').trim();
+      let fromBody = '';
+      let fromRaw = '';
       try {
-        const parsed = new URL(String(body.origin || body.link || ''));
+        const parsed = new URL(String(body.origin || ''));
         if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
-          origin = parsed.origin;
+          fromBody = parsed.origin;
         }
-      } catch (e) { origin = ''; }
+      } catch (e) { fromBody = ''; }
+      try {
+        if (/^https?:\/\//i.test(raw) || /\./.test((raw.split('/')[0] || ''))) {
+          const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
+          if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+            fromRaw = parsed.origin;
+          }
+        }
+      } catch (e) { fromRaw = ''; }
+      const origin = fromBody || fromRaw || readOrigin();
       if (!origin) {
-        sendJson(res, 400, { message: 'O link do site não serve.' });
+        sendJson(res, 400, { message: 'O link da empresa não serve. Use o endereço do site, com https.' });
         return;
       }
-      const link = String(body.link || body.origin || '').trim() || origin;
-      writeOrigin(origin, link);
+      writeOrigin(origin, raw || origin);
       captchaCache = null;
       captchaOrigin = '';
-      sendJson(res, 200, { origin, link });
+      sendJson(res, 200, { origin, link: readSavedLink() });
     }).catch(() => sendJson(res, 400, { message: 'Não li o link do site.' }));
     return;
   }
@@ -1506,25 +1516,7 @@ const server = http.createServer((req, res) => {
   if (url === '/painel/dias' && req.method === 'GET') {
     const state = readOps();
     const open = pendingDays(state);
-    const openIds = new Set(open.map((day) => day.id));
-    const fix = new Map();
-    (state.ops || []).forEach((op) => {
-      if (!op.panelId) return;
-      const key = dayKey(op);
-      if (!key || openIds.has(key)) return;
-      fix.set(key, (fix.get(key) || 0) + 1);
-    });
-    const fixDays = [...fix.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([id, count]) => ({
-      id,
-      count,
-      label: dayLabel(id) + ' · tirar a cópia repetida',
-    }));
-    const days = [
-      ...(fixDays.length ? [{ id: 'tudo', count: fixDays.reduce((sum, day) => sum + day.count, 0), label: 'Tirar as cópias repetidas' }] : []),
-      ...fixDays,
-      ...open,
-    ];
-    sendJson(res, 200, { days, total: open.reduce((sum, day) => sum + day.count, 0) });
+    sendJson(res, 200, { days: open, total: open.reduce((sum, day) => sum + day.count, 0) });
     return;
   }
   if (url === '/painel/enviar-dia' && req.method === 'POST') {
@@ -1550,20 +1542,11 @@ const server = http.createServer((req, res) => {
         return;
       }
       const state = loaded.data;
-      let removed = 0;
-      try {
-        removed = await removeRepeated(session, state, wanted || 'tudo');
-      } catch (e) {
-        sendJson(res, 502, { message: e.message || 'Não consegui tirar a cópia repetida.' });
-        return;
-      }
       const pending = (state.ops || []).filter((op) => !op.panelId && (wanted === 'tudo' || dayKey(op) === wanted));
       if (!pending.length) {
         sendJson(res, 200, {
           sent: 0,
-          message: removed
-            ? 'Tirei ' + removed + (removed === 1 ? ' cópia repetida. ' : ' cópias repetidas. ') + 'O que já estava cadastrado continua.'
-            : 'Não achei cópia repetida para tirar.',
+          message: 'Nada novo para enviar.',
         });
         return;
       }
