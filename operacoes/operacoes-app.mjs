@@ -23,9 +23,12 @@ function readAppVersion() {
     return '0';
   }
 }
+function readSite() {
+  try { return JSON.parse(fs.readFileSync(siteFile, 'utf8')); } catch (e) { return {}; }
+}
 function readOrigin() {
   try {
-    const saved = JSON.parse(fs.readFileSync(siteFile, 'utf8'));
+    const saved = readSite();
     const url = new URL(String(saved.origin || ''));
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return defaultOrigin;
     if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return defaultOrigin;
@@ -34,9 +37,20 @@ function readOrigin() {
     return defaultOrigin;
   }
 }
-function writeOrigin(origin) {
+function readSavedLink() {
+  const saved = readSite();
+  const link = String(saved.link || '').trim();
+  if (link) return link;
+  return readOrigin();
+}
+function writeOrigin(origin, link) {
+  const prev = readSite();
+  const nextLink = String(link == null ? (prev.link || '') : link).trim();
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(siteFile, JSON.stringify({ origin }));
+  fs.writeFileSync(siteFile, JSON.stringify({
+    origin,
+    link: nextLink || origin,
+  }));
 }
 const port = 8766;
 let siteCatalog = null;
@@ -1297,14 +1311,14 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url === '/painel/site' && req.method === 'GET') {
-    sendJson(res, 200, { origin: readOrigin() });
+    sendJson(res, 200, { origin: readOrigin(), link: readSavedLink() });
     return;
   }
   if (url === '/painel/site' && req.method === 'POST') {
     readBody(req).then((body) => {
       let origin = '';
       try {
-        const parsed = new URL(String(body.origin || ''));
+        const parsed = new URL(String(body.origin || body.link || ''));
         if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
           origin = parsed.origin;
         }
@@ -1313,10 +1327,11 @@ const server = http.createServer((req, res) => {
         sendJson(res, 400, { message: 'O link do site não serve.' });
         return;
       }
-      writeOrigin(origin);
+      const link = String(body.link || body.origin || '').trim() || origin;
+      writeOrigin(origin, link);
       captchaCache = null;
       captchaOrigin = '';
-      sendJson(res, 200, { origin });
+      sendJson(res, 200, { origin, link });
     }).catch(() => sendJson(res, 400, { message: 'Não li o link do site.' }));
     return;
   }

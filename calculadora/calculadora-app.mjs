@@ -35,9 +35,12 @@ function readAppVersion() {
   }
 }
 
+function readSite() {
+  try { return JSON.parse(fs.readFileSync(siteFile, 'utf8')); } catch (e) { return {}; }
+}
 function readOrigin() {
   try {
-    const saved = JSON.parse(fs.readFileSync(siteFile, 'utf8'));
+    const saved = readSite();
     const url = new URL(String(saved.origin || ''));
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return defaultOrigin;
     if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return defaultOrigin;
@@ -46,12 +49,27 @@ function readOrigin() {
     return defaultOrigin;
   }
 }
-function writeOrigin(origin) {
+function readSavedLink() {
+  const saved = readSite();
+  const link = String(saved.link || '').trim();
+  if (link) return link;
+  const slug = String(saved.companySlug || '').trim();
+  if (slug) return slug;
+  return 'elite';
+}
+function writeOrigin(origin, link) {
   const url = new URL(String(origin || ''));
   if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('O link da empresa não serve.');
   if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') throw new Error('O link da empresa não serve.');
+  const prev = readSite();
+  const nextLink = String(link == null ? (prev.link || '') : link).trim();
+  const slug = companySlug(nextLink) || String(prev.companySlug || '').trim() || 'elite';
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(siteFile, JSON.stringify({ origin: url.origin }));
+  fs.writeFileSync(siteFile, JSON.stringify({
+    origin: url.origin,
+    link: nextLink || slug,
+    companySlug: slug,
+  }));
   captchaCache = null;
 }
 function panelOrigin(value) {
@@ -154,10 +172,23 @@ async function captchaConfig() {
   };
   return captchaCache;
 }
+function flattenDoc(doc) {
+  if (!doc || typeof doc !== 'object') return null;
+  let data = doc.data && typeof doc.data === 'object' ? doc.data : doc;
+  // Alguns docs vêm aninhados (data.data).
+  if (data && data.data && typeof data.data === 'object' && !data.chave && !data.pixKeys && !data.nome && !data.email) {
+    data = data.data;
+  }
+  const id = doc.id || data.id || '';
+  return { id, ...data };
+}
 function rowsOf(result) {
-  const json = result.json || {};
-  if (result.status >= 400 || !Array.isArray(json.docs)) return [];
-  return json.docs.map((doc) => ({ id: doc.id, ...(doc.data || {}) }));
+  const json = (result && result.json) || {};
+  let docs = json.docs;
+  if (!Array.isArray(docs) && json.data && Array.isArray(json.data.docs)) docs = json.data.docs;
+  if (!Array.isArray(docs) && Array.isArray(json.data)) docs = json.data;
+  if ((result && result.status >= 400) || !Array.isArray(docs)) return [];
+  return docs.map(flattenDoc).filter(Boolean);
 }
 function normalizeGroup(raw) {
   const text = String(raw || '').replace(/\s+/g, ' ').trim();
@@ -197,11 +228,22 @@ function pixRow(item, id) {
   if (!item || typeof item !== 'object') return null;
   const chave = pixChaveOf(item);
   if (!chave) return null;
-  // Igual ao painel: inativa some; se o módulo não estiver marcado como false, entra.
-  if (pixOff(item.ativa)) return null;
-  const contas = !pixOff(item.exibirContas);
-  const montante = !pixOff(item.exibirMontante);
-  if (!contas && !montante) return null;
+  // Painel: chave ativa entra nas abas marcadas. Sem marca, libera as duas.
+  const ativa = !pixOff(item.ativa);
+  if (!ativa) return null;
+  let contas = item.exibirContas == null && item.exibirMontante == null
+    ? true
+    : !pixOff(item.exibirContas);
+  let montante = item.exibirContas == null && item.exibirMontante == null
+    ? true
+    : !pixOff(item.exibirMontante);
+  // Se veio só uma flag, a outra acompanha a ativa.
+  if (item.exibirContas == null && item.exibirMontante != null) contas = montante;
+  if (item.exibirMontante == null && item.exibirContas != null) montante = contas;
+  if (!contas && !montante) {
+    contas = true;
+    montante = true;
+  }
   const nome = String(item.nomeCompleto || item.nome || item.nomeTitular || item.titular || '').trim();
   const banco = String(item.bancoInstituicao || item.banco || item.instituicao || '').trim();
   return {
@@ -270,14 +312,18 @@ async function pullCatalog(session) {
     seen.add(key);
     pix.push(row);
   };
-  const sameCompany = (item) => String((item && item.companyId) || '') === companyId;
+  const sameCompany = (item) => {
+    const cid = String((item && item.companyId) || '');
+    return !cid || cid === companyId;
+  };
   rowsOf(pixRes).forEach((item) => pushPix(pixRow(item, item.id)));
-  // Reforço: se o filtro do site falhar, pega a coleção e filtra aqui.
+  // Reforço: coleção inteira (o que a sessão puder ler) e filtra empresa.
   rowsOf(pixAllRes).filter(sameCompany).forEach((item) => pushPix(pixRow(item, item.id)));
   rowsOf(usersRes).filter((user) => userInCompany(user, companyId)).forEach((user) => collectUserPix(user, pushPix));
-  const meDoc = meRes && meRes.json && (meRes.json.data || meRes.json);
+  const meJson = (meRes && meRes.json) || {};
+  const meDoc = (meJson.data && typeof meJson.data === 'object') ? meJson.data : (meJson.exists === false ? null : meJson);
   if (meDoc && typeof meDoc === 'object') {
-    collectUserPix({ id: session.userId, ...meDoc }, pushPix);
+    collectUserPix({ id: session.userId || meJson.id, ...meDoc }, pushPix);
   }
   pix.sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
   const packed = loadBudgetTemplates();
@@ -383,19 +429,28 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url === '/painel/site' && req.method === 'GET') {
-    sendJson(res, 200, { origin: readOrigin() });
+    const saved = readSite();
+    sendJson(res, 200, {
+      origin: readOrigin(),
+      link: readSavedLink(),
+      companySlug: String(saved.companySlug || companySlug(readSavedLink()) || 'elite'),
+    });
     return;
   }
   if (url === '/painel/site' && req.method === 'POST') {
     readBody(req).then((body) => {
       try {
-        const origin = panelOrigin(body.origin || body.companySlug || body.link || '');
+        const raw = String(body.link || body.origin || body.companySlug || '').trim();
+        const fromBody = panelOrigin(body.origin || '');
+        const fromRaw = /^https?:\/\//i.test(raw) || /\./.test(raw.split('/')[0] || '') ? panelOrigin(raw) : '';
+        const origin = fromBody || fromRaw || readOrigin();
         if (!origin) {
           sendJson(res, 400, { message: 'O link da empresa não serve. Use o endereço do site, com https.' });
           return;
         }
-        writeOrigin(origin);
-        sendJson(res, 200, { ok: true, origin });
+        writeOrigin(origin, raw || origin);
+        const saved = readSite();
+        sendJson(res, 200, { ok: true, origin, link: saved.link || raw, companySlug: saved.companySlug || 'elite' });
       } catch (e) {
         sendJson(res, 400, { message: e.message || 'Não guardei o link do site.' });
       }
@@ -414,9 +469,12 @@ const server = http.createServer((req, res) => {
   if (url === '/painel/entrar' && req.method === 'POST') {
     readBody(req).then(async (body) => {
       try {
-        const origin = panelOrigin(body.origin || body.companySlug || body.link || '');
-        if (origin) writeOrigin(origin);
-        const slug = companySlug(body.companySlug || body.link || '') || 'elite';
+        const rawLink = String(body.link || body.companySlug || body.origin || '').trim();
+        const fromBody = panelOrigin(body.origin || '');
+        const fromRaw = /^https?:\/\//i.test(rawLink) || /\./.test(rawLink.split('/')[0] || '') ? panelOrigin(rawLink) : '';
+        const origin = fromBody || fromRaw || readOrigin();
+        if (origin) writeOrigin(origin, rawLink || origin);
+        const slug = companySlug(rawLink) || 'elite';
         const result = await panelRequest('auth/login', {
           email: String(body.email || '').trim(),
           password: String(body.password || ''),

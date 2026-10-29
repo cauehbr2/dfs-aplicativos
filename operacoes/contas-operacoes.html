@@ -2101,7 +2101,7 @@ document.getElementById('panel-login').addEventListener('submit', async (event) 
     help.textContent = 'O link do painel não serve. Use o endereço do site, com https.';
     return;
   }
-  try { await panelJson('/painel/site', { origin }); }
+  try { await panelJson('/painel/site', { origin, link: String(raw || '').trim() }); }
   catch (e) {
     help.textContent = e.message || 'Não guardei o link do site.';
     return;
@@ -2292,7 +2292,7 @@ async function boot() {
   try {
     const site = await panelJson('/painel/site');
     const input = document.getElementById('panel-slug');
-    if (input && site.origin) input.value = site.origin;
+    if (input && (site.link || site.origin)) input.value = site.link || site.origin;
   } catch (e) {}
   const flag = new URLSearchParams(location.search).get('painel');
   if (flag) history.replaceState({}, '', '/');

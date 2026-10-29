@@ -88,7 +88,7 @@
         <div id="faixa-menu" class="menu hidden"></div>
         <input type="hidden" id="faixa" />
         <div class="fields" style="margin-top:12px">
-          <div><label>Qnt. contas</label><input id="qtd-contas" type="number" min="1" step="1" value="5" /></div>
+          <div><label>Qnt. contas</label><input id="qtd-contas" type="number" min="1" step="1" /></div>
           <div><label>Desconto do dia %</label><input id="desc-contas" type="number" min="0" step="0.01" value="0" /><p class="hint">Puxa o desconto do grupo da faixa. Dá para alterar. Apagar deixa 0.</p></div>
         </div>
         <label style="margin-top:12px">Chave Pix do depósito</label>
@@ -107,7 +107,7 @@
     <div class="grid">
       <div>
         <label>Valor montante (R$)</label>
-        <input id="montante" type="number" min="0" step="0.01" value="200" />
+        <input id="montante" type="number" min="0" step="0.01" />
         <label style="margin-top:12px">Taxa</label>
         <div class="chips" id="taxas"></div>
         <div class="fields" style="margin-top:12px">
@@ -149,7 +149,7 @@
     <h2 style="margin:0 0 8px">Entrar</h2>
     <p class="hint">A calculadora puxa faixa, taxa do Montante, desconto e Pix da empresa do link. O padrão é a Elite. Dá para trocar o link.</p>
     <label style="margin-top:12px">Link da empresa</label>
-    <input id="login-slug" value="elite" />
+    <input id="login-slug" value="" placeholder="elite ou https://site/#/login/empresa" />
     <label style="margin-top:12px">E-mail</label>
     <input id="login-email" type="email" />
     <label style="margin-top:12px">Senha</label>
@@ -456,15 +456,24 @@ function renderRates() {
   ).join('');
 }
 function renderMontante() {
-  const montante = Number(document.getElementById('montante').value) || 0;
-  const taxa = (rates.find((item) => item.id === rateId) || rates[0]).taxa;
+  const montanteRaw = String(document.getElementById('montante').value || '').trim();
+  const montante = montanteRaw === '' ? 0 : (Number(montanteRaw) || 0);
+  const taxa = ((rates.find((item) => item.id === rateId) || rates[0]) || { taxa: 0 }).taxa;
   const desconto = Number(document.getElementById('desc-montante').value) || 0;
-  const qtd = qtdFromMontante(montante);
-  if (document.activeElement !== document.getElementById('qtd-montante')) document.getElementById('qtd-montante').value = qtd;
+  const qtdField = document.getElementById('qtd-montante');
+  if (montante > 0) {
+    const qtd = qtdFromMontante(montante);
+    if (document.activeElement !== qtdField) qtdField.value = qtd;
+  } else if (document.activeElement !== qtdField) {
+    qtdField.value = '';
+  }
+  const qtdShown = Number(qtdField.value) || 0;
   const subtotal = montante * (taxa / 100);
   const total = Math.max(0, subtotal - subtotal * (desconto / 100));
   document.getElementById('total-montante').textContent = money.format(total);
-  document.getElementById('texto-montante').value = messageMontante(keyById(pixMontante), montante, Number(document.getElementById('qtd-montante').value) || qtd, taxa, desconto, total);
+  document.getElementById('texto-montante').value = montanteRaw === ''
+    ? ''
+    : messageMontante(keyById(pixMontante), montante, qtdShown || qtdFromMontante(montante), taxa, desconto, total);
 }
 function paint() { renderPixSelects(); renderContas(); renderMontante(); }
 const TAB_ORDER = ['contas', 'montante', 'divisao'];
@@ -603,9 +612,7 @@ function applySaved(data) {
   if (data.pixContas) pixContas = data.pixContas;
   if (data.pixMontante) pixMontante = data.pixMontante;
   if (data.faixa) document.getElementById('faixa').value = data.faixa;
-  if (data.qtdContas) document.getElementById('qtd-contas').value = data.qtdContas;
-  if (data.montante) document.getElementById('montante').value = data.montante;
-  if (data.qtdMontante) document.getElementById('qtd-montante').value = data.qtdMontante;
+  // Montante e qtd. de contas começam vazios; não restaura valor antigo nesses campos.
 }
 function applyCatalog(catalog) {
   if (!catalog || !catalog.ok) {
@@ -692,10 +699,23 @@ async function loginCaptcha(origin) {
   if (!site) throw new Error('O link da empresa não serve. Use o endereço do site, com https.');
   return askHostCaptcha(site, cfg.siteKey);
 }
+async function restoreLoginLink() {
+  const input = document.getElementById('login-slug');
+  if (!input) return;
+  try {
+    const site = await fetch('/painel/site', { cache: 'no-store' }).then((response) => response.json());
+    const value = String((site && (site.link || site.companySlug)) || '').trim();
+    if (value) input.value = value;
+    else if (!input.value) input.value = 'elite';
+  } catch (e) {
+    if (!input.value) input.value = 'elite';
+  }
+}
 async function enterApp() {
   const session = await fetch('/painel/status').then((response) => response.json());
   const gate = document.getElementById('login-gate');
   if (!session.ok) {
+    await restoreLoginLink();
     gate.classList.add('open');
     return;
   }
@@ -724,13 +744,13 @@ document.getElementById('login-go').addEventListener('click', async () => {
       error.textContent = 'O link da empresa não serve. Use o endereço do site, com https.';
       return;
     }
-    if (origin) {
+    if (origin || link) {
       const saved = await fetch('/painel/site', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ origin }),
-      }).then((response) => response.json().then((json) => ({ ok: response.ok, json })));
-      if (!saved.ok) {
+        body: JSON.stringify({ origin: origin || '', link }),
+      }).then((response) => response.json().then((json) => ({ ok: response.ok, json }))).catch(() => ({ ok: !!origin, json: {} }));
+      if (origin && !saved.ok) {
         error.textContent = (saved.json && saved.json.message) || 'Não guardei o link do site.';
         return;
       }
@@ -745,6 +765,7 @@ document.getElementById('login-go').addEventListener('click', async () => {
         email: document.getElementById('login-email').value,
         password: document.getElementById('login-pass').value,
         companySlug: link,
+        link,
         origin: origin || '',
         recaptchaToken,
       }),
@@ -767,6 +788,7 @@ document.getElementById('logout').addEventListener('click', async () => {
   campaigns = [];
   document.getElementById('company-line').textContent = 'Entre para puxar faixa, taxa e Pix da empresa.';
   paint();
+  await restoreLoginLink();
   document.getElementById('login-gate').classList.add('open');
 });
 async function loadAppVersion() {
