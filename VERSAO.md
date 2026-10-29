@@ -1,4 +1,4 @@
 ﻿# Versões
 
-- Calculadora: 1.0.34 — janela maior; Total/Copiar/Fila fixos; botão Fila na barra; HostObjects.
-- Operações: 1.0.14 — captcha igual à Calculadora (origin do site + WebMessage).
+- Calculadora: 1.0.35 — janela bem mais larga, sem rolagem no meio; Fila abre de verdade (sem fechar na hora).
+- Operações: 1.0.14 — captcha alinhado à Calculadora.

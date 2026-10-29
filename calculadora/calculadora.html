@@ -36,23 +36,18 @@
   .primary { background:var(--emerald); color:#052e16; border:0; }
   .ghost { background:#27272a; border:1px solid #3f3f46; }
   .grid {
-    display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.15fr);
-    gap:18px; align-items:stretch; height:100%; width:100%;
+    display:grid; grid-template-columns:minmax(420px, 1fr) minmax(460px, 1.2fr);
+    gap:22px; align-items:stretch; height:100%; width:100%;
     overflow:hidden;
   }
-  .form-col { display:flex; flex-direction:column; gap:14px; min-width:0; overflow-x:hidden; overflow-y:auto; height:100%; }
-  .form-block { display:flex; flex-direction:column; gap:10px; min-width:0; flex-shrink:0; }
+  .form-col { display:flex; flex-direction:column; gap:12px; min-width:0; overflow:hidden; height:100%; }
+  .form-block { display:flex; flex-direction:column; gap:8px; min-width:0; }
   .form-foot {
-    margin-top:auto; flex-shrink:0; padding-top:14px; display:flex; flex-direction:column; gap:12px; padding-bottom:8px;
-    position:sticky; bottom:0; z-index:3; background:linear-gradient(180deg, rgba(17,17,19,0) 0%, #111113 18%, #111113 100%);
+    margin-top:auto; flex-shrink:0; padding-top:12px; display:flex; flex-direction:column; gap:10px; padding-bottom:4px;
   }
-  .budget-col { display:flex; flex-direction:column; gap:12px; min-width:0; min-height:0; height:100%; overflow-x:hidden; overflow-y:auto; padding-bottom:8px; }
-  .budget-col .actions {
-    padding-right:4px; margin-top:8px; flex-shrink:0;
-    position:sticky; bottom:0; z-index:3; background:linear-gradient(180deg, rgba(17,17,19,0) 0%, #111113 18%, #111113 100%);
-    padding-top:10px; padding-bottom:4px;
-  }
-  .fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:22px; }
+  .budget-col { display:flex; flex-direction:column; gap:10px; min-width:0; min-height:0; height:100%; overflow:hidden; padding-bottom:4px; }
+  .budget-col .actions { padding-right:4px; margin-top:8px; flex-shrink:0; }
+  .fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; }
   label { display:block; margin:0 0 2px; font-size:11px; font-weight:800; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); }
   input, select, textarea { width:100%; max-width:100%; height:40px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
   textarea { flex:1; min-height:0; height:auto; padding:12px; resize:none; white-space:pre-wrap; line-height:1.4; overflow:auto; }
@@ -1140,40 +1135,33 @@ function paintFilaAlertUi(isFirst, alerting) {
 function openFilaNow() {
   const ts = Date.now();
   const url = '/fila/abrir?ts=' + ts;
-  // Caminho principal: HostObject C# (abre a janela da fila ao lado).
+  let asked = false;
+  // HostObject C# (abre o painel da fila ao lado).
   try {
     const host = window.chrome && window.chrome.webview && window.chrome.webview.hostObjects;
     if (host && host.sync && host.sync.dfs && typeof host.sync.dfs.AbrirFila === 'function') {
       host.sync.dfs.AbrirFila();
-      return;
+      asked = true;
     }
   } catch (_) {}
+  if (!asked) {
+    try {
+      const host = window.chrome && window.chrome.webview && window.chrome.webview.hostObjects;
+      if (host && host.dfs && host.dfs.AbrirFila) {
+        Promise.resolve(host.dfs.AbrirFila()).catch(() => {});
+        asked = true;
+      }
+    } catch (_) {}
+  }
+  // Sempre pede também pelo arquivo/watch (não depende só do HostObject).
   try {
-    const host = window.chrome && window.chrome.webview && window.chrome.webview.hostObjects;
-    if (host && host.dfs && host.dfs.AbrirFila) {
-      Promise.resolve(host.dfs.AbrirFila()).catch(() => {});
-      return;
-    }
+    fetch(url, { method: 'POST', cache: 'no-store' }).catch(() => {});
   } catch (_) {}
   const payload = JSON.stringify({ kind: 'fila', t: ts });
   const bridge = window.chrome && window.chrome.webview;
   if (bridge && typeof bridge.postMessage === 'function') {
     try { bridge.postMessage(payload); } catch (_) {}
-    try { bridge.postMessage({ kind: 'fila', t: ts }); } catch (_) {}
   }
-  try {
-    const prev = document.title || 'Calculadora';
-    document.title = 'dfs:fila:' + ts;
-    setTimeout(() => { try { document.title = prev; } catch (_) {} }, 150);
-  } catch (_) {}
-  try {
-    const img = new Image();
-    img.src = url;
-  } catch (_) {}
-  try {
-    fetch(url, { method: 'GET', cache: 'no-store' }).catch(() => {});
-    fetch(url, { method: 'POST', cache: 'no-store' }).catch(() => {});
-  } catch (_) {}
 }
 document.getElementById('open-fila').addEventListener('click', () => {
   const fab = document.getElementById('open-fila');
