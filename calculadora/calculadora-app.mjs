@@ -216,116 +216,65 @@ function rateLabel(item) {
   const base = mult.toLocaleString('pt-BR') + ' x ' + taxa.toLocaleString('pt-BR') + '%';
   return item.observacao ? base + ' · ' + item.observacao : base;
 }
-function pixOff(value) {
-  return value === false || value === 0 || value === '0' || String(value || '').toLowerCase() === 'false';
-}
-function pixChaveOf(item) {
-  return String(
-    (item && (item.chave || item.pixChave || item.key || item.valor || item.value)) || ''
-  ).trim();
-}
+// Igual ao painel (useCalculatorPixKeys): lista calculatorPixKeys da empresa.
 function pixRow(item, id) {
   if (!item || typeof item !== 'object') return null;
-  const chave = pixChaveOf(item);
+  const chave = String(item.chave || '').trim();
   if (!chave) return null;
-  // Painel: chave ativa entra nas abas marcadas. Sem marca, libera as duas.
-  const ativa = !pixOff(item.ativa);
-  if (!ativa) return null;
-  let contas = item.exibirContas == null && item.exibirMontante == null
-    ? true
-    : !pixOff(item.exibirContas);
-  let montante = item.exibirContas == null && item.exibirMontante == null
-    ? true
-    : !pixOff(item.exibirMontante);
-  // Se veio só uma flag, a outra acompanha a ativa.
-  if (item.exibirContas == null && item.exibirMontante != null) contas = montante;
-  if (item.exibirMontante == null && item.exibirContas != null) montante = contas;
-  if (!contas && !montante) {
-    contas = true;
-    montante = true;
-  }
-  const nome = String(item.nomeCompleto || item.nome || item.nomeTitular || item.titular || '').trim();
-  const banco = String(item.bancoInstituicao || item.banco || item.instituicao || '').trim();
   return {
     id: String(id || item.id || item.userKeyId || chave),
     tipo: String(item.tipoChave || item.tipo || 'CPF').trim() || 'CPF',
     chave,
-    nome: nome || 'Pix',
-    banco: banco || '—',
-    contas,
-    montante,
+    nome: String(item.nomeCompleto || item.nome || '').trim() || 'Pix',
+    banco: String(item.bancoInstituicao || item.banco || '').trim() || '—',
+    contas: item.exibirContas !== false,
+    montante: item.exibirMontante !== false,
   };
 }
-function userInCompany(user, companyId) {
-  if (!companyId) return false;
-  const wanted = String(companyId);
-  if (String(user.companyId || '') === wanted) return true;
-  const links = Array.isArray(user.companyLinks) ? user.companyLinks : [];
-  return links.some((link) => link && String(link.companyId || '') === wanted);
-}
-function collectUserPix(user, pushPix) {
-  if (!user) return;
-  const list = Array.isArray(user.pixKeys) ? user.pixKeys : [];
-  if (!list.length && pixChaveOf(user)) {
-    pushPix(pixRow({
-      tipoChave: user.pixTipoChave || user.tipoChave,
-      chave: user.pixChave || user.chave,
-      nome: user.name || user.nome || '',
-      banco: user.pixBanco || user.banco || '',
-      ativa: true,
-      exibirContas: true,
-      exibirMontante: true,
-    }, 'user-' + (user.id || 'me')));
-    return;
-  }
-  list.forEach((item, index) => {
-    pushPix(pixRow(item, 'user-' + (user.id || 'me') + '-' + (item.id || item.chave || index)));
+async function resolveCompanyId(session) {
+  if (!session || !session.token) return '';
+  let companyId = String(session.companyId || '').trim();
+  if (companyId) return companyId;
+  const slug = String(session.companySlug || '').trim();
+  if (!slug) return '';
+  const res = await panelRequest('query', {
+    collection: 'companies',
+    filters: [{ field: 'loginSlug', op: '==', value: slug }],
+    limit: 1,
+    dfs_token: session.token,
   });
+  const row = rowsOf(res)[0];
+  if (!row) return '';
+  companyId = String(row.id || '').trim();
+  if (!companyId) return '';
+  session.companyId = companyId;
+  session.companyName = session.companyName || String(row.name || row.nome || slug);
+  writeSession(session);
+  return companyId;
 }
 async function pullCatalog(session) {
-  if (!session || !session.token || !session.companyId) {
+  if (!session || !session.token) {
     return { ok: false, message: 'Entre com o link da empresa para puxar faixa, taxa e Pix.' };
   }
-  const companyId = String(session.companyId);
+  const companyId = await resolveCompanyId(session);
+  if (!companyId) {
+    return { ok: false, message: 'Entre com o link da empresa para puxar faixa, taxa e Pix.' };
+  }
   const filters = [{ field: 'companyId', op: '==', value: companyId }];
   const body = { filters, limit: 0, dfs_token: session.token };
   const budgetId = 'calculator_budget_' + companyId;
-  const [rangesRes, campaignsRes, ratesRes, rulesRes, pixRes, pixAllRes, usersRes, meRes, budgetRes] = await Promise.all([
+  const [rangesRes, campaignsRes, ratesRes, rulesRes, pixRes, budgetRes] = await Promise.all([
     panelRequest('query', { ...body, collection: 'calculatorRanges' }),
     panelRequest('query', { ...body, collection: 'campaigns' }),
     panelRequest('query', { ...body, collection: 'calculatorMontanteRates' }),
     panelRequest('query', { ...body, collection: 'calculatorMontanteAccountRules' }),
     panelRequest('query', { ...body, collection: 'calculatorPixKeys' }),
-    panelRequest('query', { collection: 'calculatorPixKeys', limit: 0, dfs_token: session.token }),
-    panelRequest('query', { collection: 'users', limit: 0, dfs_token: session.token }),
-    session.userId
-      ? panelRequest('read', { collection: 'users', id: session.userId, dfs_token: session.token })
-      : Promise.resolve({ status: 404, json: {} }),
     panelRequest('read', { collection: 'settings', id: budgetId, dfs_token: session.token }),
   ]);
-  const pix = [];
-  const seen = new Set();
-  const pushPix = (row) => {
-    if (!row || !row.chave) return;
-    const key = String(row.tipo || '') + '|' + String(row.chave || '');
-    if (seen.has(key)) return;
-    seen.add(key);
-    pix.push(row);
-  };
-  const sameCompany = (item) => {
-    const cid = String((item && item.companyId) || '');
-    return !cid || cid === companyId;
-  };
-  rowsOf(pixRes).forEach((item) => pushPix(pixRow(item, item.id)));
-  // Reforço: coleção inteira (o que a sessão puder ler) e filtra empresa.
-  rowsOf(pixAllRes).filter(sameCompany).forEach((item) => pushPix(pixRow(item, item.id)));
-  rowsOf(usersRes).filter((user) => userInCompany(user, companyId)).forEach((user) => collectUserPix(user, pushPix));
-  const meJson = (meRes && meRes.json) || {};
-  const meDoc = (meJson.data && typeof meJson.data === 'object') ? meJson.data : (meJson.exists === false ? null : meJson);
-  if (meDoc && typeof meDoc === 'object') {
-    collectUserPix({ id: session.userId || meJson.id, ...meDoc }, pushPix);
-  }
-  pix.sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+  const pix = rowsOf(pixRes)
+    .map((item) => pixRow(item, item.id))
+    .filter(Boolean)
+    .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
   const packed = loadBudgetTemplates();
   const budgetDoc = (budgetRes && budgetRes.json && budgetRes.json.data) || {};
   const budget = {
@@ -489,18 +438,34 @@ const server = http.createServer((req, res) => {
         const profile = json.profile || {};
         const links = Array.isArray(profile.companyLinks) ? profile.companyLinks : [];
         const link = links.find((item) => item && item.companyId && item.companyId === profile.companyId) || links[0] || null;
+        let companyId = String(profile.companyId || (link && link.companyId) || '').trim();
+        let companyName = (link && (link.companyName || link.name)) || profile.companyName || slug;
+        // Link da empresa: se o perfil não trouxer companyId (ex.: ADM), resolve pelo slug.
+        if (!companyId && slug) {
+          const companyRes = await panelRequest('query', {
+            collection: 'companies',
+            filters: [{ field: 'loginSlug', op: '==', value: slug }],
+            limit: 1,
+            dfs_token: json.token,
+          });
+          const company = rowsOf(companyRes)[0];
+          if (company && company.id) {
+            companyId = String(company.id);
+            companyName = String(company.name || company.nome || companyName);
+          }
+        }
         writeSession({
           token: json.token,
           userId: (json.user && json.user.uid) || profile.id || '',
           name: (json.user && json.user.displayName) || profile.name || '',
           email: (json.user && json.user.email) || '',
-          companyId: profile.companyId || (link && link.companyId) || '',
-          companyName: (link && (link.companyName || link.name)) || profile.companyName || slug,
+          companyId,
+          companyName,
           companySlug: slug,
         });
         const session = readSession();
         try { await pullCatalog(session); } catch (e) {}
-        sendJson(res, 200, publicSession(session));
+        sendJson(res, 200, publicSession(readSession() || session));
       } catch (e) {
         sendJson(res, 502, { message: 'Não consegui falar com o painel.' });
       }

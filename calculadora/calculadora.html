@@ -310,7 +310,8 @@ function stamp() {
   return `Gerado em: ${day} às ${time}`;
 }
 function keysFor(module) {
-  return pixKeys.filter((item) => module === 'contas' ? !!item.contas : !!item.montante);
+  // Igual ao painel: entra se a aba não estiver marcada como false.
+  return pixKeys.filter((item) => module === 'contas' ? item.contas !== false : item.montante !== false);
 }
 function pick(module, current) {
   const list = keysFor(module);
@@ -414,6 +415,12 @@ function renderRanges() {
     `<button type="button" class="${item.id === hidden.value ? 'on' : ''}" data-faixa-id="${item.id}">${faixaLabelOf(item)}</button>`
   ).join('') || '<p class="hint">Nenhuma faixa neste grupo.</p>';
 }
+function escapeOpt(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/"/g, '&quot;');
+}
 function renderPixSelects() {
   pixContas = pick('contas', pixContas);
   pixMontante = pick('montante', pixMontante);
@@ -421,9 +428,10 @@ function renderPixSelects() {
     const list = keysFor(module);
     const select = document.getElementById(id);
     select.innerHTML = list.length
-      ? list.map((item) => `<option value="${item.id}">${item.nome} - ${item.tipo} - ${item.banco}</option>`).join('')
-      : '<option value="">Nenhuma chave para esta aba</option>';
+      ? list.map((item) => `<option value="${escapeOpt(item.id)}">${escapeOpt(item.nome)} - ${escapeOpt(item.tipo)} - ${escapeOpt(item.banco)}</option>`).join('')
+      : '<option value="">Nenhuma chave Pix desta empresa</option>';
     if (selected) select.value = selected;
+    else if (list[0]) select.value = list[0].id;
   };
   fill('pix-contas', 'contas', pixContas);
   fill('pix-montante', 'montante', pixMontante);
