@@ -40,9 +40,10 @@
     gap:16px; align-items:stretch; height:100%; width:100%;
     overflow:hidden;
   }
-  .form-col { display:flex; flex-direction:column; gap:10px; min-width:0; overflow:auto; }
+  .form-col { display:flex; flex-direction:column; gap:10px; min-width:0; overflow:hidden; }
   .form-block { display:flex; flex-direction:column; gap:6px; min-width:0; }
-  .budget-col { display:flex; flex-direction:column; gap:8px; min-width:0; min-height:0; height:100%; overflow:hidden; }
+  .budget-col { display:flex; flex-direction:column; gap:8px; min-width:0; min-height:0; height:100%; overflow:hidden; padding-bottom:4px; }
+  .budget-col .actions { padding-right:4px; }
   .fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
   label { display:block; margin:0; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
   input, select, textarea { width:100%; max-width:100%; height:40px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
@@ -86,11 +87,11 @@
     min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     font-family:ui-monospace, Consolas, monospace; color:#a1a1aa;
   }
-  .credit { margin:0; flex-shrink:0; display:flex; justify-content:space-between; gap:12px; align-items:center; font-size: 11px; color: #52525b; }
+  .credit { margin:0; flex-shrink:0; display:flex; justify-content:space-between; gap:12px; align-items:center; font-size: 11px; color: #52525b; padding-left:88px; }
   .credit .app-version { color: #71717a; font-weight: 700; letter-spacing: .04em; }
   .top, .tabs { flex-shrink:0; }
   .fila-dock {
-    position:fixed; right:16px; bottom:16px; z-index:40;
+    position:fixed; left:16px; bottom:16px; z-index:40;
     width:72px; height:72px;
   }
   .fila-fab {
@@ -148,7 +149,7 @@
     display:block; background:#fca5a5; animation:none;
   }
   .fila-pop {
-    position:absolute; right:0; bottom:82px; z-index:42;
+    position:absolute; left:0; bottom:82px; z-index:42;
     min-width:168px; padding:10px 12px 11px;
     border-radius:16px;
     background:rgba(15,23,42,.96);
@@ -163,14 +164,14 @@
   .fila-pop .pop-title { font-size:12px; font-weight:800; letter-spacing:.04em; color:#fff; }
   .fila-pop .pop-sub { font-size:11px; color:#93c5fd; margin-top:2px; }
   .fila-pop::after {
-    content:""; position:absolute; right:26px; bottom:-7px;
+    content:""; position:absolute; left:26px; bottom:-7px;
     width:12px; height:12px; background:rgba(15,23,42,.96);
     border-right:1px solid rgba(147,197,253,.35);
     border-bottom:1px solid rgba(147,197,253,.35);
     transform: rotate(45deg);
   }
   .fila-stop {
-    position:fixed; right:16px; bottom:100px; z-index:41;
+    position:fixed; left:16px; bottom:100px; z-index:41;
     height:40px; padding:0 14px; border:1px solid rgba(252,165,165,.35);
     border-radius:14px; background:rgba(127,29,29,.95); color:#fecaca; font-weight:800;
     cursor:pointer; display:none; gap:6px; align-items:center;
