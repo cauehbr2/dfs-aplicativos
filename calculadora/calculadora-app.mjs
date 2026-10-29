@@ -11,6 +11,7 @@ const catalogFile = path.join(dataDir, 'catalogo.json');
 const sessionFile = path.join(dataDir, 'painel-sessao.json');
 const siteFile = path.join(dataDir, 'painel-site.json');
 const alertFile = path.join(dataDir, 'fila-alerta.json');
+const openFilaFile = path.join(dataDir, 'fila-abrir.json');
 const htmlFile = path.join(codeDir, 'calculadora.html');
 const filaFile = path.join(codeDir, 'fila.html');
 const versionFile = path.join(codeDir, 'app-versao.txt');
@@ -783,6 +784,17 @@ const server = http.createServer((req, res) => {
   if ((url === '/fila' || url === '/fila.html') && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(fs.readFileSync(filaFile));
+    return;
+  }
+  if (url === '/fila/abrir' && (req.method === 'POST' || req.method === 'GET')) {
+    const payload = { at: Date.now() };
+    try {
+      fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(openFilaFile, JSON.stringify(payload));
+      sendJson(res, 200, { ok: true, at: payload.at });
+    } catch (e) {
+      sendJson(res, 500, { ok: false, message: e.message || 'Não pedi abertura da fila.' });
+    }
     return;
   }
   if (url === '/fila/alerta' && req.method === 'GET') {

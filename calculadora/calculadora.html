@@ -36,13 +36,13 @@
   .primary { background:var(--emerald); color:#052e16; border:0; }
   .ghost { background:#27272a; border:1px solid #3f3f46; }
   .grid {
-    display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.15fr);
-    gap:20px; align-items:stretch; height:100%; width:100%;
+    display:grid; grid-template-columns:minmax(320px, 1fr) minmax(0, 1.2fr);
+    gap:22px; align-items:stretch; height:100%; width:100%;
     overflow:hidden;
   }
   .form-col { display:flex; flex-direction:column; gap:10px; min-width:0; overflow:hidden; height:100%; }
   .form-block { display:flex; flex-direction:column; gap:6px; min-width:0; }
-  .form-foot { margin-top:auto; flex-shrink:0; padding-top:8px; display:flex; flex-direction:column; gap:10px; }
+  .form-foot { margin-top:auto; flex-shrink:0; padding-top:12px; display:flex; flex-direction:column; gap:18px; padding-bottom:6px; }
   .budget-col { display:flex; flex-direction:column; gap:8px; min-width:0; min-height:0; height:100%; overflow:hidden; padding-bottom:4px; }
   .budget-col .actions { padding-right:4px; }
   .fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
@@ -56,7 +56,11 @@
   .actions .primary { min-width:160px; }
   .hint { color:var(--muted); font-size:11px; margin:0; line-height:1.35; }
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  #faixa-grupos.chips {
+    display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; flex-wrap:nowrap;
+  }
   .chip { height:36px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; padding:0 10px; cursor:pointer; font-weight:700; }
+  #faixa-grupos .chip { width:100%; white-space:nowrap; padding:0 6px; font-size:13px; }
   .chip.on { background:#2563eb; border-color:transparent; }
   .modal { position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; padding:18px; }
   .modal.open { display:flex; }
@@ -92,7 +96,7 @@
   .credit .app-version { color: #71717a; font-weight: 700; letter-spacing: .04em; }
   .top, .tabs { flex-shrink:0; }
   .fila-slot {
-    margin-top:0; padding-top:0; border-top:0;
+    margin-top:4px; padding-top:14px; border-top:1px solid #27272a;
     display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   }
   .fila-dock { position:relative; width:auto; height:auto; }
@@ -1129,20 +1133,21 @@ function paintFilaAlertUi(isFirst, alerting) {
 function openFilaNow() {
   const payload = JSON.stringify({ kind: 'fila', t: Date.now() });
   const bridge = window.chrome && window.chrome.webview;
-  let sent = false;
   if (bridge && typeof bridge.postMessage === 'function') {
-    try { bridge.postMessage(payload); sent = true; } catch (_) {}
-    try { bridge.postMessage({ kind: 'fila', t: Date.now() }); sent = true; } catch (_) {}
+    try { bridge.postMessage(payload); } catch (_) {}
+    try { bridge.postMessage({ kind: 'fila', t: Date.now() }); } catch (_) {}
   }
-  // Plano B: o host C# escuta mudança de título.
   try {
     const prev = document.title || 'Calculadora';
     document.title = 'dfs:fila:' + Date.now();
     setTimeout(() => { try { document.title = prev; } catch (_) {} }, 120);
   } catch (_) {}
-  if (!sent) {
-    try { window.open('/fila.html', 'dfs-fila', 'width=420,height=760'); } catch (_) {}
-  }
+  // Plano certo: o host C# escuta o arquivo via /fila/abrir.
+  try {
+    fetch('/fila/abrir?ts=' + Date.now(), { method: 'POST', cache: 'no-store' }).catch(() => {
+      fetch('/fila/abrir?ts=' + Date.now(), { method: 'GET', cache: 'no-store' }).catch(() => {});
+    });
+  } catch (_) {}
 }
 document.getElementById('open-fila').addEventListener('click', () => {
   const fab = document.getElementById('open-fila');
