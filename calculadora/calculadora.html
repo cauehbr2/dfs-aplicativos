@@ -21,11 +21,11 @@
   .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:0; }
   button, input, select, textarea { font:inherit; color:inherit; }
   .tabs button, .primary, .ghost { height:40px; border-radius:12px; padding:0 14px; cursor:pointer; font-weight:800; }
-  .stage { perspective:1400px; flex:1; min-height:0; overflow:hidden; }
+  .stage { perspective:1400px; flex:1; min-height:0; overflow:hidden; width:100%; }
   .panel {
-    height:100%; overflow:auto; transform-style:preserve-3d; backface-visibility:hidden;
+    height:100%; width:100%; overflow:hidden; transform-style:preserve-3d; backface-visibility:hidden;
     transition:transform .42s cubic-bezier(.2,.7,.2,1), opacity .42s;
-    background:#111113; border:1px solid var(--line); border-radius:22px; padding:16px 18px;
+    background:#111113; border:1px solid var(--line); border-radius:22px; padding:14px 16px;
   }
   .panel.flip-out-left { transform:rotateY(-88deg); opacity:.15; transform-origin:left center; }
   .panel.flip-out-right { transform:rotateY(88deg); opacity:.15; transform-origin:right center; }
@@ -36,16 +36,17 @@
   .primary { background:var(--emerald); color:#052e16; border:0; }
   .ghost { background:#27272a; border:1px solid #3f3f46; }
   .grid {
-    display:grid; grid-template-columns:minmax(320px, 0.95fr) minmax(340px, 1.05fr);
-    gap:18px; align-items:stretch; min-height:100%;
+    display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.05fr);
+    gap:16px; align-items:stretch; height:100%; width:100%;
+    overflow:hidden;
   }
-  .form-col { display:flex; flex-direction:column; gap:12px; min-width:0; }
-  .form-block { display:flex; flex-direction:column; gap:6px; }
-  .budget-col { display:flex; flex-direction:column; gap:8px; min-height:280px; min-width:0; }
-  .fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .form-col { display:flex; flex-direction:column; gap:10px; min-width:0; overflow:auto; }
+  .form-block { display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .budget-col { display:flex; flex-direction:column; gap:8px; min-width:0; min-height:0; height:100%; overflow:hidden; }
+  .fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
   label { display:block; margin:0; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
-  input, select, textarea { width:100%; height:42px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
-  textarea { flex:1; min-height:220px; height:auto; padding:14px; resize:none; white-space:pre-wrap; line-height:1.45; }
+  input, select, textarea { width:100%; max-width:100%; height:40px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
+  textarea { flex:1; min-height:0; height:auto; padding:12px; resize:none; white-space:pre-wrap; line-height:1.4; overflow:auto; }
   input:focus, select:focus, textarea:focus { outline:2px solid rgba(37,99,235,.45); border-color:#2563eb; }
   .line { display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding-top:8px; border-top:1px solid #27272a; }
   .big { color:var(--emerald); font-size:22px; font-weight:800; }
@@ -1078,7 +1079,10 @@ function paintFilaAlertUi(isFirst, alerting) {
 document.getElementById('open-fila').addEventListener('click', () => {
   const bridge = window.chrome && window.chrome.webview;
   if (bridge && typeof bridge.postMessage === 'function') {
-    try { bridge.postMessage(JSON.stringify({ kind: 'fila' })); } catch (e) {}
+    try { bridge.postMessage({ kind: 'fila' }); }
+    catch (e1) {
+      try { bridge.postMessage(JSON.stringify({ kind: 'fila' })); } catch (e2) {}
+    }
     return;
   }
   window.open('/fila.html', 'dfs-fila', 'width=420,height=760');
