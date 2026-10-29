@@ -233,24 +233,48 @@ function pixRow(item, id) {
 }
 async function resolveCompanyId(session) {
   if (!session || !session.token) return '';
-  let companyId = String(session.companyId || '').trim();
-  if (companyId) return companyId;
-  const slug = String(session.companySlug || '').trim();
-  if (!slug) return '';
-  const res = await panelRequest('query', {
-    collection: 'companies',
-    filters: [{ field: 'loginSlug', op: '==', value: slug }],
-    limit: 1,
-    dfs_token: session.token,
+  const slug = companySlug(String(session.companySlug || '').trim()) || String(session.companySlug || '').trim().toLowerCase();
+  // Sempre resolve pelo link/slug da empresa (evita companyId velho sem Pix).
+  if (slug) {
+    const res = await panelRequest('query', {
+      collection: 'companies',
+      filters: [{ field: 'loginSlug', op: '==', value: slug }],
+      limit: 1,
+      dfs_token: session.token,
+    });
+    let row = rowsOf(res)[0];
+    if (!row) {
+      const all = await panelRequest('query', { collection: 'companies', limit: 0, dfs_token: session.token });
+      row = rowsOf(all).find((item) => companySlug(item.loginSlug || '') === slug || String(item.loginSlug || '').toLowerCase() === slug.toLowerCase()) || null;
+    }
+    if (row && row.id) {
+      session.companyId = String(row.id);
+      session.companyName = String(row.name || row.nome || session.companyName || slug);
+      session.companySlug = slug;
+      writeSession(session);
+      return session.companyId;
+    }
+  }
+  return String(session.companyId || '').trim();
+}
+async function loadCompanyPix(session, companyId) {
+  const token = session.token;
+  const filtered = await panelRequest('query', {
+    collection: 'calculatorPixKeys',
+    filters: [{ field: 'companyId', op: '==', value: companyId }],
+    limit: 0,
+    dfs_token: token,
   });
-  const row = rowsOf(res)[0];
-  if (!row) return '';
-  companyId = String(row.id || '').trim();
-  if (!companyId) return '';
-  session.companyId = companyId;
-  session.companyName = session.companyName || String(row.name || row.nome || slug);
-  writeSession(session);
-  return companyId;
+  let docs = rowsOf(filtered);
+  // Reforço: se o filtro do site vier vazio, lê o que a sessão enxerga e filtra aqui.
+  if (!docs.length) {
+    const all = await panelRequest('query', { collection: 'calculatorPixKeys', limit: 0, dfs_token: token });
+    docs = rowsOf(all).filter((item) => String(item.companyId || '') === String(companyId));
+  }
+  return docs
+    .map((item) => pixRow(item, item.id))
+    .filter(Boolean)
+    .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
 }
 async function pullCatalog(session) {
   if (!session || !session.token) {
@@ -263,18 +287,16 @@ async function pullCatalog(session) {
   const filters = [{ field: 'companyId', op: '==', value: companyId }];
   const body = { filters, limit: 0, dfs_token: session.token };
   const budgetId = 'calculator_budget_' + companyId;
-  const [rangesRes, campaignsRes, ratesRes, rulesRes, pixRes, budgetRes] = await Promise.all([
+  const [rangesRes, campaignsRes, ratesRes, rulesRes, budgetRes] = await Promise.all([
     panelRequest('query', { ...body, collection: 'calculatorRanges' }),
     panelRequest('query', { ...body, collection: 'campaigns' }),
     panelRequest('query', { ...body, collection: 'calculatorMontanteRates' }),
     panelRequest('query', { ...body, collection: 'calculatorMontanteAccountRules' }),
-    panelRequest('query', { ...body, collection: 'calculatorPixKeys' }),
     panelRequest('read', { collection: 'settings', id: budgetId, dfs_token: session.token }),
   ]);
-  const pix = rowsOf(pixRes)
-    .map((item) => pixRow(item, item.id))
-    .filter(Boolean)
-    .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
+  // Pix separado: se falhar, o resto do catálogo continua e a tela não fica sem faixa.
+  let pix = [];
+  try { pix = await loadCompanyPix(session, companyId); } catch (e) { pix = []; }
   const packed = loadBudgetTemplates();
   const budgetDoc = (budgetRes && budgetRes.json && budgetRes.json.data) || {};
   const budget = {
@@ -440,15 +462,19 @@ const server = http.createServer((req, res) => {
         const link = links.find((item) => item && item.companyId && item.companyId === profile.companyId) || links[0] || null;
         let companyId = String(profile.companyId || (link && link.companyId) || '').trim();
         let companyName = (link && (link.companyName || link.name)) || profile.companyName || slug;
-        // Link da empresa: se o perfil não trouxer companyId (ex.: ADM), resolve pelo slug.
-        if (!companyId && slug) {
+        // Link da empresa manda: companyId da sessão = empresa do slug digitado.
+        if (slug) {
           const companyRes = await panelRequest('query', {
             collection: 'companies',
             filters: [{ field: 'loginSlug', op: '==', value: slug }],
             limit: 1,
             dfs_token: json.token,
           });
-          const company = rowsOf(companyRes)[0];
+          let company = rowsOf(companyRes)[0];
+          if (!company) {
+            const all = await panelRequest('query', { collection: 'companies', limit: 0, dfs_token: json.token });
+            company = rowsOf(all).find((item) => companySlug(item.loginSlug || '') === slug) || null;
+          }
           if (company && company.id) {
             companyId = String(company.id);
             companyName = String(company.name || company.nome || companyName);

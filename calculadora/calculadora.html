@@ -9,14 +9,19 @@
   * { box-sizing:border-box; }
   html, body { height:100%; overflow:hidden; }
   body { margin:0; background:#09090b; color:var(--text); font-family:"Segoe UI", system-ui, sans-serif; }
-  .wrap { max-width:980px; margin:0 auto; padding:28px 18px 70px; }
+  .wrap {
+    max-width:980px; margin:0 auto; height:100%;
+    padding:16px 18px 12px;
+    display:flex; flex-direction:column; gap:10px;
+    overflow:hidden;
+  }
   h1 { margin:0; font-size:28px; }
   .sub { color:var(--muted); margin:6px 0 16px; font-size:13px; }
   .top { display:flex; justify-content:space-between; gap:12px; align-items:flex-end; }
   .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
   button, input, select, textarea { font:inherit; color:inherit; }
   .tabs button, .primary, .ghost { height:40px; border-radius:12px; padding:0 14px; cursor:pointer; font-weight:800; }
-  .stage { perspective:1400px; }
+  .stage { perspective:1400px; flex:1; min-height:0; overflow:auto; }
   .panel { transform-style:preserve-3d; backface-visibility:hidden; transition:transform .42s cubic-bezier(.2,.7,.2,1), opacity .42s; }
   .panel.flip-out-left { transform:rotateY(-88deg); opacity:.15; transform-origin:left center; }
   .panel.flip-out-right { transform:rotateY(88deg); opacity:.15; transform-origin:right center; }
@@ -27,15 +32,17 @@
   .primary { background:var(--emerald); color:#052e16; border:0; }
   .ghost { background:#27272a; border:1px solid #3f3f46; }
   .panel { background:#111113; border:1px solid var(--line); border-radius:22px; padding:18px; }
-  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:stretch; }
+  .budget-col { display:flex; flex-direction:column; min-height:0; min-width:0; }
   .fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   label { display:block; margin-bottom:6px; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
   input, select, textarea { width:100%; height:44px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
-  textarea { height:280px; padding:12px; resize:vertical; white-space:pre-wrap; line-height:1.45; }
+  textarea { flex:1; min-height:120px; height:auto; padding:12px; resize:vertical; white-space:pre-wrap; line-height:1.45; }
   input:focus, select:focus, textarea:focus { outline:2px solid rgba(37,99,235,.45); border-color:#2563eb; }
   .line { display:flex; justify-content:space-between; margin-top:10px; }
   .big { color:var(--emerald); font-size:22px; font-weight:800; }
-  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:10px; flex-shrink:0; }
+  .actions .primary { min-width:160px; }
   .hint { color:var(--muted); font-size:12px; }
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
   .chip { height:36px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; padding:0 10px; cursor:pointer; font-weight:700; }
@@ -50,16 +57,17 @@
   .menu { display:grid; gap:6px; margin-top:8px; }
   .menu button { height:40px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; text-align:left; padding:0 12px; cursor:pointer; font-weight:700; }
   .menu button.on { background:#2563eb; border-color:transparent; }
-  .credit { margin: 18px 0 0; display:flex; justify-content:space-between; gap:12px; align-items:center; font-size: 11px; color: #52525b; }
+  .credit { margin:0; flex-shrink:0; display:flex; justify-content:space-between; gap:12px; align-items:center; font-size: 11px; color: #52525b; }
   .credit .app-version { color: #71717a; font-weight: 700; letter-spacing: .04em; }
+  .top, .tabs { flex-shrink:0; }
   @media (max-width:800px) {
     .grid { grid-template-columns:1fr; }
     .wrap { padding:10px 14px 8px; }
     h1 { font-size:22px; }
-    .sub { margin:4px 0 10px; font-size:12px; }
-    textarea { height:96px; }
+    .sub { margin:4px 0 8px; font-size:12px; }
+    textarea { min-height:88px; }
     .panel { padding:12px; }
-    .credit { margin-top:8px; }
+    .actions { position:sticky; bottom:0; background:#111113; padding-top:8px; padding-bottom:4px; }
   }
 </style>
 </head>
@@ -96,7 +104,7 @@
         <p class="hint" id="pix-contas-hint"></p>
         <div class="line"><span>Total</span><strong class="big" id="total-contas"></strong></div>
       </div>
-      <div>
+      <div class="budget-col">
         <label>Texto do orçamento</label>
         <textarea id="texto-contas" readonly></textarea>
         <div class="actions"><button class="primary" id="copy-contas" type="button">Copiar orçamento</button></div>
@@ -119,7 +127,7 @@
         <select id="pix-montante"></select>
         <div class="line"><span>Total</span><strong class="big" id="total-montante"></strong></div>
       </div>
-      <div>
+      <div class="budget-col">
         <label>Texto do orçamento</label>
         <textarea id="texto-montante" readonly></textarea>
         <div class="actions"><button class="primary" id="copy-montante" type="button">Copiar orçamento</button></div>
@@ -311,8 +319,9 @@ function stamp() {
   return `Gerado em: ${day} às ${time}`;
 }
 function keysFor(module) {
-  // Igual ao painel: entra se a aba não estiver marcada como false.
-  return pixKeys.filter((item) => module === 'contas' ? item.contas !== false : item.montante !== false);
+  // Igual ao painel: aba Contas/Montante. Se a marca vier vazia, mostra todas da empresa.
+  const marked = pixKeys.filter((item) => module === 'contas' ? item.contas !== false : item.montante !== false);
+  return marked.length ? marked : pixKeys;
 }
 function pick(module, current) {
   const list = keysFor(module);
