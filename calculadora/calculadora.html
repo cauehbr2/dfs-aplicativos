@@ -40,12 +40,12 @@
     gap:24px; align-items:stretch; height:100%; width:100%;
     overflow:hidden;
   }
-  .form-col { display:flex; flex-direction:column; gap:14px; min-width:0; overflow:hidden; height:100%; }
+  .form-col { display:flex; flex-direction:column; gap:16px; min-width:0; overflow:hidden; height:100%; }
   .form-block { display:flex; flex-direction:column; gap:8px; min-width:0; }
-  .form-foot { margin-top:auto; flex-shrink:0; padding-top:16px; display:flex; flex-direction:column; gap:14px; padding-bottom:10px; }
-  .budget-col { display:flex; flex-direction:column; gap:10px; min-width:0; min-height:0; height:100%; overflow:hidden; padding-bottom:8px; }
-  .budget-col .actions { padding-right:4px; margin-top:4px; }
-  .fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; }
+  .form-foot { margin-top:auto; flex-shrink:0; padding-top:18px; display:flex; flex-direction:column; gap:16px; padding-bottom:12px; }
+  .budget-col { display:flex; flex-direction:column; gap:12px; min-width:0; min-height:0; height:100%; overflow:hidden; padding-bottom:10px; }
+  .budget-col .actions { padding-right:4px; margin-top:6px; }
+  .fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; }
   label { display:block; margin:0; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
   input, select, textarea { width:100%; max-width:100%; height:40px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
   textarea { flex:1; min-height:0; height:auto; padding:12px; resize:none; white-space:pre-wrap; line-height:1.4; overflow:auto; }
@@ -57,9 +57,9 @@
   .hint { color:var(--muted); font-size:11px; margin:0; line-height:1.35; }
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
   #faixa-grupos.chips {
-    display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; flex-wrap:nowrap;
+    display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; flex-wrap:nowrap;
   }
-  .chip { height:38px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; padding:0 10px; cursor:pointer; font-weight:700; }
+  .chip { height:40px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; padding:0 10px; cursor:pointer; font-weight:700; }
   #faixa-grupos .chip { width:100%; white-space:nowrap; padding:0 8px; font-size:13px; }
   .chip.on { background:#2563eb; border-color:transparent; }
   .modal { position:fixed; inset:0; background:rgba(0,0,0,.65); display:none; align-items:center; justify-content:center; padding:18px; }
@@ -72,7 +72,7 @@
   .menu { display:grid; gap:6px; margin-top:8px; }
   .menu button { height:40px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; text-align:left; padding:0 12px; cursor:pointer; font-weight:700; }
   .menu button.on { background:#2563eb; border-color:transparent; }
-  .pix-box { display:flex; flex-direction:column; gap:8px; min-width:0; margin-top:2px; }
+  .pix-box { display:flex; flex-direction:column; gap:8px; min-width:0; margin-top:6px; margin-bottom:4px; }
   .pix-select {
     width:100%; height:36px; border-radius:10px; border:1px solid #27272a;
     background:#18181b; color:#fafafa; padding:0 10px; font-size:13px; font-weight:600;
@@ -1133,6 +1133,21 @@ function paintFilaAlertUi(isFirst, alerting) {
 function openFilaNow() {
   const ts = Date.now();
   const url = '/fila/abrir?ts=' + ts;
+  // Caminho principal: HostObject C# (abre a janela da fila ao lado).
+  try {
+    const host = window.chrome && window.chrome.webview && window.chrome.webview.hostObjects;
+    if (host && host.sync && host.sync.dfs && typeof host.sync.dfs.AbrirFila === 'function') {
+      host.sync.dfs.AbrirFila();
+      return;
+    }
+  } catch (_) {}
+  try {
+    const host = window.chrome && window.chrome.webview && window.chrome.webview.hostObjects;
+    if (host && host.dfs && host.dfs.AbrirFila) {
+      Promise.resolve(host.dfs.AbrirFila()).catch(() => {});
+      return;
+    }
+  } catch (_) {}
   const payload = JSON.stringify({ kind: 'fila', t: ts });
   const bridge = window.chrome && window.chrome.webview;
   if (bridge && typeof bridge.postMessage === 'function') {
@@ -1144,7 +1159,6 @@ function openFilaNow() {
     document.title = 'dfs:fila:' + ts;
     setTimeout(() => { try { document.title = prev; } catch (_) {} }, 150);
   } catch (_) {}
-  // Vários caminhos: o host C# pega o pedido em WebResourceRequested / arquivo.
   try {
     const img = new Image();
     img.src = url;
