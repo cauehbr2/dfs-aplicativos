@@ -920,20 +920,34 @@ async function pullCatalog(session, key) {
   siteCatalog = catalog;
   return catalog;
 }
-function ensureCatalog(session) {
+function ensureCatalog(session, options) {
   settleCompany(session);
   if (!session || !session.token || !session.companyId) {
-    return Promise.resolve({ clientsOk: false, rangesOk: false, campaignsOk: false, clients: [], ranges: [], campaigns: [] });
+    return Promise.resolve({ clientsOk: false, rangesOk: false, campaignsOk: false, clients: [], ranges: [], campaigns: [], rates: [], accountRules: [] });
   }
   const key = session.companyId + '|' + session.userId;
-  if (siteCatalog && siteCatalog.key === key) return Promise.resolve(siteCatalog);
+  const fresh = !!(options && options.fresh);
+  if (fresh) {
+    siteCatalog = null;
+    if (catalogKey === key) catalogKey = '';
+  }
+  if (!fresh && siteCatalog && siteCatalog.key === key) return Promise.resolve(siteCatalog);
   if (catalogFlight && catalogKey === key) return catalogFlight;
   catalogKey = key;
   catalogFlight = pullCatalog(session, key).finally(() => { catalogFlight = null; });
   return catalogFlight;
 }
 function publicCatalog(session, catalog) {
-  const data = catalog || { clientsOk: false, rangesOk: false, campaignsOk: false, clients: [], ranges: [], campaigns: [] };
+  const data = catalog || { clientsOk: false, rangesOk: false, campaignsOk: false, clients: [], ranges: [], campaigns: [], rates: [], accountRules: [] };
+  const clients = data.clients || [];
+  const ranges = data.ranges || [];
+  const rates = data.rates || [];
+  const accountRules = data.accountRules || [];
+  const parts = [];
+  if (data.clientsOk) parts.push(clients.length + ' cliente' + (clients.length === 1 ? '' : 's'));
+  if (data.rangesOk) parts.push(ranges.length + ' faixa' + (ranges.length === 1 ? '' : 's'));
+  if (rates.length) parts.push(rates.length + ' taxa' + (rates.length === 1 ? '' : 's'));
+  if (accountRules.length) parts.push(accountRules.length + ' regra' + (accountRules.length === 1 ? '' : 's') + ' de montante');
   return {
     ok: !!(data.clientsOk && data.rangesOk && data.campaignsOk),
     name: (session && session.name) || '',
@@ -943,12 +957,18 @@ function publicCatalog(session, catalog) {
     clientsOk: !!data.clientsOk,
     rangesOk: !!data.rangesOk,
     campaignsOk: !!data.campaignsOk,
-    clients: data.clients || [],
-    ranges: data.ranges || [],
+    clients,
+    ranges,
     campaigns: data.campaigns || [],
-    rates: data.rates || [],
-    accountRules: data.accountRules || [],
-    message: catalogBlock(data),
+    rates,
+    accountRules,
+    synced: {
+      clients: clients.length,
+      ranges: ranges.length,
+      rates: rates.length,
+      montante: accountRules.length,
+    },
+    message: catalogBlock(data) || (parts.length ? ('Sincronizado: ' + parts.join(', ') + '.') : ''),
   };
 }
 function prepareSiteOps(pending, state, catalog) {
@@ -1267,7 +1287,7 @@ const server = http.createServer((req, res) => {
       sendJson(res, 200, { ok: false, name: session.name || '', email: session.email || '', message: 'A conta não tem empresa nesta sessão.' });
       return;
     }
-    ensureCatalog(session)
+    ensureCatalog(session, { fresh: true })
       .then((catalog) => sendJson(res, 200, publicCatalog(session, catalog)))
       .catch(() => sendJson(res, 200, { ok: false, name: session.name || '', message: 'O site não devolveu o cadastro.' }));
     return;

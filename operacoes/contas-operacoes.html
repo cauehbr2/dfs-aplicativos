@@ -130,9 +130,10 @@
     position: fixed; inset: 0; background: rgba(0,0,0,.62); display: none; align-items: center; justify-content: center; padding: 20px;
   }
   .modal.open { display: flex; }
-  .modal.gate { background: #09090b; }
-  .modal.gate .sheet { width: min(480px, 100%); }
-  .sheet { width: min(860px, 100%); background: rgba(24,24,27,.82); border: 1px solid rgba(255,255,255,.08); border-radius: 28px; padding: 18px; backdrop-filter: blur(18px); }
+  .modal.gate { background: rgba(0,0,0,.72); }
+  .modal.gate .sheet { width: min(420px, 100%); }
+  .sheet { width: min(860px, 100%); background: rgba(24,24,27,.92); border: 1px solid rgba(255,255,255,.08); border-radius: 28px; padding: 18px; backdrop-filter: blur(18px); }
+  #panel-modal .sheet { width: min(420px, 100%); }
   .ranges { display: grid; gap: 8px; margin-top: 12px; max-height: 360px; overflow: auto; }
   .range-row { display: grid; grid-template-columns: .9fr 1.3fr .6fr .6fr .8fr 36px; gap: 8px; }
   .range-box { position: relative; }
@@ -887,8 +888,17 @@ function applyCatalog(catalog) {
   siteReady = !!(catalog && catalog.clientsOk && catalog.rangesOk && catalog.campaignsOk && siteRanges.length && siteClients.length);
   const list = document.getElementById('site-clients');
   if (list) list.innerHTML = siteClients.map((item) => `<option value="${escapeHtml(item.name)}"></option>`).join('');
+  renderTaxas();
   paint();
   applyAutoDiscount();
+  paintSiteNote();
+  if (catalog && catalog.message && siteReady) {
+    const note = document.getElementById('site-note');
+    if (note && String(catalog.message).indexOf('Sincronizado:') === 0) {
+      note.textContent = catalog.message;
+      note.className = 'site-note';
+    }
+  }
 }
 async function loadAccount() {
   let session = { ok: false };
