@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fila</title>
+<style>
+  :root { --bg:#09090b; --line:#27272a; --muted:#a1a1aa; --text:#fafafa; --emerald:#34d399; --blue:#2563eb; --red:#ef4444; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:"Segoe UI", system-ui, sans-serif; }
+  .wrap { height:100%; padding:14px 14px 10px; display:flex; flex-direction:column; gap:10px; }
+  .top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  h1 { margin:0; font-size:22px; }
+  .sub { margin:4px 0 0; color:var(--muted); font-size:12px; line-height:1.35; }
+  .tabs { display:flex; gap:8px; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  .tabs button, .act, .ghost {
+    height:38px; border-radius:12px; padding:0 12px; font-weight:800; border:1px solid var(--line); background:#18181b;
+  }
+  .tabs button.on { background:var(--blue); border-color:transparent; }
+  .ghost { background:#27272a; }
+  .act { background:var(--emerald); color:#052e16; border:0; }
+  .act.warn { background:#f59e0b; color:#422006; }
+  .act.danger { background:#7f1d1d; color:#fecaca; }
+  .panel {
+    flex:1; min-height:0; overflow:auto; background:#111113; border:1px solid var(--line);
+    border-radius:18px; padding:12px;
+  }
+  .me-card {
+    display:flex; align-items:center; gap:12px; padding:12px; border-radius:14px;
+    border:1px solid #3f3f46; background:#18181b; margin-bottom:12px;
+  }
+  .me-card.first {
+    border-color:rgba(239,68,68,.55); background:linear-gradient(180deg, rgba(239,68,68,.18), #18181b);
+  }
+  .pulse {
+    width:18px; height:18px; border-radius:50%; background:#3f3f46; flex-shrink:0;
+    box-shadow:0 0 0 0 transparent;
+  }
+  .pulse.on {
+    background:var(--red);
+    animation: tremble .28s ease-in-out infinite, glow 1.1s ease-out infinite;
+  }
+  @keyframes tremble {
+    0%, 100% { transform: translate(0,0) rotate(0deg); }
+    20% { transform: translate(-1.5px, 1px) rotate(-8deg); }
+    40% { transform: translate(1.5px, -1px) rotate(7deg); }
+    60% { transform: translate(-1px, -1px) rotate(-5deg); }
+    80% { transform: translate(1px, 1px) rotate(6deg); }
+  }
+  @keyframes glow {
+    0% { box-shadow: 0 0 0 0 rgba(239,68,68,.55); }
+    70% { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+    100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  }
+  .me-meta { min-width:0; flex:1; }
+  .me-meta strong { display:block; font-size:14px; }
+  .me-meta span { display:block; color:var(--muted); font-size:12px; margin-top:2px; }
+  .actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .actions button { flex:1; min-width:90px; }
+  .list { display:flex; flex-direction:column; gap:8px; }
+  .row {
+    display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px;
+    border:1px solid #27272a; background:#151518;
+  }
+  .row.me { border-color:rgba(37,99,235,.45); }
+  .row.first { border-color:rgba(239,68,68,.45); }
+  .pos {
+    width:28px; height:28px; border-radius:999px; display:grid; place-items:center;
+    font-size:12px; font-weight:800; background:#27272a; color:#d4d4d8; flex-shrink:0;
+  }
+  .row.first .pos { background:var(--red); color:#fff; }
+  .row.paused .pos { background:#3f3f46; color:#a1a1aa; }
+  .name { flex:1; min-width:0; font-weight:700; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tag { font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .tag.go { color:#fca5a5; }
+  .tag.pause { color:#a1a1aa; }
+  .hint { color:var(--muted); font-size:12px; margin:0; }
+  .status { color:var(--muted); font-size:11px; }
+  .alert-bar {
+    display:none; align-items:center; justify-content:space-between; gap:10px;
+    padding:10px 12px; border-radius:12px; border:1px solid rgba(239,68,68,.4);
+    background:rgba(239,68,68,.12); margin-bottom:10px;
+  }
+  .alert-bar.on { display:flex; }
+  .alert-bar strong { color:#fecaca; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Fila</h1>
+      <p class="sub" id="line">Sincronizada com o site.</p>
+    </div>
+  </div>
+  <div class="tabs">
+    <button type="button" class="on" data-sector="contas">Contas</button>
+    <button type="button" data-sector="montante">Montante</button>
+  </div>
+  <div class="alert-bar" id="alert-bar">
+    <strong id="alert-text">É a sua vez!</strong>
+    <button type="button" class="ghost" id="stop-alert">Parar alerta</button>
+  </div>
+  <div class="panel">
+    <div class="me-card" id="me-card">
+      <div class="pulse" id="pulse"></div>
+      <div class="me-meta">
+        <strong id="me-title">—</strong>
+        <span id="me-sub">Carregando fila...</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" class="act" id="btn-enter">Entrar</button>
+      <button type="button" class="act warn" id="btn-pause">Pausar</button>
+      <button type="button" class="act" id="btn-pass">Próximo</button>
+      <button type="button" class="act danger" id="btn-leave">Sair</button>
+    </div>
+    <div class="list" id="list"></div>
+    <p class="hint" id="empty"></p>
+  </div>
+  <p class="status" id="status">Atualizando...</p>
+</div>
+<script>
+let sector = 'contas';
+let state = null;
+let busy = false;
+let alertOn = false;
+let alertSector = '';
+let prev = { contas: null, montante: null };
+let ready = { contas: false, montante: false };
+let beepTimer = null;
+let audioCtx = null;
+
+function sectorLabel(id) { return id === 'montante' ? 'Montante' : 'Contas'; }
+function meIn(s) {
+  if (!state) return null;
+  return s === 'montante' ? state.meMontante : state.meContas;
+}
+function opsOf(s) {
+  if (!state) return [];
+  return s === 'montante' ? (state.montante || []) : (state.contas || []);
+}
+function ensureAudio() {
+  if (audioCtx) return audioCtx;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  audioCtx = new Ctx();
+  return audioCtx;
+}
+function beepOnce() {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(880, now);
+  osc.frequency.exponentialRampToValueAtTime(440, now + 0.18);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.12, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.24);
+}
+function startAlert(which) {
+  alertOn = true;
+  alertSector = which;
+  document.getElementById('alert-bar').classList.add('on');
+  document.getElementById('alert-text').textContent = 'É a sua vez na fila de ' + sectorLabel(which) + '!';
+  if (beepTimer) clearInterval(beepTimer);
+  beepOnce();
+  beepTimer = setInterval(beepOnce, 1800);
+}
+function stopAlert() {
+  alertOn = false;
+  alertSector = '';
+  document.getElementById('alert-bar').classList.remove('on');
+  if (beepTimer) { clearInterval(beepTimer); beepTimer = null; }
+}
+function trackTurn() {
+  if (!state || !state.me || !state.me.id) return;
+  ['contas', 'montante'].forEach((s) => {
+    const mine = meIn(s);
+    const pos = mine && mine.active !== false ? Number(mine.position) || 0 : 0;
+    const current = pos > 0 ? pos : null;
+    if (!ready[s]) {
+      prev[s] = current;
+      ready[s] = true;
+      return;
+    }
+    const before = prev[s];
+    if (before !== current) {
+      prev[s] = current;
+      if (current === 1 && before !== 1 && mine && mine.active !== false) {
+        startAlert(s);
+      }
+    }
+  });
+  const stillFirst =
+    (meIn('contas') && meIn('contas').active !== false && Number(meIn('contas').position) === 1) ||
+    (meIn('montante') && meIn('montante').active !== false && Number(meIn('montante').position) === 1);
+  if (alertOn && !stillFirst) stopAlert();
+}
+function paint() {
+  const ops = opsOf(sector);
+  const mine = meIn(sector);
+  const meCard = document.getElementById('me-card');
+  const pulse = document.getElementById('pulse');
+  const title = document.getElementById('me-title');
+  const sub = document.getElementById('me-sub');
+  const list = document.getElementById('list');
+  const empty = document.getElementById('empty');
+  const line = document.getElementById('line');
+  const who = (state && state.me && state.me.name) || 'Você';
+
+  if (!state || !state.ok) {
+    title.textContent = 'Fora da sessão';
+    sub.textContent = (state && state.message) || 'Entre na Calculadora.';
+    meCard.classList.remove('first');
+    pulse.classList.remove('on');
+    list.innerHTML = '';
+    empty.textContent = '';
+    return;
+  }
+
+  line.textContent = 'Conectado: ' + who + ' · igual ao site';
+  const isFirst = !!(mine && mine.active !== false && Number(mine.position) === 1);
+  meCard.classList.toggle('first', isFirst);
+  pulse.classList.toggle('on', isFirst);
+
+  if (!mine) {
+    title.textContent = who;
+    sub.textContent = 'Fora da fila de ' + sectorLabel(sector);
+  } else if (mine.active === false) {
+    title.textContent = who + ' · pausado';
+    sub.textContent = 'Sem número — no fim da fila de ' + sectorLabel(sector);
+  } else if (isFirst) {
+    title.textContent = who + ' · é a sua vez';
+    sub.textContent = 'Posição 1 em ' + sectorLabel(sector);
+  } else {
+    title.textContent = who + ' · posição ' + mine.position;
+    sub.textContent = 'Fila de ' + sectorLabel(sector);
+  }
+
+  document.getElementById('btn-enter').disabled = !!mine || busy;
+  document.getElementById('btn-leave').disabled = !mine || busy;
+  document.getElementById('btn-pause').disabled = !mine || busy;
+  document.getElementById('btn-pause').textContent = mine && mine.active === false ? 'Retomar' : 'Pausar';
+  document.getElementById('btn-pass').disabled = !(mine && mine.active !== false && Number(mine.position) === 1) || busy;
+
+  list.innerHTML = ops.map((op) => {
+    const first = op.active !== false && Number(op.position) === 1;
+    const paused = op.active === false;
+    const me = state.me && String(op.userId) === String(state.me.id);
+    const pos = paused ? '—' : String(op.position || '—');
+    const tag = first ? 'SUA VEZ' : (paused ? 'PAUSADO' : '');
+    return `<div class="row${me ? ' me' : ''}${first ? ' first' : ''}${paused ? ' paused' : ''}">
+      <div class="pos">${pos}</div>
+      <div class="name">${escapeHtml(op.name || 'Operador')}</div>
+      <div class="tag${first ? ' go' : ''}${paused ? ' pause' : ''}">${tag}</div>
+    </div>`;
+  }).join('');
+  empty.textContent = ops.length ? '' : 'Ninguém nesta fila agora.';
+}
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+async function refresh() {
+  try {
+    const data = await fetch('/fila/estado?ts=' + Date.now(), { cache: 'no-store' }).then((r) => r.json());
+    state = data;
+    trackTurn();
+    paint();
+    document.getElementById('status').textContent = data && data.ok
+      ? ('Atualizado · ' + new Date().toLocaleTimeString('pt-BR'))
+      : ((data && data.message) || 'Sem sessão');
+  } catch (e) {
+    document.getElementById('status').textContent = 'Sem conexão com a fila.';
+  }
+}
+async function run(action) {
+  if (busy) return;
+  busy = true;
+  paint();
+  document.getElementById('status').textContent = 'Atualizando no site...';
+  try {
+    ensureAudio();
+    const res = await fetch('/fila/acao', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, sector }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error((json && json.message) || 'Não atualizei a fila.');
+    state = json;
+    trackTurn();
+    paint();
+    document.getElementById('status').textContent = 'Fila igual ao site · ' + new Date().toLocaleTimeString('pt-BR');
+  } catch (e) {
+    document.getElementById('status').textContent = e.message || 'Falha ao sincronizar.';
+    await refresh();
+  } finally {
+    busy = false;
+    paint();
+  }
+}
+document.querySelectorAll('.tabs button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    sector = btn.getAttribute('data-sector') || 'contas';
+    document.querySelectorAll('.tabs button').forEach((el) => el.classList.toggle('on', el === btn));
+    paint();
+  });
+});
+document.getElementById('btn-enter').addEventListener('click', () => run('enter'));
+document.getElementById('btn-leave').addEventListener('click', () => run('leave'));
+document.getElementById('btn-pause').addEventListener('click', () => run('pause'));
+document.getElementById('btn-pass').addEventListener('click', () => run('pass'));
+document.getElementById('stop-alert').addEventListener('click', () => stopAlert());
+refresh();
+setInterval(refresh, 2500);
+</script>
+</body>
+</html>

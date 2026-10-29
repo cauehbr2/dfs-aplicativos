@@ -11,6 +11,7 @@ const catalogFile = path.join(dataDir, 'catalogo.json');
 const sessionFile = path.join(dataDir, 'painel-sessao.json');
 const siteFile = path.join(dataDir, 'painel-site.json');
 const htmlFile = path.join(codeDir, 'calculadora.html');
+const filaFile = path.join(codeDir, 'fila.html');
 const versionFile = path.join(codeDir, 'app-versao.txt');
 const templatesFile = path.join(codeDir, 'budget-templates.json');
 const defaultOrigin = 'https://renovanow.online';
@@ -395,6 +396,212 @@ async function pullCatalog(session) {
   fs.writeFileSync(catalogFile, JSON.stringify(catalog));
   return catalog;
 }
+
+function localDateString(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function assignQueuePositions(ops) {
+  let n = 0;
+  return (ops || []).map((op) => {
+    if (op.active === false) return { ...op, position: 0 };
+    n += 1;
+    return { ...op, position: n };
+  });
+}
+function firstPausedIndex(ops) {
+  const idx = (ops || []).findIndex((op) => op.active === false);
+  return idx === -1 ? (ops || []).length : idx;
+}
+function insertAtActiveEnd(ops, op) {
+  const next = (ops || []).slice();
+  next.splice(firstPausedIndex(next), 0, { ...op, active: true });
+  return assignQueuePositions(next);
+}
+function sendOperatorToPausedEnd(ops, userId) {
+  const idx = (ops || []).findIndex((op) => op.userId === userId);
+  if (idx === -1) return ops || [];
+  const next = ops.slice();
+  const [moved] = next.splice(idx, 1);
+  next.push({ ...moved, active: false });
+  return assignQueuePositions(next);
+}
+function sendOperatorToActiveEnd(ops, userId, extra = {}) {
+  const idx = (ops || []).findIndex((op) => op.userId === userId);
+  if (idx === -1) return ops || [];
+  const next = ops.slice();
+  const [moved] = next.splice(idx, 1);
+  next.splice(firstPausedIndex(next), 0, { ...moved, ...extra, active: true });
+  return assignQueuePositions(next);
+}
+function filterActiveCycleQueueOperators(ops, resetTime = '00:00', lastResetAt, now = new Date()) {
+  if (!Array.isArray(ops)) return [];
+  const parts = String(resetTime || '00:00').split(':');
+  const h = parseInt(parts[0], 10) || 0;
+  const m = parseInt(parts[1], 10) || 0;
+  const cycleStart = new Date(now);
+  cycleStart.setHours(h, m, 0, 0);
+  if (cycleStart.getTime() > now.getTime()) cycleStart.setDate(cycleStart.getDate() - 1);
+  let minValid = cycleStart.getTime();
+  if (lastResetAt) {
+    const manualTs = new Date(lastResetAt).getTime();
+    if (!isNaN(manualTs) && manualTs > minValid) minValid = manualTs;
+  }
+  const today = localDateString(now);
+  const filtered = ops.filter((op) => {
+    let opTime = 0;
+    if (op.enteredAt) opTime = new Date(op.enteredAt).getTime();
+    else if (op.lastMovedAt) {
+      if (typeof op.lastMovedAt === 'string') opTime = new Date(op.lastMovedAt).getTime();
+      else if (op.lastMovedAt && typeof op.lastMovedAt === 'object' && op.lastMovedAt.seconds) {
+        opTime = op.lastMovedAt.seconds * 1000;
+      }
+    }
+    if (opTime && !isNaN(opTime)) return opTime >= minValid;
+    if (op.queueDate && op.queueDate === today) return true;
+    return false;
+  });
+  return assignQueuePositions(filtered);
+}
+async function readDoc(session, collection, id) {
+  const res = await panelRequest('read', { collection, id, dfs_token: session.token });
+  const json = (res && res.json) || {};
+  if (res.status >= 400) return null;
+  if (json.data && typeof json.data === 'object') return { id, ...json.data };
+  if (json.doc && json.doc.data) return { id, ...json.doc.data };
+  return null;
+}
+async function writeQueueSector(session, sectorId, operators, updatedBy) {
+  const nowIso = new Date().toISOString();
+  const res = await panelRequest('write', {
+    op: 'set',
+    collection: 'queueSectors',
+    id: sectorId,
+    data: {
+      sector: sectorId,
+      operators,
+      updatedAt: nowIso,
+      updatedBy: updatedBy || session.name || '',
+    },
+    merge: true,
+    dfs_token: session.token,
+  });
+  if (res.status >= 400) {
+    const message = (res.json && res.json.message) || 'Não gravei a fila no site.';
+    throw new Error(message);
+  }
+  return operators;
+}
+async function appendQueueLog(session, payload) {
+  try {
+    const now = new Date();
+    await panelRequest('write', {
+      op: 'create',
+      collection: 'queueActivityLogs',
+      data: {
+        sector: payload.sector,
+        action: payload.action,
+        operatorId: payload.operatorId,
+        operatorName: payload.operatorName,
+        actorId: payload.actorId || payload.operatorId,
+        actorName: payload.actorName || payload.operatorName,
+        note: payload.note || '',
+        timestamp: now.toISOString(),
+        date: localDateString(now),
+        time: String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0'),
+      },
+      dfs_token: session.token,
+    });
+  } catch (e) {}
+}
+async function loadQueueState(session) {
+  const [settingsDoc, contasDoc, montanteDoc] = await Promise.all([
+    readDoc(session, 'queueSettings', 'global'),
+    readDoc(session, 'queueSectors', 'contas'),
+    readDoc(session, 'queueSectors', 'montante'),
+  ]);
+  const resetTime = (settingsDoc && settingsDoc.resetTime) || '00:00';
+  const lastResetAt = settingsDoc && settingsDoc.lastResetAt;
+  const contas = filterActiveCycleQueueOperators((contasDoc && contasDoc.operators) || [], resetTime, lastResetAt);
+  const montante = filterActiveCycleQueueOperators((montanteDoc && montanteDoc.operators) || [], resetTime, lastResetAt);
+  const meId = String(session.userId || '');
+  const meContas = contas.find((op) => String(op.userId) === meId) || null;
+  const meMontante = montante.find((op) => String(op.userId) === meId) || null;
+  return {
+    ok: true,
+    me: { id: meId, name: session.name || '' },
+    resetTime,
+    lastResetAt: lastResetAt || '',
+    contas,
+    montante,
+    meContas,
+    meMontante,
+  };
+}
+async function queueAction(session, action, sector) {
+  const sectorId = sector === 'montante' ? 'montante' : 'contas';
+  if (!['enter', 'leave', 'pause', 'pass'].includes(action)) {
+    throw new Error('Ação inválida.');
+  }
+  const meId = String(session.userId || '');
+  const meName = String(session.name || 'Operador');
+  if (!meId) throw new Error('Entre de novo para usar a fila.');
+  const state = await loadQueueState(session);
+  let ops = sectorId === 'contas' ? state.contas.slice() : state.montante.slice();
+  const todayStr = localDateString();
+  const nowIso = new Date().toISOString();
+  let logAction = action;
+  let note = '';
+
+  if (action === 'enter') {
+    if (ops.some((op) => String(op.userId) === meId)) {
+      return { ok: true, already: true, ...(await loadQueueState(session)) };
+    }
+    ops = insertAtActiveEnd(ops, {
+      userId: meId,
+      name: meName,
+      position: 0,
+      active: true,
+      lastMovedAt: nowIso,
+      enteredAt: nowIso,
+      queueDate: todayStr,
+    });
+    logAction = 'enter';
+  } else if (action === 'leave') {
+    ops = assignQueuePositions(ops.filter((op) => String(op.userId) !== meId));
+    logAction = 'leave';
+  } else if (action === 'pause') {
+    const idx = ops.findIndex((op) => String(op.userId) === meId);
+    if (idx < 0) throw new Error('Você não está nesta fila.');
+    const isActive = ops[idx].active !== false;
+    if (isActive) {
+      ops = sendOperatorToPausedEnd(ops, meId);
+      logAction = 'pause';
+      note = 'Finalizou turno';
+    } else {
+      ops = sendOperatorToActiveEnd(ops, meId, { lastMovedAt: nowIso, queueDate: todayStr });
+      logAction = 'resume';
+      note = 'Voltou ao ativo';
+    }
+  } else if (action === 'pass') {
+    const first = ops.find((op) => op.active !== false);
+    if (!first) throw new Error('Não há operadores ativos nesta fila.');
+    if (String(first.userId) !== meId) throw new Error('Somente o operador da vez pode avançar a fila.');
+    ops = sendOperatorToActiveEnd(ops, meId, { lastMovedAt: nowIso, queueDate: todayStr });
+    logAction = 'pass';
+  }
+
+  await writeQueueSector(session, sectorId, ops, meName);
+  await appendQueueLog(session, {
+    sector: sectorId,
+    action: logAction,
+    operatorId: meId,
+    operatorName: meName,
+    actorId: meId,
+    actorName: meName,
+    note,
+  });
+  return { ok: true, ...(await loadQueueState(session)) };
+}
 function sendJson(res, status, payload) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(payload));
@@ -570,6 +777,38 @@ const server = http.createServer((req, res) => {
   if ((url === '/' || url === '/calculadora.html') && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(fs.readFileSync(htmlFile));
+    return;
+  }
+  if ((url === '/fila' || url === '/fila.html') && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(fs.readFileSync(filaFile));
+    return;
+  }
+  if (url === '/fila/estado' && req.method === 'GET') {
+    const session = readSession();
+    if (!session || !session.token) {
+      sendJson(res, 200, { ok: false, message: 'Entre na Calculadora para ver a fila.' });
+      return;
+    }
+    loadQueueState(session)
+      .then((state) => sendJson(res, 200, state))
+      .catch(() => sendJson(res, 502, { ok: false, message: 'Não li a fila do site.' }));
+    return;
+  }
+  if (url === '/fila/acao' && req.method === 'POST') {
+    const session = readSession();
+    if (!session || !session.token) {
+      sendJson(res, 401, { ok: false, message: 'Entre na Calculadora para usar a fila.' });
+      return;
+    }
+    readBody(req).then(async (body) => {
+      try {
+        const result = await queueAction(session, String(body.action || ''), String(body.sector || 'contas'));
+        sendJson(res, 200, result);
+      } catch (e) {
+        sendJson(res, 400, { ok: false, message: e.message || 'Não atualizei a fila.' });
+      }
+    }).catch(() => sendJson(res, 400, { ok: false, message: 'Não li a ação da fila.' }));
     return;
   }
   res.writeHead(404);

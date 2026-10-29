@@ -1,6 +1,6 @@
 ﻿{
     "calculadora":  {
-                        "version":  "1.0.19",
+                        "version":  "1.0.20",
                         "files":  [
                                       "app-versao.txt",
                                       "budget-templates.json",
@@ -15,7 +15,8 @@
                                       "Microsoft.Web.WebView2.WinForms.dll",
                                       "Microsoft.Web.WebView2.Wpf.dll",
                                       "runtimes/win-x64/native/WebView2Loader.dll",
-                                      "WebView2Loader.dll"
+                                      "WebView2Loader.dll",
+                                      "fila.html"
                                   ]
                     },
     "operacoes":  {
