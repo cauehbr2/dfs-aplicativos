@@ -1137,25 +1137,17 @@ function paintFilaAlertUi(isFirst, alerting) {
 function openFilaNow() {
   const ts = Date.now();
   const url = '/fila/abrir?ts=' + ts;
-  let asked = false;
-  // HostObject C# (abre o painel da fila ao lado).
+  // Título = sinal mais estável pro C# (DocumentTitleChanged).
+  try { document.title = 'dfs:fila:' + ts; } catch (_) {}
   try {
     const host = window.chrome && window.chrome.webview && window.chrome.webview.hostObjects;
     if (host && host.sync && host.sync.dfs && typeof host.sync.dfs.AbrirFila === 'function') {
       host.sync.dfs.AbrirFila();
-      asked = true;
+    } else if (host && host.dfs && host.dfs.AbrirFila) {
+      Promise.resolve(host.dfs.AbrirFila()).catch(() => {});
     }
   } catch (_) {}
-  if (!asked) {
-    try {
-      const host = window.chrome && window.chrome.webview && window.chrome.webview.hostObjects;
-      if (host && host.dfs && host.dfs.AbrirFila) {
-        Promise.resolve(host.dfs.AbrirFila()).catch(() => {});
-        asked = true;
-      }
-    } catch (_) {}
-  }
-  // Sempre pede também pelo arquivo/watch (não depende só do HostObject).
+  // Arquivo + watch no C# (Node grava fila-abrir.json).
   try {
     fetch(url, { method: 'POST', cache: 'no-store' }).catch(() => {});
   } catch (_) {}
