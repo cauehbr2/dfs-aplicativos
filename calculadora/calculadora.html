@@ -100,7 +100,9 @@
           <div><label>Desconto do dia %</label><input id="desc-contas" type="number" min="0" step="0.01" value="0" /><p class="hint">Puxa o desconto do grupo da faixa. Dá para alterar. Apagar deixa 0.</p></div>
         </div>
         <label style="margin-top:12px">Chave Pix do depósito</label>
-        <select id="pix-contas"></select>
+        <button type="button" class="ghost" id="pix-contas-trigger" style="width:100%;text-align:left">Escolha a chave Pix</button>
+        <div id="pix-contas-menu" class="menu hidden"></div>
+        <input type="hidden" id="pix-contas" />
         <p class="hint" id="pix-contas-hint"></p>
         <div class="line"><span>Total</span><strong class="big" id="total-contas"></strong></div>
       </div>
@@ -124,7 +126,10 @@
           <div><label>Desconto do dia %</label><input id="desc-montante" type="number" min="0" step="0.01" value="0" /><p class="hint">Puxa o desconto do valor. Dá para alterar. Apagar deixa 0.</p></div>
         </div>
         <label style="margin-top:12px">Chave Pix do depósito</label>
-        <select id="pix-montante"></select>
+        <button type="button" class="ghost" id="pix-montante-trigger" style="width:100%;text-align:left">Escolha a chave Pix</button>
+        <div id="pix-montante-menu" class="menu hidden"></div>
+        <input type="hidden" id="pix-montante" />
+        <p class="hint" id="pix-montante-hint"></p>
         <div class="line"><span>Total</span><strong class="big" id="total-montante"></strong></div>
       </div>
       <div class="budget-col">
@@ -197,6 +202,8 @@ let budget = {
 let siteOn = false;
 let faixaGroup = '';
 let faixaOpen = false;
+let pixContasOpen = false;
+let pixMontanteOpen = false;
 let rateId = '1.5';
 let pixContas = '';
 let pixMontante = '';
@@ -319,19 +326,20 @@ function stamp() {
   return `Gerado em: ${day} às ${time}`;
 }
 function keysFor(module) {
-  // Lista da empresa inteira (cadastro da calculadora). Sem filtrar a ponto de zerar o select.
-  const list = Array.isArray(pixKeys) ? pixKeys.filter((item) => item && item.chave) : [];
-  if (!list.length) return [];
-  const marked = list.filter((item) => {
-    if (module === 'contas') return item.contas !== false && item.exibirContas !== false;
-    return item.montante !== false && item.exibirMontante !== false;
+  // Igual ao painel: Contas = exibirContas; Montante = exibirMontante.
+  return (Array.isArray(pixKeys) ? pixKeys : []).filter((item) => {
+    if (!item || !item.chave) return false;
+    return module === 'contas' ? item.contas !== false : item.montante !== false;
   });
-  return marked.length ? marked : list;
 }
 function pick(module, current) {
   const list = keysFor(module);
   if (list.some((item) => String(item.id) === String(current))) return String(current);
   return list[0] ? String(list[0].id) : '';
+}
+function pixLabelOf(item) {
+  if (!item) return 'Escolha a chave Pix';
+  return [item.nome || 'Pix', item.tipo || 'CPF', item.banco || '—'].join(' · ');
 }
 function keyById(id) { return pixKeys.find((item) => item.id === id) || null; }
 function faixaLabel(range) {
@@ -439,40 +447,30 @@ function escapeOpt(value) {
 function renderPixSelects() {
   pixContas = pick('contas', pixContas);
   pixMontante = pick('montante', pixMontante);
-  const fill = (id, module, selected) => {
+  const fill = (module, selected, triggerId, menuId, hiddenId, open) => {
     const list = keysFor(module);
-    const select = document.getElementById(id);
-    if (!select) return;
-    while (select.firstChild) select.removeChild(select.firstChild);
-    if (!list.length) {
-      const empty = document.createElement('option');
-      empty.value = '';
-      empty.textContent = 'Nenhuma chave Pix desta empresa';
-      select.appendChild(empty);
-      select.value = '';
-      return;
-    }
-    list.forEach((item) => {
-      const opt = document.createElement('option');
-      opt.value = String(item.id || item.chave || '');
-      opt.textContent = [item.nome || 'Pix', item.tipo || 'CPF', item.banco || '—'].join(' · ');
-      select.appendChild(opt);
-    });
-    const want = String(selected || '');
-    select.value = list.some((item) => String(item.id) === want) ? want : String(list[0].id || '');
+    const hidden = document.getElementById(hiddenId);
+    const trigger = document.getElementById(triggerId);
+    const menu = document.getElementById(menuId);
+    if (!hidden || !trigger || !menu) return;
+    const current = list.find((item) => String(item.id) === String(selected)) || null;
+    hidden.value = current ? String(current.id) : '';
+    trigger.textContent = current ? pixLabelOf(current) : (list.length ? 'Escolha a chave Pix' : 'Nenhuma chave Pix nesta aba');
+    menu.classList.toggle('hidden', !open);
+    menu.innerHTML = list.length
+      ? list.map((item) =>
+        `<button type="button" class="${String(item.id) === String(selected) ? 'on' : ''}" data-pix-id="${escapeOpt(item.id)}" data-pix-module="${module}">${escapeOpt(pixLabelOf(item))}</button>`
+      ).join('')
+      : '<p class="hint">Nenhuma chave Pix liberada nesta aba.</p>';
   };
-  fill('pix-contas', 'contas', pixContas);
-  fill('pix-montante', 'montante', pixMontante);
-  const hint = document.getElementById('pix-contas-hint');
-  if (hint) {
-    const n = keysFor('contas').length;
-    const total = Array.isArray(pixKeys) ? pixKeys.length : 0;
-    hint.textContent = n
-      ? (n + ' chave(s) nesta aba' + (total && total !== n ? (' · ' + total + ' na empresa') : ''))
-      : (total
-        ? (total + ' Pix na empresa, mas nenhuma liberada nesta aba.')
-        : (siteOn ? 'Nenhuma chave Pix desta empresa na lista da calculadora.' : 'Entre pelo link da empresa para puxar as chaves Pix.'));
-  }
+  fill('contas', pixContas, 'pix-contas-trigger', 'pix-contas-menu', 'pix-contas', pixContasOpen);
+  fill('montante', pixMontante, 'pix-montante-trigger', 'pix-montante-menu', 'pix-montante', pixMontanteOpen);
+  const nContas = keysFor('contas').length;
+  const nMontante = keysFor('montante').length;
+  const hintC = document.getElementById('pix-contas-hint');
+  const hintM = document.getElementById('pix-montante-hint');
+  if (hintC) hintC.textContent = nContas ? (nContas + ' chave(s) Pix em Contas') : (siteOn ? 'Nenhuma chave Pix liberada em Contas.' : 'Entre pelo link da empresa.');
+  if (hintM) hintM.textContent = nMontante ? (nMontante + ' chave(s) Pix em Montante') : (siteOn ? 'Nenhuma chave Pix liberada em Montante.' : 'Entre pelo link da empresa.');
   savePrefs();
 }
 function selectedRange() {
@@ -561,6 +559,9 @@ document.getElementById('faixa-grupos').addEventListener('click', (event) => {
 });
 document.getElementById('faixa-trigger').addEventListener('click', () => {
   faixaOpen = !faixaOpen;
+  pixContasOpen = false;
+  pixMontanteOpen = false;
+  renderPixSelects();
   renderRanges();
 });
 document.getElementById('faixa-menu').addEventListener('click', (event) => {
@@ -574,7 +575,36 @@ document.getElementById('faixa-menu').addEventListener('click', (event) => {
 });
 document.getElementById('qtd-contas').addEventListener('input', () => { applyAutoContas(); renderContas(); });
 document.getElementById('desc-contas').addEventListener('input', renderContas);
-document.getElementById('pix-contas').addEventListener('change', (event) => { pixContas = event.target.value; renderContas(); });
+document.getElementById('pix-contas-trigger').addEventListener('click', () => {
+  pixContasOpen = !pixContasOpen;
+  pixMontanteOpen = false;
+  faixaOpen = false;
+  renderRanges();
+  renderPixSelects();
+});
+document.getElementById('pix-montante-trigger').addEventListener('click', () => {
+  pixMontanteOpen = !pixMontanteOpen;
+  pixContasOpen = false;
+  faixaOpen = false;
+  renderRanges();
+  renderPixSelects();
+});
+document.getElementById('pix-contas-menu').addEventListener('click', (event) => {
+  const btn = event.target.closest('[data-pix-id]');
+  if (!btn) return;
+  pixContas = btn.getAttribute('data-pix-id') || '';
+  pixContasOpen = false;
+  renderPixSelects();
+  renderContas();
+});
+document.getElementById('pix-montante-menu').addEventListener('click', (event) => {
+  const btn = event.target.closest('[data-pix-id]');
+  if (!btn) return;
+  pixMontante = btn.getAttribute('data-pix-id') || '';
+  pixMontanteOpen = false;
+  renderPixSelects();
+  renderMontante();
+});
 document.getElementById('taxas').addEventListener('click', (event) => {
   if (!event.target.dataset.rate) return;
   rateId = event.target.dataset.rate;
@@ -584,7 +614,6 @@ document.getElementById('taxas').addEventListener('click', (event) => {
 document.getElementById('montante').addEventListener('input', () => { applyAutoMontante(); renderMontante(); });
 document.getElementById('qtd-montante').addEventListener('input', renderMontante);
 document.getElementById('desc-montante').addEventListener('input', renderMontante);
-document.getElementById('pix-montante').addEventListener('change', (event) => { pixMontante = event.target.value; renderMontante(); });
 async function copy(id, button) {
   const text = document.getElementById(id).value;
   try { await navigator.clipboard.writeText(text); } catch (e) { document.getElementById(id).select(); document.execCommand('copy'); }
@@ -674,17 +703,19 @@ function applyCatalog(catalog) {
     if (!rates.some((item) => item.id === rateId)) rateId = rates[0].id;
   }
   if (Array.isArray(catalog.rules) && catalog.rules.length) rules = catalog.rules;
-  pixKeys = (Array.isArray(catalog.pix) ? catalog.pix : []).map((item) => ({
-    id: String((item && (item.id || item.userKeyId || item.chave)) || ''),
-    tipo: String((item && (item.tipo || item.tipoChave)) || 'CPF'),
-    chave: String((item && item.chave) || '').trim(),
-    nome: String((item && (item.nome || item.nomeCompleto)) || 'Pix').trim() || 'Pix',
-    banco: String((item && (item.banco || item.bancoInstituicao)) || '—').trim() || '—',
-    contas: !item ? true : (item.contas !== false && item.exibirContas !== false),
-    montante: !item ? true : (item.montante !== false && item.exibirMontante !== false),
-    exibirContas: !item ? true : item.exibirContas !== false,
-    exibirMontante: !item ? true : item.exibirMontante !== false,
-  })).filter((item) => item.chave);
+  pixKeys = (Array.isArray(catalog.pix) ? catalog.pix : []).map((item) => {
+    const contas = item && (item.contas !== false) && (item.exibirContas !== false);
+    const montante = item && (item.montante !== false) && (item.exibirMontante !== false);
+    return {
+      id: String((item && (item.id || item.userKeyId || item.chave)) || ''),
+      tipo: String((item && (item.tipo || item.tipoChave)) || 'CPF'),
+      chave: String((item && item.chave) || '').trim(),
+      nome: String((item && (item.nome || item.nomeCompleto)) || 'Pix').trim() || 'Pix',
+      banco: String((item && (item.banco || item.bancoInstituicao)) || '—').trim() || '—',
+      contas: !!contas,
+      montante: !!montante,
+    };
+  }).filter((item) => item.chave);
   campaigns = Array.isArray(catalog.campaigns) ? catalog.campaigns : [];
   if (catalog.budget && typeof catalog.budget === 'object') {
     budget = {
@@ -700,10 +731,12 @@ function applyCatalog(catalog) {
   const line = document.getElementById('company-line');
   if (line) {
     const who = String((line.textContent.match(/^Conectado:\s*([^·]+)/) || [])[1] || '').trim();
+    const nContas = keysFor('contas').length;
+    const nMontante = keysFor('montante').length;
     const parts = [];
     if (who) parts.push('Conectado: ' + who);
     if (catalog.companyName) parts.push('Empresa: ' + catalog.companyName);
-    parts.push(pixKeys.length ? (pixKeys.length + ' Pix') : 'sem chave Pix');
+    parts.push(nContas + ' Contas · ' + nMontante + ' Montante');
     line.textContent = parts.join(' · ');
   }
   renderPixSelects();
@@ -773,11 +806,15 @@ async function restoreLoginLink() {
 function sessionLine(session, catalog) {
   const who = String((session && session.name) || '').trim();
   const company = String((catalog && catalog.companyName) || (session && session.companyName) || '').trim();
-  const pixCount = catalog && Array.isArray(catalog.pix) ? catalog.pix.length : null;
   const parts = [];
   if (who) parts.push('Conectado: ' + who);
   if (company) parts.push('Empresa: ' + company);
-  if (pixCount != null) parts.push(pixCount ? (pixCount + ' Pix') : 'sem chave Pix');
+  if (catalog && Array.isArray(catalog.pix)) {
+    const list = catalog.pix;
+    const nContas = list.filter((item) => item && item.chave && item.contas !== false && item.exibirContas !== false).length;
+    const nMontante = list.filter((item) => item && item.chave && item.montante !== false && item.exibirMontante !== false).length;
+    parts.push(nContas + ' Contas · ' + nMontante + ' Montante');
+  }
   return parts.join(' · ') || 'Cadastro do site';
 }
 async function enterApp() {

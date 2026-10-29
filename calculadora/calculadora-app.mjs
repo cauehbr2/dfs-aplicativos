@@ -259,22 +259,31 @@ async function resolveCompanyId(session) {
 }
 async function loadCompanyPix(session, companyId) {
   const token = session.token;
-  const filtered = await panelRequest('query', {
-    collection: 'calculatorPixKeys',
-    filters: [{ field: 'companyId', op: '==', value: companyId }],
-    limit: 0,
-    dfs_token: token,
-  });
-  let docs = rowsOf(filtered);
-  // Reforço: se o filtro do site vier vazio, lê o que a sessão enxerga e filtra aqui.
+  const wanted = String(companyId || '');
+  // Lê a coleção e filtra a empresa aqui (mesmo critério do painel).
+  const all = await panelRequest('query', { collection: 'calculatorPixKeys', limit: 0, dfs_token: token });
+  let docs = rowsOf(all).filter((item) => String((item && item.companyId) || '') === wanted);
   if (!docs.length) {
-    const all = await panelRequest('query', { collection: 'calculatorPixKeys', limit: 0, dfs_token: token });
-    docs = rowsOf(all).filter((item) => String(item.companyId || '') === String(companyId));
+    const filtered = await panelRequest('query', {
+      collection: 'calculatorPixKeys',
+      filters: [{ field: 'companyId', op: '==', value: wanted }],
+      limit: 0,
+      dfs_token: token,
+    });
+    docs = rowsOf(filtered);
   }
-  return docs
-    .map((item) => pixRow(item, item.id))
-    .filter(Boolean)
-    .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
+  const seen = new Set();
+  const rows = [];
+  docs.forEach((item) => {
+    const row = pixRow(item, item.id);
+    if (!row || !row.chave) return;
+    const key = String(row.id || '') + '|' + String(row.chave || '');
+    if (seen.has(key)) return;
+    seen.add(key);
+    rows.push(row);
+  });
+  rows.sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
+  return rows;
 }
 async function pullCatalog(session) {
   if (!session || !session.token) {
