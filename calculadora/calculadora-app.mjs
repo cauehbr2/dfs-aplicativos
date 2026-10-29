@@ -221,7 +221,7 @@ function flagOn(value) {
   if (typeof value === 'string' && value.trim().toLowerCase() === 'false') return false;
   return true;
 }
-// Igual ao painel (useCalculatorPixKeys): lista calculatorPixKeys da empresa.
+// Igual ao painel (useCalculatorPixKeys + FloatingCalculator).
 function pixRow(item, id) {
   if (!item || typeof item !== 'object') return null;
   const chave = String(item.chave || item.pixChave || '').trim();
@@ -232,9 +232,9 @@ function pixRow(item, id) {
     chave,
     nome: String(item.nomeCompleto || item.nome || item.nomeTitular || '').trim() || 'Pix',
     banco: String(item.bancoInstituicao || item.banco || item.instituicao || '').trim() || '—',
-    // Mesmo critério do painel flutuante.
-    contas: flagOn(item.exibirContas),
-    montante: flagOn(item.exibirMontante),
+    // Painel: exibirContas !== false / exibirMontante !== false.
+    contas: item.exibirContas !== false && item.exibirContas !== 0 && item.exibirContas !== '0' && String(item.exibirContas).toLowerCase() !== 'false',
+    montante: item.exibirMontante !== false && item.exibirMontante !== 0 && item.exibirMontante !== '0' && String(item.exibirMontante).toLowerCase() !== 'false',
   };
 }
 async function resolveCompanyId(session) {
@@ -266,29 +266,28 @@ async function resolveCompanyId(session) {
 async function loadCompanyPix(session, companyId) {
   const token = session.token;
   const wanted = String(companyId || '');
-  // Lê a coleção e filtra a empresa aqui (mesmo critério do painel).
-  const all = await panelRequest('query', { collection: 'calculatorPixKeys', limit: 0, dfs_token: token });
-  let docs = rowsOf(all).filter((item) => String((item && item.companyId) || '') === wanted);
+  // Fonte única do painel: calculatorPixKeys da empresa (sem mesclar lixo local).
+  const filtered = await panelRequest('query', {
+    collection: 'calculatorPixKeys',
+    filters: [{ field: 'companyId', op: '==', value: wanted }],
+    limit: 0,
+    dfs_token: token,
+  });
+  let docs = rowsOf(filtered).filter((item) => String((item && item.companyId) || '') === wanted);
   if (!docs.length) {
-    const filtered = await panelRequest('query', {
-      collection: 'calculatorPixKeys',
-      filters: [{ field: 'companyId', op: '==', value: wanted }],
-      limit: 0,
-      dfs_token: token,
-    });
-    docs = rowsOf(filtered);
+    const all = await panelRequest('query', { collection: 'calculatorPixKeys', limit: 0, dfs_token: token });
+    docs = rowsOf(all).filter((item) => String((item && item.companyId) || '') === wanted);
   }
-  const seen = new Set();
-  const rows = [];
+  // Espelho estrito: o que veio do site é a lista final (a mais some, a menos entra).
+  const byId = new Map();
   docs.forEach((item) => {
     const row = pixRow(item, item.id);
     if (!row || !row.chave) return;
-    const key = String(row.id || '') + '|' + String(row.chave || '');
-    if (seen.has(key)) return;
-    seen.add(key);
-    rows.push(row);
+    byId.set(String(row.id), row);
   });
-  rows.sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
+  const rows = Array.from(byId.values()).sort((a, b) =>
+    String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' })
+  );
   return {
     docs: docs.length,
     pix: rows,
@@ -314,10 +313,16 @@ async function pullCatalog(session) {
     panelRequest('query', { ...body, collection: 'calculatorMontanteAccountRules' }),
     panelRequest('read', { collection: 'settings', id: budgetId, dfs_token: session.token }),
   ]);
-  // Pix separado: se falhar, o resto do catálogo continua e a tela não fica sem faixa.
+  // Pix separado: se falhar, zera a lista (não mantém chave antiga a mais).
   let pixPack = { docs: 0, pix: [], contas: 0, montante: 0 };
-  try { pixPack = await loadCompanyPix(session, companyId); } catch (e) { pixPack = { docs: 0, pix: [], contas: 0, montante: 0 }; }
-  const pix = pixPack.pix || [];
+  let pixOk = false;
+  try {
+    pixPack = await loadCompanyPix(session, companyId);
+    pixOk = true;
+  } catch (e) {
+    pixPack = { docs: 0, pix: [], contas: 0, montante: 0 };
+  }
+  const pix = Array.isArray(pixPack.pix) ? pixPack.pix.slice() : [];
   const packed = loadBudgetTemplates();
   const budgetDoc = (budgetRes && budgetRes.json && budgetRes.json.data) || {};
   const budget = {
@@ -381,9 +386,12 @@ async function pullCatalog(session) {
       docs: pixPack.docs || 0,
       contas: pixPack.contas || 0,
       montante: pixPack.montante || 0,
+      synced: pixOk,
     },
   };
   fs.mkdirSync(dataDir, { recursive: true });
+  // Regrava o catálogo inteiro: chave local a mais some; a que faltava entra.
+  try { fs.unlinkSync(catalogFile); } catch (e) {}
   fs.writeFileSync(catalogFile, JSON.stringify(catalog));
   return catalog;
 }
@@ -530,9 +538,17 @@ const server = http.createServer((req, res) => {
       sendJson(res, 200, { ok: false });
       return;
     }
+    const companyId = String(session.companyId || '');
     pullCatalog(session).then((catalog) => sendJson(res, 200, catalog)).catch(() => {
-      try { sendJson(res, 200, JSON.parse(fs.readFileSync(catalogFile, 'utf8'))); }
-      catch (e) { sendJson(res, 200, { ok: false, message: 'O site não devolveu o cadastro.' }); }
+      try {
+        const cached = JSON.parse(fs.readFileSync(catalogFile, 'utf8'));
+        // Só reaproveita cache da mesma empresa — senão apaga Pix velho.
+        if (cached && cached.ok && String(cached.companyId || '') === companyId) {
+          sendJson(res, 200, cached);
+          return;
+        }
+      } catch (e) {}
+      sendJson(res, 200, { ok: false, message: 'O site não devolveu o cadastro.', pix: [], pixMeta: { docs: 0, contas: 0, montante: 0 } });
     });
     return;
   }

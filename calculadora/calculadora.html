@@ -326,10 +326,10 @@ function flagOn(value) {
   return true;
 }
 function keysFor(module) {
-  // Igual ao painel: Contas / Montante pelas marcas da lista calculatorPixKeys.
+  // Igual ao painel flutuante: Contas / Montante só com a marca da aba.
   return (Array.isArray(pixKeys) ? pixKeys : []).filter((item) => {
     if (!item || !item.chave) return false;
-    return module === 'contas' ? flagOn(item.contas) : flagOn(item.montante);
+    return module === 'contas' ? item.contas !== false && flagOn(item.contas) : item.montante !== false && flagOn(item.montante);
   });
 }
 function pick(module, current) {
@@ -693,6 +693,8 @@ function applyCatalog(catalog) {
   if (!catalog || !catalog.ok) {
     siteOn = false;
     pixKeys = [];
+    pixContas = '';
+    pixMontante = '';
     campaigns = [];
     return;
   }
@@ -703,15 +705,30 @@ function applyCatalog(catalog) {
     if (!rates.some((item) => item.id === rateId)) rateId = rates[0].id;
   }
   if (Array.isArray(catalog.rules) && catalog.rules.length) rules = catalog.rules;
-  pixKeys = (Array.isArray(catalog.pix) ? catalog.pix : []).map((item) => ({
-    id: String((item && (item.id || item.userKeyId || item.chave)) || ''),
-    tipo: String((item && (item.tipo || item.tipoChave)) || 'CPF'),
-    chave: String((item && (item.chave || item.pixChave)) || '').trim(),
-    nome: String((item && (item.nome || item.nomeCompleto)) || 'Pix').trim() || 'Pix',
-    banco: String((item && (item.banco || item.bancoInstituicao)) || '—').trim() || '—',
-    contas: flagOn(item && (item.contas !== undefined ? item.contas : item.exibirContas)),
-    montante: flagOn(item && (item.montante !== undefined ? item.montante : item.exibirMontante)),
-  })).filter((item) => item.chave);
+  // Espelho do site: apaga a lista local e monta de novo (a mais some, a menos entra).
+  const remote = Array.isArray(catalog.pix) ? catalog.pix : [];
+  const nextPix = [];
+  const seenIds = new Set();
+  remote.forEach((item) => {
+    const id = String((item && (item.id || item.userKeyId || item.chave)) || '');
+    const chave = String((item && (item.chave || item.pixChave)) || '').trim();
+    if (!chave || !id || seenIds.has(id)) return;
+    seenIds.add(id);
+    const contasFlag = item.contas !== undefined ? item.contas : item.exibirContas;
+    const montanteFlag = item.montante !== undefined ? item.montante : item.exibirMontante;
+    nextPix.push({
+      id,
+      tipo: String((item && (item.tipo || item.tipoChave)) || 'CPF'),
+      chave,
+      nome: String((item && (item.nome || item.nomeCompleto)) || 'Pix').trim() || 'Pix',
+      banco: String((item && (item.banco || item.bancoInstituicao)) || '—').trim() || '—',
+      contas: flagOn(contasFlag),
+      montante: flagOn(montanteFlag),
+    });
+  });
+  pixKeys = nextPix;
+  pixContas = pick('contas', pixContas);
+  pixMontante = pick('montante', pixMontante);
   campaigns = Array.isArray(catalog.campaigns) ? catalog.campaigns : [];
   if (catalog.budget && typeof catalog.budget === 'object') {
     budget = {
