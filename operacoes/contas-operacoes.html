@@ -1946,7 +1946,9 @@ function askHostCaptcha(origin, siteKey) {
 async function loginCaptcha(origin) {
   const cfg = await panelJson('/painel/captcha');
   if (!cfg.enabled || !cfg.siteKey) return '';
-  const site = panelOrigin(origin) || panelOrigin(cfg.origin) || '';
+  // Igual à Calculadora: o captcha roda no domínio salvo do site (reCAPTCHA),
+  // não no texto truncado do campo de link.
+  const site = panelOrigin(cfg.origin) || panelOrigin(origin) || '';
   if (!site) throw new Error('O link da empresa não serve. Use o endereço do site, com https.');
   return askHostCaptcha(site, cfg.siteKey);
 }

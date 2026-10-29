@@ -1228,6 +1228,7 @@ async function captchaConfig() {
   captchaCache = {
     enabled: !!json.recaptchaEnabled && !!json.recaptchaSiteKey,
     siteKey: json.recaptchaSiteKey || '',
+    origin,
   };
   return captchaCache;
 }
@@ -1307,7 +1308,7 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url === '/painel/captcha' && req.method === 'GET') {
-    captchaConfig().then((cfg) => sendJson(res, 200, cfg)).catch(() => sendJson(res, 200, { enabled: false, siteKey: '' }));
+    captchaConfig().then((cfg) => sendJson(res, 200, cfg)).catch(() => sendJson(res, 200, { enabled: false, siteKey: '', origin: readOrigin() }));
     return;
   }
   if (url === '/painel/site' && req.method === 'GET') {
@@ -1461,10 +1462,30 @@ const server = http.createServer((req, res) => {
   if (url === '/painel/entrar' && req.method === 'POST') {
     readBody(req).then(async (body) => {
       try {
+        const rawLink = String(body.link || body.companySlug || body.origin || '').trim();
+        let fromBody = '';
+        let fromRaw = '';
+        try {
+          const parsed = new URL(String(body.origin || ''));
+          if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+            fromBody = parsed.origin;
+          }
+        } catch (e) { fromBody = ''; }
+        try {
+          if (/^https?:\/\//i.test(rawLink) || /\./.test((rawLink.split('/')[0] || ''))) {
+            const parsed = new URL(/^https?:\/\//i.test(rawLink) ? rawLink : 'https://' + rawLink);
+            if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+              fromRaw = parsed.origin;
+            }
+          }
+        } catch (e) { fromRaw = ''; }
+        const origin = fromBody || fromRaw || readOrigin();
+        if (origin) writeOrigin(origin, rawLink || origin);
+        const slug = companySlug(rawLink) || 'elite';
         const result = await panelRequest('auth/login', {
           email: String(body.email || '').trim(),
           password: String(body.password || ''),
-          companySlug: companySlug(body.companySlug),
+          companySlug: slug,
           recaptchaToken: String(body.recaptchaToken || ''),
         });
         const json = result.json || {};

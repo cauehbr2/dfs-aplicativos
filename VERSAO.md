@@ -1,4 +1,4 @@
 ﻿# Versões
 
-- Calculadora: 1.0.33 — barra: Fila · minimizar · fechar (× à direita); janela menor.
-- Operações: 1.0.13 — login igual à Calculadora; cartão "Operações" sem Voltar; sem tirar cópia no select.
+- Calculadora: 1.0.34 — janela maior; Total/Copiar/Fila fixos; botão Fila na barra; HostObjects.
+- Operações: 1.0.14 — captcha igual à Calculadora (origin do site + WebMessage).
