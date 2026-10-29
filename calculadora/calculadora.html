@@ -87,6 +87,20 @@
     display:block; background:#fecaca;
     animation: filaTremble .28s ease-in-out infinite, filaGlow 1.1s ease-out infinite;
   }
+  .fila-fab.first-quiet {
+    background:#7f1d1d;
+    box-shadow:0 8px 20px rgba(127,29,29,.3);
+  }
+  .fila-fab.first-quiet .dot {
+    display:block; background:#fca5a5; animation:none;
+  }
+  .fila-stop {
+    position:fixed; right:18px; bottom:74px; z-index:41;
+    height:40px; padding:0 14px; border:1px solid rgba(239,68,68,.45);
+    border-radius:12px; background:#7f1d1d; color:#fecaca; font-weight:800;
+    cursor:pointer; display:none;
+  }
+  .fila-stop.on { display:inline-flex; align-items:center; }
   @keyframes filaTremble {
     0%, 100% { transform: translate(0,0) rotate(0deg); }
     25% { transform: translate(-1.5px,1px) rotate(-10deg); }
@@ -208,6 +222,7 @@
   </div>
   <p class="credit"><span class="app-version" id="app-version">Versão —</span><span>Criado por Cauê BR</span></p>
 </div>
+<button type="button" class="fila-stop" id="stop-fila-alert">Parar alerta</button>
 <button type="button" class="fila-fab" id="open-fila" title="Abrir fila do site"><span class="dot" aria-hidden="true"></span>Fila</button>
 
 <div class="modal open" id="login-gate">
@@ -988,6 +1003,78 @@ async function loadAppVersion() {
     el.textContent = 'Versão —';
   }
 }
+let filaPrev = { contas: null, montante: null };
+let filaReady = { contas: false, montante: false };
+let filaBeepTimer = null;
+let filaAudioCtx = null;
+let filaAlerting = false;
+let filaAlertCache = { active: false, sector: '', stopped: false };
+
+async function readFilaAlert() {
+  try {
+    filaAlertCache = await fetch('/fila/alerta?ts=' + Date.now(), { cache: 'no-store' }).then((r) => r.json());
+  } catch (e) {}
+  return filaAlertCache || { active: false, sector: '', stopped: false };
+}
+async function writeFilaAlert(data) {
+  filaAlertCache = data || { active: false, sector: '', stopped: false };
+  try {
+    await fetch('/fila/alerta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(filaAlertCache),
+    });
+  } catch (e) {}
+}
+function ensureFilaAudio() {
+  if (filaAudioCtx) return filaAudioCtx;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  filaAudioCtx = new Ctx();
+  return filaAudioCtx;
+}
+function filaBeepOnce() {
+  const ctx = ensureFilaAudio();
+  if (!ctx) return;
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(880, now);
+  osc.frequency.exponentialRampToValueAtTime(440, now + 0.18);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.12, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.24);
+}
+function startFilaAlert(sector) {
+  writeFilaAlert({ active: true, sector: sector || 'contas', stopped: false });
+  paintFilaAlertUi(true, true);
+  if (filaBeepTimer) clearInterval(filaBeepTimer);
+  filaBeepOnce();
+  filaBeepTimer = setInterval(filaBeepOnce, 1800);
+  filaAlerting = true;
+}
+async function stopFilaAlert() {
+  const cur = await readFilaAlert();
+  const still = !!(cur && cur.active);
+  await writeFilaAlert({ active: still, sector: (cur && cur.sector) || '', stopped: true });
+  if (filaBeepTimer) { clearInterval(filaBeepTimer); filaBeepTimer = null; }
+  filaAlerting = false;
+  paintFilaAlertUi(still, false);
+}
+function paintFilaAlertUi(isFirst, alerting) {
+  const fab = document.getElementById('open-fila');
+  const stop = document.getElementById('stop-fila-alert');
+  if (!fab || !stop) return;
+  fab.classList.toggle('hot', !!(isFirst && alerting));
+  fab.classList.toggle('first-quiet', !!(isFirst && !alerting));
+  stop.classList.toggle('on', !!(isFirst && alerting));
+}
 document.getElementById('open-fila').addEventListener('click', () => {
   const bridge = window.chrome && window.chrome.webview;
   if (bridge && typeof bridge.postMessage === 'function') {
@@ -996,19 +1083,65 @@ document.getElementById('open-fila').addEventListener('click', () => {
   }
   window.open('/fila.html', 'dfs-fila', 'width=420,height=760');
 });
+document.getElementById('stop-fila-alert').addEventListener('click', () => {
+  ensureFilaAudio();
+  stopFilaAlert();
+});
 async function watchFilaTurn() {
   const fab = document.getElementById('open-fila');
   if (!fab) return;
   try {
     const data = await fetch('/fila/estado?ts=' + Date.now(), { cache: 'no-store' }).then((r) => r.json());
-    const mine = [
-      data && data.meContas,
-      data && data.meMontante,
-    ].filter(Boolean);
-    const first = mine.some((op) => op && op.active !== false && Number(op.position) === 1);
-    fab.classList.toggle('hot', !!first);
+    const slots = [
+      { key: 'contas', op: data && data.meContas },
+      { key: 'montante', op: data && data.meMontante },
+    ];
+    let isFirst = false;
+    slots.forEach((slot) => {
+      const pos = slot.op && slot.op.active !== false ? Number(slot.op.position) || 0 : 0;
+      const current = pos > 0 ? pos : null;
+      if (current === 1) isFirst = true;
+      if (!filaReady[slot.key]) {
+        filaPrev[slot.key] = current;
+        filaReady[slot.key] = true;
+        return;
+      }
+      const before = filaPrev[slot.key];
+      if (before !== current) {
+        filaPrev[slot.key] = current;
+        if (current === 1 && before !== 1 && slot.op && slot.op.active !== false) {
+          startFilaAlert(slot.key);
+        }
+      }
+    });
+    const saved = await readFilaAlert();
+    if (!isFirst) {
+      await writeFilaAlert({ active: false, sector: '', stopped: false });
+      if (filaBeepTimer) { clearInterval(filaBeepTimer); filaBeepTimer = null; }
+      filaAlerting = false;
+      paintFilaAlertUi(false, false);
+      return;
+    }
+    if (saved.stopped) {
+      if (filaBeepTimer) { clearInterval(filaBeepTimer); filaBeepTimer = null; }
+      filaAlerting = false;
+      paintFilaAlertUi(true, false);
+      return;
+    }
+    if (saved.active && !saved.stopped) {
+      paintFilaAlertUi(true, true);
+      if (!filaBeepTimer) {
+        filaBeepOnce();
+        filaBeepTimer = setInterval(filaBeepOnce, 1800);
+        filaAlerting = true;
+      }
+      return;
+    }
+    paintFilaAlertUi(true, filaAlerting);
   } catch (e) {
     fab.classList.remove('hot');
+    fab.classList.remove('first-quiet');
+    document.getElementById('stop-fila-alert').classList.remove('on');
   }
 }
 async function boot() {

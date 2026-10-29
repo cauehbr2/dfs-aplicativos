@@ -10,6 +10,7 @@ const dataFile = path.join(dataDir, 'calculadora.json');
 const catalogFile = path.join(dataDir, 'catalogo.json');
 const sessionFile = path.join(dataDir, 'painel-sessao.json');
 const siteFile = path.join(dataDir, 'painel-site.json');
+const alertFile = path.join(dataDir, 'fila-alerta.json');
 const htmlFile = path.join(codeDir, 'calculadora.html');
 const filaFile = path.join(codeDir, 'fila.html');
 const versionFile = path.join(codeDir, 'app-versao.txt');
@@ -782,6 +783,28 @@ const server = http.createServer((req, res) => {
   if ((url === '/fila' || url === '/fila.html') && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(fs.readFileSync(filaFile));
+    return;
+  }
+  if (url === '/fila/alerta' && req.method === 'GET') {
+    try {
+      sendJson(res, 200, JSON.parse(fs.readFileSync(alertFile, 'utf8')));
+    } catch (e) {
+      sendJson(res, 200, { active: false, sector: '', stopped: false });
+    }
+    return;
+  }
+  if (url === '/fila/alerta' && req.method === 'POST') {
+    readBody(req).then((body) => {
+      const payload = {
+        active: !!body.active,
+        sector: String(body.sector || ''),
+        stopped: !!body.stopped,
+        at: Date.now(),
+      };
+      fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(alertFile, JSON.stringify(payload));
+      sendJson(res, 200, payload);
+    }).catch(() => sendJson(res, 400, { active: false, sector: '', stopped: false }));
     return;
   }
   if (url === '/fila/estado' && req.method === 'GET') {

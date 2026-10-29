@@ -132,6 +132,7 @@ let prev = { contas: null, montante: null };
 let ready = { contas: false, montante: false };
 let beepTimer = null;
 let audioCtx = null;
+let alertCache = { active: false, sector: '', stopped: false };
 
 function sectorLabel(id) { return id === 'montante' ? 'Montante' : 'Contas'; }
 function meIn(s) {
@@ -141,6 +142,22 @@ function meIn(s) {
 function opsOf(s) {
   if (!state) return [];
   return s === 'montante' ? (state.montante || []) : (state.contas || []);
+}
+async function readFilaAlert() {
+  try {
+    alertCache = await fetch('/fila/alerta?ts=' + Date.now(), { cache: 'no-store' }).then((r) => r.json());
+  } catch (e) {}
+  return alertCache || { active: false, sector: '', stopped: false };
+}
+async function writeFilaAlert(data) {
+  alertCache = data || { active: false, sector: '', stopped: false };
+  try {
+    await fetch('/fila/alerta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(alertCache),
+    });
+  } catch (e) {}
 }
 function ensureAudio() {
   if (audioCtx) return audioCtx;
@@ -167,22 +184,36 @@ function beepOnce() {
   osc.start(now);
   osc.stop(now + 0.24);
 }
+function paintAlertBar() {
+  const bar = document.getElementById('alert-bar');
+  const text = document.getElementById('alert-text');
+  if (alertOn) {
+    bar.classList.add('on');
+    text.textContent = 'É a sua vez na fila de ' + sectorLabel(alertSector || sector) + '!';
+  } else {
+    bar.classList.remove('on');
+  }
+}
 function startAlert(which) {
   alertOn = true;
   alertSector = which;
-  document.getElementById('alert-bar').classList.add('on');
-  document.getElementById('alert-text').textContent = 'É a sua vez na fila de ' + sectorLabel(which) + '!';
+  writeFilaAlert({ active: true, sector: which || 'contas', stopped: false });
+  paintAlertBar();
   if (beepTimer) clearInterval(beepTimer);
   beepOnce();
   beepTimer = setInterval(beepOnce, 1800);
 }
-function stopAlert() {
+async function stopAlert() {
+  const stillFirst =
+    (meIn('contas') && meIn('contas').active !== false && Number(meIn('contas').position) === 1) ||
+    (meIn('montante') && meIn('montante').active !== false && Number(meIn('montante').position) === 1);
   alertOn = false;
+  await writeFilaAlert({ active: !!stillFirst, sector: alertSector || sector, stopped: true });
   alertSector = '';
-  document.getElementById('alert-bar').classList.remove('on');
+  paintAlertBar();
   if (beepTimer) { clearInterval(beepTimer); beepTimer = null; }
 }
-function trackTurn() {
+async function trackTurn() {
   if (!state || !state.me || !state.me.id) return;
   ['contas', 'montante'].forEach((s) => {
     const mine = meIn(s);
@@ -204,7 +235,21 @@ function trackTurn() {
   const stillFirst =
     (meIn('contas') && meIn('contas').active !== false && Number(meIn('contas').position) === 1) ||
     (meIn('montante') && meIn('montante').active !== false && Number(meIn('montante').position) === 1);
-  if (alertOn && !stillFirst) stopAlert();
+  const saved = await readFilaAlert();
+  if (!stillFirst) {
+    if (alertOn) await stopAlert();
+    await writeFilaAlert({ active: false, sector: '', stopped: false });
+    return;
+  }
+  if (saved.stopped) {
+    if (alertOn) {
+      alertOn = false;
+      paintAlertBar();
+      if (beepTimer) { clearInterval(beepTimer); beepTimer = null; }
+    }
+    return;
+  }
+  if (saved.active && !saved.stopped && !alertOn) startAlert(saved.sector || sector);
 }
 function paint() {
   const ops = opsOf(sector);
@@ -278,7 +323,7 @@ async function refresh() {
   try {
     const data = await fetch('/fila/estado?ts=' + Date.now(), { cache: 'no-store' }).then((r) => r.json());
     state = data;
-    trackTurn();
+    await trackTurn();
     paint();
     document.getElementById('status').textContent = data && data.ok
       ? ('Atualizado · ' + new Date().toLocaleTimeString('pt-BR'))
