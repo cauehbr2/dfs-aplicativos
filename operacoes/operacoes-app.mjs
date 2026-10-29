@@ -45,11 +45,18 @@ function readSavedLink() {
 }
 function writeOrigin(origin, link) {
   const prev = readSite();
+  let nextOrigin = String(origin || '').trim();
+  try {
+    const url = new URL(nextOrigin);
+    if (!String(url.hostname || '').includes('.')) nextOrigin = '';
+  } catch (e) { nextOrigin = ''; }
+  // Não grava host truncado (elitecpasystem sem .digital) por cima do bom.
+  if (!nextOrigin) nextOrigin = readOrigin();
   const nextLink = String(link == null ? (prev.link || '') : link).trim();
   fs.mkdirSync(dataDir, { recursive: true });
   fs.writeFileSync(siteFile, JSON.stringify({
-    origin,
-    link: nextLink || origin,
+    origin: nextOrigin,
+    link: nextLink || nextOrigin,
   }));
 }
 const port = 8766;

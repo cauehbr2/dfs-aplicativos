@@ -133,7 +133,7 @@
   .modal.gate { background: rgba(0,0,0,.72); }
   .modal.gate .sheet { width: min(420px, 100%); }
   .sheet { width: min(860px, 100%); background: rgba(24,24,27,.92); border: 1px solid rgba(255,255,255,.08); border-radius: 28px; padding: 18px; backdrop-filter: blur(18px); }
-  #panel-modal .sheet { width: min(420px, 100%); }
+  #panel-modal .sheet { width: min(480px, 100%); }
   .ranges { display: grid; gap: 8px; margin-top: 12px; max-height: 360px; overflow: auto; }
   .range-row { display: grid; grid-template-columns: .9fr 1.3fr .6fr .6fr .8fr 36px; gap: 8px; }
   .range-box { position: relative; }
@@ -395,7 +395,7 @@
 <div class="modal" id="panel-modal">
   <div class="sheet">
     <h2 style="margin:0 0 8px">Entrar</h2>
-    <p class="hint" id="panel-help">O login é o mesmo da Calculadora: link da empresa, e-mail e senha. Depois o Sincronizar manda as operações deste período para o site.</p>
+    <p class="hint" id="panel-help">Link da empresa, e-mail e senha — igual à Calculadora. Na confirmação do Google pode levar alguns segundos.</p>
     <form id="panel-login">
       <div class="fields" style="margin-top:12px">
         <div class="span2">
@@ -1944,12 +1944,18 @@ function askHostCaptcha(origin, siteKey) {
   });
 }
 async function loginCaptcha(origin) {
+  // Igual à Calculadora: pega a chave e o origin do site salvo.
   const cfg = await panelJson('/painel/captcha');
   if (!cfg.enabled || !cfg.siteKey) return '';
-  // Igual à Calculadora: o captcha roda no domínio salvo do site (reCAPTCHA),
-  // não no texto truncado do campo de link.
-  const site = panelOrigin(cfg.origin) || panelOrigin(origin) || '';
-  if (!site) throw new Error('O link da empresa não serve. Use o endereço do site, com https.');
+  let site = panelOrigin(cfg.origin) || '';
+  if (!site) {
+    try {
+      const saved = await panelJson('/painel/site');
+      site = panelOrigin(saved.origin) || panelOrigin(saved.link) || '';
+    } catch (e) {}
+  }
+  if (!site) site = panelOrigin(origin) || '';
+  if (!site) throw new Error('O link da empresa não serve. Use o endereço completo do site, com https.');
   return askHostCaptcha(site, cfg.siteKey);
 }
 function panelDocId() {
@@ -2098,6 +2104,8 @@ function panelOrigin(value) {
     const url = new URL(/^https?:\/\//i.test(text) ? text : 'https://' + text);
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
     if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return '';
+    // Host sem ponto (ex.: elitecpasystem truncado) não é site válido.
+    if (!String(url.hostname || '').includes('.')) return '';
     return url.origin;
   } catch (e) {
     return '';
