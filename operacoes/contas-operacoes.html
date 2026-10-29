@@ -133,7 +133,12 @@
   .modal.gate { background: rgba(0,0,0,.72); }
   .modal.gate .sheet { width: min(420px, 100%); }
   .sheet { width: min(860px, 100%); background: rgba(24,24,27,.92); border: 1px solid rgba(255,255,255,.08); border-radius: 28px; padding: 18px; backdrop-filter: blur(18px); }
-  #panel-modal .sheet { width: min(480px, 100%); }
+  #panel-modal .sheet { width: min(480px, 100%); box-sizing: border-box; }
+  #panel-modal input, #panel-modal select {
+    width: 100%; max-width: 100%; box-sizing: border-box;
+    overflow-x: auto; text-overflow: clip; white-space: nowrap;
+  }
+  #panel-slug { font-size: 12px; }
   .ranges { display: grid; gap: 8px; margin-top: 12px; max-height: 360px; overflow: auto; }
   .range-row { display: grid; grid-template-columns: .9fr 1.3fr .6fr .6fr .8fr 36px; gap: 8px; }
   .range-box { position: relative; }
@@ -1940,21 +1945,19 @@ function askHostCaptcha(origin, siteKey) {
     } catch (e) {
       finish('', 'Não pedi a proteção do Google.');
     }
-    setTimeout(() => finish('', 'O Google não confirmou a entrada a tempo.'), 45000);
+    setTimeout(() => finish('', 'O Google não confirmou a entrada a tempo.'), 70000);
   });
 }
 async function loginCaptcha(origin) {
-  // Igual à Calculadora: pega a chave e o origin do site salvo.
+  // Sempre o origin gravado no programa (não o texto cortado do campo).
+  let site = '';
+  try {
+    const saved = await panelJson('/painel/site');
+    site = panelOrigin(saved.origin) || panelOrigin(saved.link) || '';
+  } catch (e) {}
   const cfg = await panelJson('/painel/captcha');
   if (!cfg.enabled || !cfg.siteKey) return '';
-  let site = panelOrigin(cfg.origin) || '';
-  if (!site) {
-    try {
-      const saved = await panelJson('/painel/site');
-      site = panelOrigin(saved.origin) || panelOrigin(saved.link) || '';
-    } catch (e) {}
-  }
-  if (!site) site = panelOrigin(origin) || '';
+  site = site || panelOrigin(cfg.origin) || panelOrigin(origin) || '';
   if (!site) throw new Error('O link da empresa não serve. Use o endereço completo do site, com https.');
   return askHostCaptcha(site, cfg.siteKey);
 }
@@ -2135,7 +2138,7 @@ document.getElementById('panel-login').addEventListener('submit', async (event) 
     if (origin || raw) {
       try {
         const saved = await panelJson('/painel/site', { origin: origin || '', link: String(raw || '').trim() });
-        siteOrigin = saved.origin || origin || siteOrigin;
+        siteOrigin = panelOrigin(saved.origin) || panelOrigin(saved.link) || origin || siteOrigin;
       } catch (e) {
         if (origin) {
           error.textContent = e.message || 'Não guardei o link do site.';
@@ -2143,14 +2146,14 @@ document.getElementById('panel-login').addEventListener('submit', async (event) 
         }
         try {
           const current = await panelJson('/painel/site');
-          siteOrigin = current.origin || '';
+          siteOrigin = panelOrigin(current.origin) || '';
         } catch (err) {}
       }
     }
     if (!siteOrigin) {
       try {
         const current = await panelJson('/painel/site');
-        siteOrigin = current.origin || '';
+        siteOrigin = panelOrigin(current.origin) || '';
       } catch (e) {}
     }
     try { await panelJson('/painel/lembrar', { save: document.getElementById('save-login').checked }); } catch (e) {}

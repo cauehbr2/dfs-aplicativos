@@ -26,12 +26,18 @@ function readAppVersion() {
 function readSite() {
   try { return JSON.parse(fs.readFileSync(siteFile, 'utf8')); } catch (e) { return {}; }
 }
+function hostOk(hostname) {
+  const host = String(hostname || '');
+  if (!host || host === '127.0.0.1' || host === 'localhost') return false;
+  // elitecpasystem sem .digital não é host válido.
+  return host.includes('.');
+}
 function readOrigin() {
   try {
     const saved = readSite();
     const url = new URL(String(saved.origin || ''));
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return defaultOrigin;
-    if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return defaultOrigin;
+    if (!hostOk(url.hostname)) return defaultOrigin;
     return url.origin;
   } catch (e) {
     return defaultOrigin;
@@ -48,10 +54,17 @@ function writeOrigin(origin, link) {
   let nextOrigin = String(origin || '').trim();
   try {
     const url = new URL(nextOrigin);
-    if (!String(url.hostname || '').includes('.')) nextOrigin = '';
+    if (!hostOk(url.hostname)) nextOrigin = '';
+    else nextOrigin = url.origin;
   } catch (e) { nextOrigin = ''; }
   // Não grava host truncado (elitecpasystem sem .digital) por cima do bom.
-  if (!nextOrigin) nextOrigin = readOrigin();
+  if (!nextOrigin) {
+    try {
+      const prevUrl = new URL(String(prev.origin || ''));
+      if (hostOk(prevUrl.hostname)) nextOrigin = prevUrl.origin;
+    } catch (e) {}
+  }
+  if (!nextOrigin) nextOrigin = defaultOrigin;
   const nextLink = String(link == null ? (prev.link || '') : link).trim();
   fs.mkdirSync(dataDir, { recursive: true });
   fs.writeFileSync(siteFile, JSON.stringify({
@@ -1329,27 +1342,28 @@ const server = http.createServer((req, res) => {
       let fromRaw = '';
       try {
         const parsed = new URL(String(body.origin || ''));
-        if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+        if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && hostOk(parsed.hostname)) {
           fromBody = parsed.origin;
         }
       } catch (e) { fromBody = ''; }
       try {
         if (/^https?:\/\//i.test(raw) || /\./.test((raw.split('/')[0] || ''))) {
           const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
-          if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+          if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && hostOk(parsed.hostname)) {
             fromRaw = parsed.origin;
           }
         }
       } catch (e) { fromRaw = ''; }
       const origin = fromBody || fromRaw || readOrigin();
-      if (!origin) {
+      if (!origin || !hostOk(new URL(origin).hostname)) {
         sendJson(res, 400, { message: 'O link da empresa não serve. Use o endereço do site, com https.' });
         return;
       }
       writeOrigin(origin, raw || origin);
       captchaCache = null;
       captchaOrigin = '';
-      sendJson(res, 200, { origin, link: readSavedLink() });
+      // Devolve o origin gravado (nunca o truncado que veio no body).
+      sendJson(res, 200, { origin: readOrigin(), link: readSavedLink() });
     }).catch(() => sendJson(res, 400, { message: 'Não li o link do site.' }));
     return;
   }

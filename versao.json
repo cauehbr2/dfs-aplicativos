@@ -20,7 +20,7 @@
                                   ]
                     },
     "operacoes":  {
-                      "version":  "1.0.16",
+                      "version":  "1.0.17",
                       "files":  [
                                     "app-versao.txt",
                                     "contas-operacoes.html",
