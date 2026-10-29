@@ -42,11 +42,13 @@
   .site-note.warn { color: #fbbf24; }
   .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   button, input, select { font: inherit; color: inherit; }
-  .ghost, .primary {
+  .ghost, .primary, .logout {
     height: 40px; border-radius: 999px; padding: 0 16px; cursor: pointer; font-weight: 700; font-size: 13px;
   }
   .ghost { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); color: #e4e4e7; }
   .ghost:hover { background: rgba(255,255,255,.08); }
+  .logout { background: rgba(127,29,29,.35); border: 1px solid #7f1d1d; color: #fecaca; }
+  .logout:hover { background: #7f1d1d; color: #fff; }
   .primary { background: var(--emerald); color: #052e16; border: 0; box-shadow: 0 10px 28px rgba(52,211,153,.22); }
   .primary:hover { filter: brightness(1.06); }
   .primary:disabled { opacity: .45; box-shadow: none; cursor: default; }
@@ -250,6 +252,7 @@
       </div>
     </div>
     <div class="head-actions">
+      <button class="logout" id="logout-account" type="button" hidden>Sair da conta</button>
       <button class="ghost" id="send-panel" type="button">Sincronizar</button>
       <button class="ghost" id="open-config" type="button">Comissão e faixas</button>
       <button class="ghost" id="export-json" type="button">Baixar cópia</button>
@@ -717,6 +720,8 @@ function showAccount(session) {
   accountName = (session && (session.name || session.email)) || '';
   const el = document.getElementById('account-name');
   if (el) el.textContent = accountName || 'Entre no painel para mostrar a conta.';
+  const logout = document.getElementById('logout-account');
+  if (logout) logout.hidden = !accountName;
   const operator = document.getElementById('operator');
   if (!operator) return;
   operator.readOnly = true;
@@ -2098,7 +2103,7 @@ document.getElementById('panel-login').addEventListener('submit', async (event) 
   }
   window.location.href = page;
 });
-document.getElementById('panel-logout').addEventListener('click', async () => {
+async function leaveAccount() {
   const bridge = window.chrome && window.chrome.webview;
   if (bridge) {
     try { bridge.postMessage(JSON.stringify({ kind: 'sair' })); } catch (e) {}
@@ -2119,8 +2124,10 @@ document.getElementById('panel-logout').addEventListener('click', async () => {
   showAccount(null);
   setScreen('contas');
   document.getElementById('panel-modal').classList.add('gate');
-  openPanel();
-});
+  openPanel({ login: true });
+}
+document.getElementById('panel-logout').addEventListener('click', () => leaveAccount());
+document.getElementById('logout-account').addEventListener('click', () => leaveAccount());
 async function syncNow() {
   let session = { ok: false };
   try { session = await panelJson('/painel/status'); } catch (e) { session = { ok: false }; }
