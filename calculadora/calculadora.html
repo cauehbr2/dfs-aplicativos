@@ -11,18 +11,22 @@
   body { margin:0; background:#09090b; color:var(--text); font-family:"Segoe UI", system-ui, sans-serif; }
   .wrap {
     max-width:none; width:100%; margin:0; height:100%;
-    padding:12px 16px 8px;
-    display:flex; flex-direction:column; gap:8px;
+    padding:14px 18px 10px;
+    display:flex; flex-direction:column; gap:10px;
     overflow:hidden;
   }
-  h1 { margin:0; font-size:24px; }
-  .sub { color:var(--muted); margin:4px 0 0; font-size:12px; }
+  h1 { margin:0; font-size:26px; }
+  .sub { color:var(--muted); margin:6px 0 0; font-size:12px; line-height:1.35; }
   .top { display:flex; justify-content:space-between; gap:12px; align-items:flex-end; }
   .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:0; }
   button, input, select, textarea { font:inherit; color:inherit; }
-  .tabs button, .primary, .ghost { height:38px; border-radius:12px; padding:0 14px; cursor:pointer; font-weight:800; }
+  .tabs button, .primary, .ghost { height:40px; border-radius:12px; padding:0 14px; cursor:pointer; font-weight:800; }
   .stage { perspective:1400px; flex:1; min-height:0; overflow:hidden; }
-  .panel { height:100%; overflow:hidden; transform-style:preserve-3d; backface-visibility:hidden; transition:transform .42s cubic-bezier(.2,.7,.2,1), opacity .42s; }
+  .panel {
+    height:100%; overflow:auto; transform-style:preserve-3d; backface-visibility:hidden;
+    transition:transform .42s cubic-bezier(.2,.7,.2,1), opacity .42s;
+    background:#111113; border:1px solid var(--line); border-radius:22px; padding:16px 18px;
+  }
   .panel.flip-out-left { transform:rotateY(-88deg); opacity:.15; transform-origin:left center; }
   .panel.flip-out-right { transform:rotateY(88deg); opacity:.15; transform-origin:right center; }
   .panel.flip-in-left { transform:rotateY(-88deg); opacity:.15; transform-origin:left center; }
@@ -31,19 +35,23 @@
   .tabs button.on { background:#2563eb; color:#fff; border-color:transparent; }
   .primary { background:var(--emerald); color:#052e16; border:0; }
   .ghost { background:#27272a; border:1px solid #3f3f46; }
-  .panel { background:#111113; border:1px solid var(--line); border-radius:22px; padding:14px; }
-  .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:stretch; height:100%; }
-  .budget-col { display:flex; flex-direction:column; min-height:0; min-width:0; height:100%; }
-  .fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  label { display:block; margin-bottom:4px; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
-  input, select, textarea { width:100%; height:40px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
-  textarea { flex:1; min-height:0; height:auto; padding:12px; resize:none; white-space:pre-wrap; line-height:1.45; }
+  .grid {
+    display:grid; grid-template-columns:minmax(320px, 0.95fr) minmax(340px, 1.05fr);
+    gap:18px; align-items:stretch; min-height:100%;
+  }
+  .form-col { display:flex; flex-direction:column; gap:12px; min-width:0; }
+  .form-block { display:flex; flex-direction:column; gap:6px; }
+  .budget-col { display:flex; flex-direction:column; gap:8px; min-height:280px; min-width:0; }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  label { display:block; margin:0; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  input, select, textarea { width:100%; height:42px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
+  textarea { flex:1; min-height:220px; height:auto; padding:14px; resize:none; white-space:pre-wrap; line-height:1.45; }
   input:focus, select:focus, textarea:focus { outline:2px solid rgba(37,99,235,.45); border-color:#2563eb; }
-  .line { display:flex; justify-content:space-between; margin-top:8px; }
-  .big { color:var(--emerald); font-size:20px; font-weight:800; }
-  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; flex-shrink:0; }
+  .line { display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding-top:8px; border-top:1px solid #27272a; }
+  .big { color:var(--emerald); font-size:22px; font-weight:800; }
+  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:0; flex-shrink:0; }
   .actions .primary { min-width:160px; }
-  .hint { color:var(--muted); font-size:11px; margin:4px 0 0; }
+  .hint { color:var(--muted); font-size:11px; margin:0; line-height:1.35; }
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
   .chip { height:36px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; padding:0 10px; cursor:pointer; font-weight:700; }
   .chip.on { background:#2563eb; border-color:transparent; }
@@ -84,21 +92,29 @@
   <div class="stage">
   <section class="panel" id="tab-contas">
     <div class="grid">
-      <div>
-        <label>Faixa de depósito</label>
-        <div class="chips" id="faixa-grupos"></div>
-        <button type="button" class="ghost" id="faixa-trigger" style="width:100%;margin-top:8px;text-align:left">Escolha uma faixa</button>
-        <div id="faixa-menu" class="menu hidden"></div>
-        <input type="hidden" id="faixa" />
-        <div class="fields" style="margin-top:12px">
-          <div><label>Qnt. contas</label><input id="qtd-contas" type="number" min="1" step="1" /></div>
-          <div><label>Desconto do dia %</label><input id="desc-contas" type="number" min="0" step="0.01" value="0" /><p class="hint">Puxa o desconto do grupo da faixa. Dá para alterar. Apagar deixa 0.</p></div>
+      <div class="form-col">
+        <div class="form-block">
+          <label>Faixa de depósito</label>
+          <div class="chips" id="faixa-grupos"></div>
+          <button type="button" class="ghost" id="faixa-trigger" style="width:100%;text-align:left">Escolha uma faixa</button>
+          <div id="faixa-menu" class="menu hidden"></div>
+          <input type="hidden" id="faixa" />
         </div>
-        <label style="margin-top:12px">Chave Pix do depósito</label>
-        <button type="button" class="ghost" id="pix-contas-trigger" style="width:100%;text-align:left">Escolha a chave Pix</button>
-        <div id="pix-contas-menu" class="menu hidden"></div>
-        <input type="hidden" id="pix-contas" />
-        <p class="hint" id="pix-contas-hint"></p>
+        <div class="fields">
+          <div class="form-block"><label>Qnt. contas</label><input id="qtd-contas" type="number" min="1" step="1" /></div>
+          <div class="form-block">
+            <label>Desconto do dia %</label>
+            <input id="desc-contas" type="number" min="0" step="0.01" value="0" />
+            <p class="hint">Puxa o desconto do grupo da faixa. Dá para alterar.</p>
+          </div>
+        </div>
+        <div class="form-block">
+          <label>Chave Pix do depósito</label>
+          <button type="button" class="ghost" id="pix-contas-trigger" style="width:100%;text-align:left">Escolha a chave Pix</button>
+          <div id="pix-contas-menu" class="menu hidden"></div>
+          <input type="hidden" id="pix-contas" />
+          <p class="hint" id="pix-contas-hint"></p>
+        </div>
         <div class="line"><span>Total</span><strong class="big" id="total-contas"></strong></div>
       </div>
       <div class="budget-col">
@@ -111,20 +127,30 @@
 
   <section class="panel hidden" id="tab-montante">
     <div class="grid">
-      <div>
-        <label>Valor montante (R$)</label>
-        <input id="montante" type="number" min="0" step="0.01" />
-        <label style="margin-top:12px">Taxa</label>
-        <div class="chips" id="taxas"></div>
-        <div class="fields" style="margin-top:12px">
-          <div><label>Qnt. contas</label><input id="qtd-montante" type="number" min="1" step="1" /></div>
-          <div><label>Desconto do dia %</label><input id="desc-montante" type="number" min="0" step="0.01" value="0" /><p class="hint">Puxa o desconto do valor. Dá para alterar. Apagar deixa 0.</p></div>
+      <div class="form-col">
+        <div class="form-block">
+          <label>Valor montante (R$)</label>
+          <input id="montante" type="number" min="0" step="0.01" />
         </div>
-        <label style="margin-top:12px">Chave Pix do depósito</label>
-        <button type="button" class="ghost" id="pix-montante-trigger" style="width:100%;text-align:left">Escolha a chave Pix</button>
-        <div id="pix-montante-menu" class="menu hidden"></div>
-        <input type="hidden" id="pix-montante" />
-        <p class="hint" id="pix-montante-hint"></p>
+        <div class="form-block">
+          <label>Taxa</label>
+          <div class="chips" id="taxas"></div>
+        </div>
+        <div class="fields">
+          <div class="form-block"><label>Qnt. contas</label><input id="qtd-montante" type="number" min="1" step="1" /></div>
+          <div class="form-block">
+            <label>Desconto do dia %</label>
+            <input id="desc-montante" type="number" min="0" step="0.01" value="0" />
+            <p class="hint">Puxa o desconto do valor. Dá para alterar.</p>
+          </div>
+        </div>
+        <div class="form-block">
+          <label>Chave Pix do depósito</label>
+          <button type="button" class="ghost" id="pix-montante-trigger" style="width:100%;text-align:left">Escolha a chave Pix</button>
+          <div id="pix-montante-menu" class="menu hidden"></div>
+          <input type="hidden" id="pix-montante" />
+          <p class="hint" id="pix-montante-hint"></p>
+        </div>
         <div class="line"><span>Total</span><strong class="big" id="total-montante"></strong></div>
       </div>
       <div class="budget-col">
@@ -170,19 +196,19 @@
 <script>
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const KEY = 'dfs-calculadora-pix';
-const ranges = [
+let ranges = [
   ['Grupo 01', '10 a 11', 5], ['Grupo 01', '10 a 12', 6], ['Grupo 01', '10 a 13', 7], ['Grupo 01', '11 a 13', 8], ['Grupo 01', '11 a 14', 9], ['Grupo 01', '12 a 15', 10], ['Grupo 01', '12 a 18', 11],
   ['Grupo 02', '10', 6], ['Grupo 02', '10 a 11', 7], ['Grupo 02', '10 a 12', 8], ['Grupo 02', '11 a 13', 9], ['Grupo 02', '11 a 14', 10], ['Grupo 02', '12 a 15', 11], ['Grupo 02', '13 a 18', 12],
   ['Grupo 03', '10', 7], ['Grupo 03', '10 a 11', 8], ['Grupo 03', '11 a 12', 9], ['Grupo 03', '11 a 13', 10], ['Grupo 03', '12 a 15', 11], ['Grupo 03', '13 a 16', 12], ['Grupo 03', '14 a 18', 13],
 ].map((item, index) => ({ id: 'r' + index, group: item[0], name: item[1], price: item[2] }));
-const rates = [
+let rates = [
   { id: '1.5', label: '1,5 x 15%', taxa: 15 },
   { id: '2', label: '2 x 20%', taxa: 20 },
   { id: '2.5', label: '2,5 x 25%', taxa: 25 },
   { id: '3', label: '3 x 35%', taxa: 35 },
   { id: '4', label: '4 x 45%', taxa: 45 },
 ];
-const rules = [[200,1],[300,2],[400,2],[500,3],[600,3],[700,4],[800,5],[900,5],[1000,6]];
+let rules = [[200,1],[300,2],[400,2],[500,3],[600,3],[700,4],[800,5],[900,5],[1000,6]];
 let pixKeys = [];
 let campaigns = [];
 let budget = {
@@ -425,9 +451,13 @@ function renderRanges() {
     }
     buckets.get(group).push(item);
   });
-  const selected = ranges.find((item) => item.id === hidden.value) || null;
+  let selected = ranges.find((item) => item.id === hidden.value) || null;
   if (!faixaGroup || !buckets.has(faixaGroup)) faixaGroup = (selected && selected.group) || order[0] || '';
   const items = buckets.get(faixaGroup) || [];
+  if (!selected && items.length) {
+    selected = items[0];
+    hidden.value = String(selected.id);
+  }
   document.getElementById('faixa-grupos').innerHTML = order.map((group) =>
     `<button type="button" class="chip${group === faixaGroup ? ' on' : ''}" data-faixa-group="${group}">${group}</button>`
   ).join('');
@@ -699,13 +729,7 @@ function applyCatalog(catalog) {
     return;
   }
   siteOn = true;
-  if (Array.isArray(catalog.ranges) && catalog.ranges.length) ranges = catalog.ranges;
-  if (Array.isArray(catalog.rates) && catalog.rates.length) {
-    rates = catalog.rates;
-    if (!rates.some((item) => item.id === rateId)) rateId = rates[0].id;
-  }
-  if (Array.isArray(catalog.rules) && catalog.rules.length) rules = catalog.rules;
-  // Espelho do site: apaga a lista local e monta de novo (a mais some, a menos entra).
+  // Pix primeiro: se faixa/taxa falhar, a chave do depósito não some.
   const remote = Array.isArray(catalog.pix) ? catalog.pix : [];
   const nextPix = [];
   const seenIds = new Set();
@@ -729,6 +753,12 @@ function applyCatalog(catalog) {
   pixKeys = nextPix;
   pixContas = pick('contas', pixContas);
   pixMontante = pick('montante', pixMontante);
+  if (Array.isArray(catalog.ranges) && catalog.ranges.length) ranges = catalog.ranges;
+  if (Array.isArray(catalog.rates) && catalog.rates.length) {
+    rates = catalog.rates;
+    if (!rates.some((item) => item.id === rateId)) rateId = rates[0].id;
+  }
+  if (Array.isArray(catalog.rules) && catalog.rules.length) rules = catalog.rules;
   campaigns = Array.isArray(catalog.campaigns) ? catalog.campaigns : [];
   if (catalog.budget && typeof catalog.budget === 'object') {
     budget = {
