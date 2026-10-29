@@ -1,6 +1,6 @@
 ﻿{
     "calculadora":  {
-                        "version":  "1.0.13",
+                        "version":  "1.0.14",
                         "files":  [
                                       "app-versao.txt",
                                       "budget-templates.json",
