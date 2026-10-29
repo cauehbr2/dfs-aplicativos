@@ -10,19 +10,19 @@
   html, body { height:100%; overflow:hidden; }
   body { margin:0; background:#09090b; color:var(--text); font-family:"Segoe UI", system-ui, sans-serif; }
   .wrap {
-    max-width:980px; margin:0 auto; height:100%;
-    padding:16px 18px 12px;
-    display:flex; flex-direction:column; gap:10px;
+    max-width:none; width:100%; margin:0; height:100%;
+    padding:12px 16px 8px;
+    display:flex; flex-direction:column; gap:8px;
     overflow:hidden;
   }
-  h1 { margin:0; font-size:28px; }
-  .sub { color:var(--muted); margin:6px 0 16px; font-size:13px; }
+  h1 { margin:0; font-size:24px; }
+  .sub { color:var(--muted); margin:4px 0 0; font-size:12px; }
   .top { display:flex; justify-content:space-between; gap:12px; align-items:flex-end; }
-  .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:0; }
   button, input, select, textarea { font:inherit; color:inherit; }
-  .tabs button, .primary, .ghost { height:40px; border-radius:12px; padding:0 14px; cursor:pointer; font-weight:800; }
-  .stage { perspective:1400px; flex:1; min-height:0; overflow:auto; }
-  .panel { transform-style:preserve-3d; backface-visibility:hidden; transition:transform .42s cubic-bezier(.2,.7,.2,1), opacity .42s; }
+  .tabs button, .primary, .ghost { height:38px; border-radius:12px; padding:0 14px; cursor:pointer; font-weight:800; }
+  .stage { perspective:1400px; flex:1; min-height:0; overflow:hidden; }
+  .panel { height:100%; overflow:hidden; transform-style:preserve-3d; backface-visibility:hidden; transition:transform .42s cubic-bezier(.2,.7,.2,1), opacity .42s; }
   .panel.flip-out-left { transform:rotateY(-88deg); opacity:.15; transform-origin:left center; }
   .panel.flip-out-right { transform:rotateY(88deg); opacity:.15; transform-origin:right center; }
   .panel.flip-in-left { transform:rotateY(-88deg); opacity:.15; transform-origin:left center; }
@@ -31,19 +31,19 @@
   .tabs button.on { background:#2563eb; color:#fff; border-color:transparent; }
   .primary { background:var(--emerald); color:#052e16; border:0; }
   .ghost { background:#27272a; border:1px solid #3f3f46; }
-  .panel { background:#111113; border:1px solid var(--line); border-radius:22px; padding:18px; }
-  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:stretch; }
-  .budget-col { display:flex; flex-direction:column; min-height:0; min-width:0; }
-  .fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  label { display:block; margin-bottom:6px; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
-  input, select, textarea { width:100%; height:44px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
-  textarea { flex:1; min-height:90px; max-height:220px; height:auto; padding:12px; resize:vertical; white-space:pre-wrap; line-height:1.45; }
+  .panel { background:#111113; border:1px solid var(--line); border-radius:22px; padding:14px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:stretch; height:100%; }
+  .budget-col { display:flex; flex-direction:column; min-height:0; min-width:0; height:100%; }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  label { display:block; margin-bottom:4px; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  input, select, textarea { width:100%; height:40px; border-radius:12px; border:1px solid #3f3f46; background:#18181b; padding:0 12px; }
+  textarea { flex:1; min-height:0; height:auto; padding:12px; resize:none; white-space:pre-wrap; line-height:1.45; }
   input:focus, select:focus, textarea:focus { outline:2px solid rgba(37,99,235,.45); border-color:#2563eb; }
-  .line { display:flex; justify-content:space-between; margin-top:10px; }
-  .big { color:var(--emerald); font-size:22px; font-weight:800; }
-  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:10px; flex-shrink:0; }
+  .line { display:flex; justify-content:space-between; margin-top:8px; }
+  .big { color:var(--emerald); font-size:20px; font-weight:800; }
+  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:8px; flex-shrink:0; }
   .actions .primary { min-width:160px; }
-  .hint { color:var(--muted); font-size:12px; }
+  .hint { color:var(--muted); font-size:11px; margin:4px 0 0; }
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
   .chip { height:36px; border-radius:10px; border:1px solid #3f3f46; background:#18181b; padding:0 10px; cursor:pointer; font-weight:700; }
   .chip.on { background:#2563eb; border-color:transparent; }
@@ -60,14 +60,9 @@
   .credit { margin:0; flex-shrink:0; display:flex; justify-content:space-between; gap:12px; align-items:center; font-size: 11px; color: #52525b; }
   .credit .app-version { color: #71717a; font-weight: 700; letter-spacing: .04em; }
   .top, .tabs { flex-shrink:0; }
-  @media (max-width:800px) {
-    .grid { grid-template-columns:1fr; }
-    .wrap { padding:10px 14px 8px; }
+  @media (max-width:860px) {
+    .wrap { padding:10px 12px 8px; }
     h1 { font-size:22px; }
-    .sub { margin:4px 0 8px; font-size:12px; }
-    textarea { min-height:88px; }
-    .panel { padding:12px; }
-    .actions { position:sticky; bottom:0; background:#111113; padding-top:8px; padding-bottom:4px; }
   }
 </style>
 </head>
@@ -325,11 +320,16 @@ function stamp() {
   const time = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(date);
   return `Gerado em: ${day} às ${time}`;
 }
+function flagOn(value) {
+  if (value === false || value === 0 || value === '0') return false;
+  if (typeof value === 'string' && value.trim().toLowerCase() === 'false') return false;
+  return true;
+}
 function keysFor(module) {
-  // Igual ao painel: Contas = exibirContas; Montante = exibirMontante.
+  // Igual ao painel: Contas / Montante pelas marcas da lista calculatorPixKeys.
   return (Array.isArray(pixKeys) ? pixKeys : []).filter((item) => {
     if (!item || !item.chave) return false;
-    return module === 'contas' ? item.contas !== false : item.montante !== false;
+    return module === 'contas' ? flagOn(item.contas) : flagOn(item.montante);
   });
 }
 function pick(module, current) {
@@ -703,19 +703,15 @@ function applyCatalog(catalog) {
     if (!rates.some((item) => item.id === rateId)) rateId = rates[0].id;
   }
   if (Array.isArray(catalog.rules) && catalog.rules.length) rules = catalog.rules;
-  pixKeys = (Array.isArray(catalog.pix) ? catalog.pix : []).map((item) => {
-    const contas = item && (item.contas !== false) && (item.exibirContas !== false);
-    const montante = item && (item.montante !== false) && (item.exibirMontante !== false);
-    return {
-      id: String((item && (item.id || item.userKeyId || item.chave)) || ''),
-      tipo: String((item && (item.tipo || item.tipoChave)) || 'CPF'),
-      chave: String((item && item.chave) || '').trim(),
-      nome: String((item && (item.nome || item.nomeCompleto)) || 'Pix').trim() || 'Pix',
-      banco: String((item && (item.banco || item.bancoInstituicao)) || '—').trim() || '—',
-      contas: !!contas,
-      montante: !!montante,
-    };
-  }).filter((item) => item.chave);
+  pixKeys = (Array.isArray(catalog.pix) ? catalog.pix : []).map((item) => ({
+    id: String((item && (item.id || item.userKeyId || item.chave)) || ''),
+    tipo: String((item && (item.tipo || item.tipoChave)) || 'CPF'),
+    chave: String((item && (item.chave || item.pixChave)) || '').trim(),
+    nome: String((item && (item.nome || item.nomeCompleto)) || 'Pix').trim() || 'Pix',
+    banco: String((item && (item.banco || item.bancoInstituicao)) || '—').trim() || '—',
+    contas: flagOn(item && (item.contas !== undefined ? item.contas : item.exibirContas)),
+    montante: flagOn(item && (item.montante !== undefined ? item.montante : item.exibirMontante)),
+  })).filter((item) => item.chave);
   campaigns = Array.isArray(catalog.campaigns) ? catalog.campaigns : [];
   if (catalog.budget && typeof catalog.budget === 'object') {
     budget = {
@@ -809,10 +805,12 @@ function sessionLine(session, catalog) {
   const parts = [];
   if (who) parts.push('Conectado: ' + who);
   if (company) parts.push('Empresa: ' + company);
-  if (catalog && Array.isArray(catalog.pix)) {
+  if (catalog && catalog.pixMeta) {
+    parts.push((catalog.pixMeta.contas || 0) + ' Contas · ' + (catalog.pixMeta.montante || 0) + ' Montante');
+  } else if (catalog && Array.isArray(catalog.pix)) {
     const list = catalog.pix;
-    const nContas = list.filter((item) => item && item.chave && item.contas !== false && item.exibirContas !== false).length;
-    const nMontante = list.filter((item) => item && item.chave && item.montante !== false && item.exibirMontante !== false).length;
+    const nContas = list.filter((item) => item && item.chave && flagOn(item.contas)).length;
+    const nMontante = list.filter((item) => item && item.chave && flagOn(item.montante)).length;
     parts.push(nContas + ' Contas · ' + nMontante + ' Montante');
   }
   return parts.join(' · ') || 'Cadastro do site';

@@ -216,19 +216,25 @@ function rateLabel(item) {
   const base = mult.toLocaleString('pt-BR') + ' x ' + taxa.toLocaleString('pt-BR') + '%';
   return item.observacao ? base + ' · ' + item.observacao : base;
 }
+function flagOn(value) {
+  if (value === false || value === 0 || value === '0') return false;
+  if (typeof value === 'string' && value.trim().toLowerCase() === 'false') return false;
+  return true;
+}
 // Igual ao painel (useCalculatorPixKeys): lista calculatorPixKeys da empresa.
 function pixRow(item, id) {
   if (!item || typeof item !== 'object') return null;
-  const chave = String(item.chave || '').trim();
+  const chave = String(item.chave || item.pixChave || '').trim();
   if (!chave) return null;
   return {
     id: String(id || item.id || item.userKeyId || chave),
     tipo: String(item.tipoChave || item.tipo || 'CPF').trim() || 'CPF',
     chave,
-    nome: String(item.nomeCompleto || item.nome || '').trim() || 'Pix',
-    banco: String(item.bancoInstituicao || item.banco || '').trim() || '—',
-    contas: item.exibirContas !== false,
-    montante: item.exibirMontante !== false,
+    nome: String(item.nomeCompleto || item.nome || item.nomeTitular || '').trim() || 'Pix',
+    banco: String(item.bancoInstituicao || item.banco || item.instituicao || '').trim() || '—',
+    // Mesmo critério do painel flutuante.
+    contas: flagOn(item.exibirContas),
+    montante: flagOn(item.exibirMontante),
   };
 }
 async function resolveCompanyId(session) {
@@ -283,7 +289,12 @@ async function loadCompanyPix(session, companyId) {
     rows.push(row);
   });
   rows.sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
-  return rows;
+  return {
+    docs: docs.length,
+    pix: rows,
+    contas: rows.filter((item) => item.contas).length,
+    montante: rows.filter((item) => item.montante).length,
+  };
 }
 async function pullCatalog(session) {
   if (!session || !session.token) {
@@ -304,8 +315,9 @@ async function pullCatalog(session) {
     panelRequest('read', { collection: 'settings', id: budgetId, dfs_token: session.token }),
   ]);
   // Pix separado: se falhar, o resto do catálogo continua e a tela não fica sem faixa.
-  let pix = [];
-  try { pix = await loadCompanyPix(session, companyId); } catch (e) { pix = []; }
+  let pixPack = { docs: 0, pix: [], contas: 0, montante: 0 };
+  try { pixPack = await loadCompanyPix(session, companyId); } catch (e) { pixPack = { docs: 0, pix: [], contas: 0, montante: 0 }; }
+  const pix = pixPack.pix || [];
   const packed = loadBudgetTemplates();
   const budgetDoc = (budgetRes && budgetRes.json && budgetRes.json.data) || {};
   const budget = {
@@ -365,6 +377,11 @@ async function pullCatalog(session) {
       qtdContas: Number(item.qtdContas) || 0,
     })).filter((item) => item.montante > 0).sort((a, b) => a.montante - b.montante),
     pix,
+    pixMeta: {
+      docs: pixPack.docs || 0,
+      contas: pixPack.contas || 0,
+      montante: pixPack.montante || 0,
+    },
   };
   fs.mkdirSync(dataDir, { recursive: true });
   fs.writeFileSync(catalogFile, JSON.stringify(catalog));
@@ -520,7 +537,18 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url === '/app/versao' && req.method === 'GET') {
-    sendJson(res, 200, { version: readAppVersion() });
+    sendJson(res, 200, { version: readAppVersion(), cwd: codeDir });
+    return;
+  }
+  if (url === '/app/health' && req.method === 'GET') {
+    const session = readSession();
+    sendJson(res, 200, {
+      ok: true,
+      version: readAppVersion(),
+      cwd: codeDir,
+      companyId: session && session.companyId || '',
+      companySlug: session && session.companySlug || '',
+    });
     return;
   }
   if ((url === '/' || url === '/calculadora.html') && req.method === 'GET') {
