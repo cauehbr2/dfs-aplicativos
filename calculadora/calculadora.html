@@ -1131,22 +1131,27 @@ function paintFilaAlertUi(isFirst, alerting) {
   stop.classList.toggle('on', !!(isFirst && alerting));
 }
 function openFilaNow() {
-  const payload = JSON.stringify({ kind: 'fila', t: Date.now() });
+  const ts = Date.now();
+  const url = '/fila/abrir?ts=' + ts;
+  const payload = JSON.stringify({ kind: 'fila', t: ts });
   const bridge = window.chrome && window.chrome.webview;
   if (bridge && typeof bridge.postMessage === 'function') {
     try { bridge.postMessage(payload); } catch (_) {}
-    try { bridge.postMessage({ kind: 'fila', t: Date.now() }); } catch (_) {}
+    try { bridge.postMessage({ kind: 'fila', t: ts }); } catch (_) {}
   }
   try {
     const prev = document.title || 'Calculadora';
-    document.title = 'dfs:fila:' + Date.now();
-    setTimeout(() => { try { document.title = prev; } catch (_) {} }, 120);
+    document.title = 'dfs:fila:' + ts;
+    setTimeout(() => { try { document.title = prev; } catch (_) {} }, 150);
   } catch (_) {}
-  // Plano certo: o host C# escuta o arquivo via /fila/abrir.
+  // Vários caminhos: o host C# pega o pedido em WebResourceRequested / arquivo.
   try {
-    fetch('/fila/abrir?ts=' + Date.now(), { method: 'POST', cache: 'no-store' }).catch(() => {
-      fetch('/fila/abrir?ts=' + Date.now(), { method: 'GET', cache: 'no-store' }).catch(() => {});
-    });
+    const img = new Image();
+    img.src = url;
+  } catch (_) {}
+  try {
+    fetch(url, { method: 'GET', cache: 'no-store' }).catch(() => {});
+    fetch(url, { method: 'POST', cache: 'no-store' }).catch(() => {});
   } catch (_) {}
 }
 document.getElementById('open-fila').addEventListener('click', () => {
