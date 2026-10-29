@@ -1923,7 +1923,10 @@ function askHostCaptcha(origin, siteKey) {
     return Promise.reject(new Error('Abra pelo app Operações para o Google liberar a entrada.'));
   }
   return new Promise((resolve, reject) => {
+    let done = false;
     const finish = (token, message) => {
+      if (done) return;
+      done = true;
       try { bridge.removeEventListener('message', onMsg); } catch (e) {}
       if (token) resolve(token);
       else reject(new Error(message || 'O Google não confirmou a entrada.'));
@@ -1945,7 +1948,7 @@ function askHostCaptcha(origin, siteKey) {
     } catch (e) {
       finish('', 'Não pedi a proteção do Google.');
     }
-    setTimeout(() => finish('', 'O Google não confirmou a entrada a tempo.'), 90000);
+    setTimeout(() => finish('', 'O Google não confirmou a entrada a tempo.'), 100000);
   });
 }
 async function loginCaptcha(origin) {

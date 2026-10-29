@@ -1,4 +1,4 @@
-{
+﻿{
     "calculadora":  {
                         "version":  "1.0.39",
                         "files":  [
@@ -20,23 +20,24 @@
                                   ]
                     },
     "operacoes":  {
-                      "version":  "1.0.18",
+                      "version":  "1.0.19",
                       "files":  [
                                     "app-versao.txt",
                                     "contas-operacoes.html",
+                                    "operacoes-app.mjs",
+                                    "painel-cartao.js",
                                     "elite-cpa-logo-4.png",
                                     "icone.ico",
+                                    "icone.png",
+                                    "Operacoes.exe",
+                                    "Operacoes.dll",
+                                    "Operacoes.deps.json",
+                                    "Operacoes.runtimeconfig.json",
                                     "Microsoft.Web.WebView2.Core.dll",
                                     "Microsoft.Web.WebView2.WinForms.dll",
                                     "Microsoft.Web.WebView2.Wpf.dll",
-                                    "Operacoes.deps.json",
-                                    "Operacoes.dll",
-                                    "Operacoes.exe",
-                                    "Operacoes.runtimeconfig.json",
-                                    "operacoes-app.mjs",
-                                    "painel-cartao.js",
-                                    "runtimes/win-x64/native/WebView2Loader.dll",
-                                    "WebView2Loader.dll"
+                                    "WebView2Loader.dll",
+                                    "runtimes/win-x64/native/WebView2Loader.dll"
                                 ]
                   }
 }
