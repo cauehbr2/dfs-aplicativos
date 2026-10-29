@@ -5,122 +5,137 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Fila</title>
 <style>
-  :root { --bg:#09090b; --line:#27272a; --muted:#a1a1aa; --text:#fafafa; --emerald:#34d399; --blue:#2563eb; --red:#ef4444; }
+  :root { --bg:#09090b; --panel:#111113; --line:#27272a; --muted:#a1a1aa; --text:#fafafa; --emerald:#34d399; --blue:#2563eb; }
   * { box-sizing:border-box; }
   html, body { height:100%; overflow:hidden; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:"Segoe UI", system-ui, sans-serif; }
-  .wrap { height:100%; padding:14px 14px 10px; display:flex; flex-direction:column; gap:10px; }
-  .top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-  h1 { margin:0; font-size:22px; }
-  .sub { margin:4px 0 0; color:var(--muted); font-size:12px; line-height:1.35; }
-  .tabs { display:flex; gap:8px; }
+  .wrap { height:100%; padding:12px; display:flex; flex-direction:column; gap:10px; }
+  .head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  h1 { margin:0; font-size:18px; font-weight:800; }
+  .sub { margin:4px 0 0; color:var(--muted); font-size:11px; line-height:1.35; }
+  .live {
+    display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px;
+    border:1px solid rgba(52,211,153,.35); background:rgba(52,211,153,.08);
+    color:var(--emerald); font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+  }
+  .live .dot { width:7px; height:7px; border-radius:50%; background:var(--emerald); animation:pulse 1.2s ease-out infinite; }
+  @keyframes pulse {
+    0% { box-shadow:0 0 0 0 rgba(52,211,153,.55); }
+    70% { box-shadow:0 0 0 8px rgba(52,211,153,0); }
+    100% { box-shadow:0 0 0 0 rgba(52,211,153,0); }
+  }
+  .tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   button { font:inherit; color:inherit; cursor:pointer; }
-  .tabs button, .act, .ghost {
-    height:38px; border-radius:12px; padding:0 12px; font-weight:800; border:1px solid var(--line); background:#18181b;
+  .tabs button {
+    height:38px; border-radius:12px; border:1px solid var(--line); background:#18181b;
+    font-weight:800; font-size:12px; letter-spacing:.04em; text-transform:uppercase;
   }
-  .tabs button.on { background:var(--blue); border-color:transparent; }
-  .ghost { background:#27272a; }
-  .act { background:var(--emerald); color:#052e16; border:0; }
-  .act.warn { background:#f59e0b; color:#422006; }
-  .act.danger { background:#7f1d1d; color:#fecaca; }
-  .panel {
-    flex:1; min-height:0; overflow:auto; background:#111113; border:1px solid var(--line);
-    border-radius:18px; padding:12px;
-  }
-  .me-card {
-    display:flex; align-items:center; gap:12px; padding:12px; border-radius:14px;
-    border:1px solid #3f3f46; background:#18181b; margin-bottom:12px;
-  }
-  .me-card.first {
-    border-color:rgba(239,68,68,.55); background:linear-gradient(180deg, rgba(239,68,68,.18), #18181b);
-  }
-  .pulse {
-    width:18px; height:18px; border-radius:50%; background:#3f3f46; flex-shrink:0;
-    box-shadow:0 0 0 0 transparent;
-  }
-  .pulse.on {
-    background:var(--red);
-    animation: tremble .28s ease-in-out infinite, glow 1.1s ease-out infinite;
-  }
-  @keyframes tremble {
-    0%, 100% { transform: translate(0,0) rotate(0deg); }
-    20% { transform: translate(-1.5px, 1px) rotate(-8deg); }
-    40% { transform: translate(1.5px, -1px) rotate(7deg); }
-    60% { transform: translate(-1px, -1px) rotate(-5deg); }
-    80% { transform: translate(1px, 1px) rotate(6deg); }
-  }
-  @keyframes glow {
-    0% { box-shadow: 0 0 0 0 rgba(239,68,68,.55); }
-    70% { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
-    100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
-  }
-  .me-meta { min-width:0; flex:1; }
-  .me-meta strong { display:block; font-size:14px; }
-  .me-meta span { display:block; color:var(--muted); font-size:12px; margin-top:2px; }
-  .actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
-  .actions button { flex:1; min-width:90px; }
-  .list { display:flex; flex-direction:column; gap:8px; }
-  .row {
-    display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px;
-    border:1px solid #27272a; background:#151518;
-  }
-  .row.me { border-color:rgba(37,99,235,.45); }
-  .row.first { border-color:rgba(239,68,68,.45); }
-  .pos {
-    width:28px; height:28px; border-radius:999px; display:grid; place-items:center;
-    font-size:12px; font-weight:800; background:#27272a; color:#d4d4d8; flex-shrink:0;
-  }
-  .row.first .pos { background:var(--red); color:#fff; }
-  .row.paused .pos { background:#3f3f46; color:#a1a1aa; }
-  .name { flex:1; min-width:0; font-weight:700; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .tag { font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
-  .tag.go { color:#fca5a5; }
-  .tag.pause { color:#a1a1aa; }
-  .hint { color:var(--muted); font-size:12px; margin:0; }
-  .status { color:var(--muted); font-size:11px; }
+  .tabs button.on.contas { background:#059669; border-color:transparent; color:#fff; }
+  .tabs button.on.montante { background:var(--blue); border-color:transparent; color:#fff; }
   .alert-bar {
-    display:none; align-items:center; justify-content:space-between; gap:10px;
-    padding:10px 12px; border-radius:12px; border:1px solid rgba(239,68,68,.4);
-    background:rgba(239,68,68,.12); margin-bottom:10px;
+    display:none; flex-direction:column; gap:8px; padding:10px 12px; border-radius:14px;
+    border:1px solid rgba(239,68,68,.4); background:rgba(239,68,68,.12);
   }
   .alert-bar.on { display:flex; }
-  .alert-bar strong { color:#fecaca; font-size:13px; }
+  .alert-bar strong { color:#fecaca; font-size:12px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+  .alert-bar span { color:#e4e4e7; font-size:11px; font-weight:700; }
+  .alert-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .panel {
+    flex:1; min-height:0; overflow:auto; background:var(--panel); border:1px solid var(--line);
+    border-radius:16px; padding:12px; display:flex; flex-direction:column; gap:12px;
+    transition: box-shadow .25s ease, border-color .25s ease;
+  }
+  .panel.flash { border-color:rgba(52,211,153,.55); box-shadow:0 0 0 1px rgba(52,211,153,.25) inset; }
+  .me {
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    padding:12px; border-radius:14px; border:1px solid #3f3f46; background:#18181b;
+  }
+  .me.first { border-color:rgba(52,211,153,.35); background:rgba(16,185,129,.08); }
+  .me-left { display:flex; align-items:center; gap:10px; min-width:0; }
+  .dot-status { width:8px; height:8px; border-radius:50%; background:#52525b; flex-shrink:0; }
+  .dot-status.on { background:var(--emerald); animation:pulse 1.2s ease-out infinite; }
+  .me strong { display:block; font-size:12px; }
+  .me em { display:block; margin-top:2px; font-style:normal; color:var(--muted); font-size:10px; font-weight:700; }
+  .me-btns { display:flex; gap:6px; flex-wrap:wrap; }
+  .btn {
+    height:32px; padding:0 10px; border-radius:10px; border:1px solid #3f3f46; background:#27272a;
+    font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:5px;
+  }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn.green { background:#059669; border-color:transparent; color:#fff; }
+  .btn.red { background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.3); color:#fca5a5; }
+  .btn.join-full {
+    width:100%; height:40px; border-radius:14px; justify-content:center;
+    font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+  }
+  .join-full.contas { background:#059669; border:0; color:#fff; }
+  .join-full.montante { background:var(--blue); border:0; color:#fff; }
+  .section-title {
+    margin:0; font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#71717a;
+  }
+  .list { display:flex; flex-direction:column; gap:8px; }
+  .row {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:10px 12px; border-radius:12px; border:1px solid #27272a; background:rgba(24,24,27,.55);
+  }
+  .row.first { border-color:rgba(52,211,153,.3); background:rgba(16,185,129,.06); }
+  .row.paused { opacity:.45; }
+  .row-left { display:flex; align-items:center; gap:10px; min-width:0; }
+  .pos {
+    width:22px; height:22px; border-radius:8px; display:grid; place-items:center;
+    font-size:10px; font-weight:900; border:1px solid #3f3f46; background:#09090b; color:#71717a; flex-shrink:0;
+  }
+  .row.first .pos { border-color:rgba(52,211,153,.3); background:rgba(16,185,129,.1); color:var(--emerald); }
+  .name { font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .name.me { color:var(--emerald); }
+  .name.paused { text-decoration:line-through; color:#52525b; }
+  .tag {
+    font-size:9px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+    padding:3px 6px; border-radius:6px; border:1px solid #27272a; background:#18181b; color:#71717a;
+  }
+  .tag.vez { color:var(--emerald); background:rgba(16,185,129,.15); border-color:rgba(52,211,153,.3); }
+  .hint { margin:0; color:#52525b; font-size:11px; }
+  .foot {
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    color:#52525b; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  }
+  .empty-box {
+    padding:12px; border-radius:12px; border:1px solid #27272a; background:rgba(24,24,27,.4);
+    color:var(--muted); font-size:11px;
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="top">
+  <div class="head">
     <div>
-      <h1>Fila</h1>
-      <p class="sub" id="line">Sincronizada com o site.</p>
+      <h1>Fila operacional</h1>
+      <p class="sub" id="line">Igual ao site · atualiza sozinha</p>
     </div>
+    <div class="live"><span class="dot"></span>Realtime</div>
   </div>
   <div class="tabs">
-    <button type="button" class="on" data-sector="contas">Contas</button>
-    <button type="button" data-sector="montante">Montante</button>
+    <button type="button" class="contas on" data-sector="contas">Contas</button>
+    <button type="button" class="montante" data-sector="montante">Montante</button>
   </div>
   <div class="alert-bar" id="alert-bar">
-    <strong id="alert-text">É a sua vez!</strong>
-    <button type="button" class="ghost" id="stop-alert">Parar alerta</button>
+    <strong>É a sua vez!</strong>
+    <span id="alert-text">Posição: 1º</span>
+    <div class="alert-actions">
+      <button type="button" class="btn green" id="btn-next-alert">Finalizar Turno (Próximo)</button>
+      <button type="button" class="btn red" id="stop-alert">Parar Alerta</button>
+    </div>
   </div>
-  <div class="panel">
-    <div class="me-card" id="me-card">
-      <div class="pulse" id="pulse"></div>
-      <div class="me-meta">
-        <strong id="me-title">—</strong>
-        <span id="me-sub">Carregando fila...</span>
-      </div>
-    </div>
-    <div class="actions">
-      <button type="button" class="act" id="btn-enter">Entrar</button>
-      <button type="button" class="act warn" id="btn-pause">Pausar</button>
-      <button type="button" class="act" id="btn-pass">Próximo</button>
-      <button type="button" class="act danger" id="btn-leave">Sair</button>
-    </div>
+  <div class="panel" id="panel">
+    <div id="me-box"></div>
+    <p class="section-title">Sequência atual da fila</p>
     <div class="list" id="list"></div>
     <p class="hint" id="empty"></p>
   </div>
-  <p class="status" id="status">Atualizando...</p>
+  <div class="foot">
+    <span>Realtime ativo</span>
+    <span id="status">Atualizando…</span>
+  </div>
 </div>
 <script>
 let sector = 'contas';
@@ -128,11 +143,12 @@ let state = null;
 let busy = false;
 let alertOn = false;
 let alertSector = '';
-let prev = { contas: null, montante: null };
-let ready = { contas: false, montante: false };
+let prevPos = { contas: null, montante: null };
+let readyPos = { contas: false, montante: false };
 let beepTimer = null;
 let audioCtx = null;
 let alertCache = { active: false, sector: '', stopped: false };
+let lastFinger = '';
 
 function sectorLabel(id) { return id === 'montante' ? 'Montante' : 'Contas'; }
 function meIn(s) {
@@ -142,6 +158,18 @@ function meIn(s) {
 function opsOf(s) {
   if (!state) return [];
   return s === 'montante' ? (state.montante || []) : (state.contas || []);
+}
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function fingerprint(data) {
+  if (!data || !data.ok) return 'off';
+  const pack = (ops) => (ops || []).map((op) => [op.userId, op.position, op.active === false ? 0 : 1, op.name].join(':')).join('|');
+  return pack(data.contas) + '##' + pack(data.montante);
 }
 async function readFilaAlert() {
   try {
@@ -189,7 +217,7 @@ function paintAlertBar() {
   const text = document.getElementById('alert-text');
   if (alertOn) {
     bar.classList.add('on');
-    text.textContent = 'É a sua vez na fila de ' + sectorLabel(alertSector || sector) + '!';
+    text.textContent = 'Sua vez na fila de ' + sectorLabel(alertSector || sector) + ' · Posição: 1º';
   } else {
     bar.classList.remove('on');
   }
@@ -219,17 +247,15 @@ async function trackTurn() {
     const mine = meIn(s);
     const pos = mine && mine.active !== false ? Number(mine.position) || 0 : 0;
     const current = pos > 0 ? pos : null;
-    if (!ready[s]) {
-      prev[s] = current;
-      ready[s] = true;
+    if (!readyPos[s]) {
+      prevPos[s] = current;
+      readyPos[s] = true;
       return;
     }
-    const before = prev[s];
+    const before = prevPos[s];
     if (before !== current) {
-      prev[s] = current;
-      if (current === 1 && before !== 1 && mine && mine.active !== false) {
-        startAlert(s);
-      }
+      prevPos[s] = current;
+      if (current === 1 && before !== 1 && mine && mine.active !== false) startAlert(s);
     }
   });
   const stillFirst =
@@ -254,89 +280,113 @@ async function trackTurn() {
 function paint() {
   const ops = opsOf(sector);
   const mine = meIn(sector);
-  const meCard = document.getElementById('me-card');
-  const pulse = document.getElementById('pulse');
-  const title = document.getElementById('me-title');
-  const sub = document.getElementById('me-sub');
+  const meBox = document.getElementById('me-box');
   const list = document.getElementById('list');
   const empty = document.getElementById('empty');
   const line = document.getElementById('line');
   const who = (state && state.me && state.me.name) || 'Você';
+  const first = ops.find((op) => op.active !== false);
 
   if (!state || !state.ok) {
-    title.textContent = 'Fora da sessão';
-    sub.textContent = (state && state.message) || 'Entre na Calculadora.';
-    meCard.classList.remove('first');
-    pulse.classList.remove('on');
+    meBox.innerHTML = '<div class="empty-box">' + escapeHtml((state && state.message) || 'Entre na Calculadora para ver a fila do site.') + '</div>';
     list.innerHTML = '';
     empty.textContent = '';
+    line.textContent = 'Sem sessão';
     return;
   }
 
-  line.textContent = 'Conectado: ' + who + ' · igual ao site';
+  line.textContent = 'Conectado: ' + who + ' · mesma fila do site';
   const isFirst = !!(mine && mine.active !== false && Number(mine.position) === 1);
-  meCard.classList.toggle('first', isFirst);
-  pulse.classList.toggle('on', isFirst);
+  const isActive = !!(mine && mine.active !== false);
+  const activeCount = ops.filter((op) => op.active !== false).length;
 
   if (!mine) {
-    title.textContent = who;
-    sub.textContent = 'Fora da fila de ' + sectorLabel(sector);
-  } else if (mine.active === false) {
-    title.textContent = who + ' · pausado';
-    sub.textContent = 'Sem número — no fim da fila de ' + sectorLabel(sector);
-  } else if (isFirst) {
-    title.textContent = who + ' · é a sua vez';
-    sub.textContent = 'Posição 1 em ' + sectorLabel(sector);
+    meBox.innerHTML = '<button type="button" class="btn join-full ' + sector + '" id="btn-enter"' + (busy ? ' disabled' : '') + '>Entrar na Fila</button>';
   } else {
-    title.textContent = who + ' · posição ' + mine.position;
-    sub.textContent = 'Fila de ' + sectorLabel(sector);
+    const statusTxt = isActive ? 'Disponível' : 'Pausado';
+    const detail = isActive
+      ? ('Posição ' + mine.position + ' de ' + activeCount + ' na fila')
+      : 'Pausado no fim da fila, sem número';
+    meBox.innerHTML =
+      '<div class="me' + (isFirst ? ' first' : '') + '">' +
+        '<div class="me-left">' +
+          '<span class="dot-status' + (isActive ? ' on' : '') + '"></span>' +
+          '<div><strong>Seu status: ' + statusTxt + '</strong><em>' + escapeHtml(detail) + '</em></div>' +
+        '</div>' +
+        '<div class="me-btns">' +
+          (isFirst
+            ? '<button type="button" class="btn green" id="btn-pass"' + (busy ? ' disabled' : '') + '>Finalizar Turno (Próximo)</button>'
+            : '') +
+          '<button type="button" class="btn" id="btn-pause"' + (busy ? ' disabled' : '') + '>' + (isActive ? 'Pausar' : 'Retomar') + '</button>' +
+          '<button type="button" class="btn red" id="btn-leave"' + (busy ? ' disabled' : '') + '>Sair</button>' +
+        '</div>' +
+      '</div>' +
+      (!isFirst && first
+        ? '<p class="hint" style="margin-top:8px">Apenas ' + escapeHtml(first.name) + ' pode clicar em próximo.</p>'
+        : '');
   }
 
-  document.getElementById('btn-enter').disabled = !!mine || busy;
-  document.getElementById('btn-leave').disabled = !mine || busy;
-  document.getElementById('btn-pause').disabled = !mine || busy;
-  document.getElementById('btn-pause').textContent = mine && mine.active === false ? 'Retomar' : 'Pausar';
-  document.getElementById('btn-pass').disabled = !(mine && mine.active !== false && Number(mine.position) === 1) || busy;
+  const enter = document.getElementById('btn-enter');
+  const leave = document.getElementById('btn-leave');
+  const pause = document.getElementById('btn-pause');
+  const pass = document.getElementById('btn-pass');
+  if (enter) enter.onclick = () => run('enter');
+  if (leave) leave.onclick = () => run('leave');
+  if (pause) pause.onclick = () => run('pause');
+  if (pass) pass.onclick = () => run('pass');
 
-  list.innerHTML = ops.map((op) => {
-    const first = op.active !== false && Number(op.position) === 1;
-    const paused = op.active === false;
-    const me = state.me && String(op.userId) === String(state.me.id);
-    const pos = paused ? '—' : String(op.position || '—');
-    const tag = first ? 'SUA VEZ' : (paused ? 'PAUSADO' : '');
-    return `<div class="row${me ? ' me' : ''}${first ? ' first' : ''}${paused ? ' paused' : ''}">
-      <div class="pos">${pos}</div>
-      <div class="name">${escapeHtml(op.name || 'Operador')}</div>
-      <div class="tag${first ? ' go' : ''}${paused ? ' pause' : ''}">${tag}</div>
-    </div>`;
-  }).join('');
-  empty.textContent = ops.length ? '' : 'Ninguém nesta fila agora.';
-}
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  if (!ops.length) {
+    list.innerHTML = '';
+    empty.innerHTML = '<div class="empty-box">Fila vazia neste setor. Quem entrar no site aparece aqui na hora.</div>';
+  } else {
+    empty.textContent = '';
+    list.innerHTML = ops.map((op) => {
+      const firstRow = op.active !== false && Number(op.position) === 1;
+      const paused = op.active === false;
+      const me = state.me && String(op.userId) === String(state.me.id);
+      const pos = paused ? '—' : String(op.position || '—');
+      const tag = paused ? 'Inativo' : (firstRow ? 'VEZ' : '');
+      return '<div class="row' + (firstRow ? ' first' : '') + (paused ? ' paused' : '') + '">' +
+        '<div class="row-left">' +
+          '<div class="pos">' + pos + '</div>' +
+          '<div class="name' + (me ? ' me' : '') + (paused ? ' paused' : '') + '">' +
+            escapeHtml(op.name || 'Operador') + (me ? ' (Você)' : '') +
+          '</div>' +
+        '</div>' +
+        (tag ? '<div class="tag' + (firstRow ? ' vez' : '') + '">' + tag + '</div>' : '<span></span>') +
+      '</div>';
+    }).join('');
+  }
+  paintAlertBar();
 }
 async function refresh() {
   try {
     const data = await fetch('/fila/estado?ts=' + Date.now(), { cache: 'no-store' }).then((r) => r.json());
+    const finger = fingerprint(data);
+    const changed = finger !== lastFinger && lastFinger !== '';
+    lastFinger = finger;
     state = data;
     await trackTurn();
     paint();
+    if (changed) {
+      const panel = document.getElementById('panel');
+      panel.classList.remove('flash');
+      void panel.offsetWidth;
+      panel.classList.add('flash');
+      setTimeout(() => panel.classList.remove('flash'), 450);
+    }
     document.getElementById('status').textContent = data && data.ok
-      ? ('Atualizado · ' + new Date().toLocaleTimeString('pt-BR'))
+      ? new Date().toLocaleTimeString('pt-BR')
       : ((data && data.message) || 'Sem sessão');
   } catch (e) {
-    document.getElementById('status').textContent = 'Sem conexão com a fila.';
+    document.getElementById('status').textContent = 'Sem conexão';
   }
 }
 async function run(action) {
   if (busy) return;
   busy = true;
   paint();
-  document.getElementById('status').textContent = 'Atualizando no site...';
+  document.getElementById('status').textContent = 'Gravando no site…';
   try {
     ensureAudio();
     const res = await fetch('/fila/acao', {
@@ -347,9 +397,10 @@ async function run(action) {
     const json = await res.json();
     if (!res.ok || !json.ok) throw new Error((json && json.message) || 'Não atualizei a fila.');
     state = json;
-    trackTurn();
+    lastFinger = fingerprint(json);
+    await trackTurn();
     paint();
-    document.getElementById('status').textContent = 'Fila igual ao site · ' + new Date().toLocaleTimeString('pt-BR');
+    document.getElementById('status').textContent = 'Igual ao site · ' + new Date().toLocaleTimeString('pt-BR');
   } catch (e) {
     document.getElementById('status').textContent = e.message || 'Falha ao sincronizar.';
     await refresh();
@@ -365,13 +416,14 @@ document.querySelectorAll('.tabs button').forEach((btn) => {
     paint();
   });
 });
-document.getElementById('btn-enter').addEventListener('click', () => run('enter'));
-document.getElementById('btn-leave').addEventListener('click', () => run('leave'));
-document.getElementById('btn-pause').addEventListener('click', () => run('pause'));
-document.getElementById('btn-pass').addEventListener('click', () => run('pass'));
 document.getElementById('stop-alert').addEventListener('click', () => stopAlert());
+document.getElementById('btn-next-alert').addEventListener('click', async () => {
+  await stopAlert();
+  await run('pass');
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 refresh();
-setInterval(refresh, 2500);
+setInterval(refresh, 1000);
 </script>
 </body>
 </html>

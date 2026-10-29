@@ -1135,26 +1135,24 @@ function paintFilaAlertUi(isFirst, alerting) {
   stop.classList.toggle('on', !!(isFirst && alerting));
 }
 function openFilaNow() {
-  const ts = Date.now();
-  const url = '/fila/abrir?ts=' + ts;
-  // Título = sinal mais estável pro C# (DocumentTitleChanged).
-  try { document.title = 'dfs:fila:' + ts; } catch (_) {}
+  // Um sinal só: abre OU recolhe a janela da fila.
+  let toggled = false;
   try {
     const host = window.chrome && window.chrome.webview && window.chrome.webview.hostObjects;
     if (host && host.sync && host.sync.dfs && typeof host.sync.dfs.AbrirFila === 'function') {
       host.sync.dfs.AbrirFila();
+      toggled = true;
     } else if (host && host.dfs && host.dfs.AbrirFila) {
       Promise.resolve(host.dfs.AbrirFila()).catch(() => {});
+      toggled = true;
     }
   } catch (_) {}
-  // Arquivo + watch no C# (Node grava fila-abrir.json).
-  try {
-    fetch(url, { method: 'POST', cache: 'no-store' }).catch(() => {});
-  } catch (_) {}
-  const payload = JSON.stringify({ kind: 'fila', t: ts });
+  if (toggled) return;
+  const ts = Date.now();
+  try { document.title = 'dfs:fila:' + ts; } catch (_) {}
   const bridge = window.chrome && window.chrome.webview;
   if (bridge && typeof bridge.postMessage === 'function') {
-    try { bridge.postMessage(payload); } catch (_) {}
+    try { bridge.postMessage(JSON.stringify({ kind: 'fila-toggle', t: ts })); } catch (_) {}
   }
 }
 document.getElementById('open-fila').addEventListener('click', () => {
