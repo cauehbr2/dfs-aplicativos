@@ -1,43 +1,43 @@
-﻿{
-    "calculadora":  {
-                        "version":  "1.0.39",
-                        "files":  [
-                                      "app-versao.txt",
-                                      "budget-templates.json",
-                                      "Calculadora.deps.json",
-                                      "Calculadora.dll",
-                                      "Calculadora.exe",
-                                      "calculadora.html",
-                                      "Calculadora.runtimeconfig.json",
-                                      "calculadora-app.mjs",
-                                      "elite-cpa-logo-4.png",
-                                      "Microsoft.Web.WebView2.Core.dll",
-                                      "Microsoft.Web.WebView2.WinForms.dll",
-                                      "Microsoft.Web.WebView2.Wpf.dll",
-                                      "runtimes/win-x64/native/WebView2Loader.dll",
-                                      "WebView2Loader.dll",
-                                      "fila.html"
-                                  ]
-                    },
-    "operacoes":  {
-                      "version":  "1.0.19",
-                      "files":  [
-                                    "app-versao.txt",
-                                    "contas-operacoes.html",
-                                    "operacoes-app.mjs",
-                                    "painel-cartao.js",
-                                    "elite-cpa-logo-4.png",
-                                    "icone.ico",
-                                    "icone.png",
-                                    "Operacoes.exe",
-                                    "Operacoes.dll",
-                                    "Operacoes.deps.json",
-                                    "Operacoes.runtimeconfig.json",
-                                    "Microsoft.Web.WebView2.Core.dll",
-                                    "Microsoft.Web.WebView2.WinForms.dll",
-                                    "Microsoft.Web.WebView2.Wpf.dll",
-                                    "WebView2Loader.dll",
-                                    "runtimes/win-x64/native/WebView2Loader.dll"
-                                ]
-                  }
+{
+    "calculadora": {
+        "version": "1.0.112",
+        "files": [
+            "app-versao.txt",
+            "budget-templates.json",
+            "Calculadora.deps.json",
+            "Calculadora.dll",
+            "Calculadora.exe",
+            "calculadora.html",
+            "Calculadora.runtimeconfig.json",
+            "calculadora-app.mjs",
+            "elite-cpa-logo-4.png",
+            "Microsoft.Web.WebView2.Core.dll",
+            "Microsoft.Web.WebView2.WinForms.dll",
+            "Microsoft.Web.WebView2.Wpf.dll",
+            "runtimes/win-x64/native/WebView2Loader.dll",
+            "WebView2Loader.dll",
+            "fila.html"
+        ]
+    },
+    "operacoes": {
+        "version": "1.0.50",
+        "files": [
+            "app-versao.txt",
+            "contas-operacoes.html",
+            "operacoes-app.mjs",
+            "painel-cartao.js",
+            "elite-cpa-logo-4.png",
+            "icone.ico",
+            "icone.png",
+            "Operacoes.exe",
+            "Operacoes.dll",
+            "Operacoes.deps.json",
+            "Operacoes.runtimeconfig.json",
+            "Microsoft.Web.WebView2.Core.dll",
+            "Microsoft.Web.WebView2.WinForms.dll",
+            "Microsoft.Web.WebView2.Wpf.dll",
+            "WebView2Loader.dll",
+            "runtimes/win-x64/native/WebView2Loader.dll"
+        ]
+    }
 }

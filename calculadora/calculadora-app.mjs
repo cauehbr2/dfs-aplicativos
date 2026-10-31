@@ -2,7 +2,7 @@ import fs from 'fs';
 import http from 'http';
 import https from 'https';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const codeDir = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.DFS_DATA_DIR || path.join(codeDir, 'dados');
@@ -12,10 +12,66 @@ const sessionFile = path.join(dataDir, 'painel-sessao.json');
 const siteFile = path.join(dataDir, 'painel-site.json');
 const alertFile = path.join(dataDir, 'fila-alerta.json');
 const openFilaFile = path.join(dataDir, 'fila-abrir.json');
-const htmlFile = path.join(codeDir, 'calculadora.html');
-const filaFile = path.join(codeDir, 'fila.html');
-const versionFile = path.join(codeDir, 'app-versao.txt');
+const queueStateFile = path.join(dataDir, 'fila-estado-cache.json');
+const queuePendingFile = path.join(dataDir, 'fila-pendente.json');
+const versionFile = [
+  path.join(codeDir, 'app-versao-calculadora.txt'),
+  path.join(codeDir, 'app-versao.txt'),
+].find((file) => fs.existsSync(file)) || path.join(codeDir, 'app-versao-calculadora.txt');
 const templatesFile = path.join(codeDir, 'budget-templates.json');
+const logoFile = path.join(codeDir, 'elite-cpa-logo-4.png');
+const sealJs = fs.existsSync(path.join(codeDir, 'ui-seal.mjs'))
+  ? path.join(codeDir, 'ui-seal.mjs')
+  : path.join(codeDir, '..', 'ui-seal.mjs');
+const { loadUi } = await import(pathToFileURL(sealJs).href);
+function uiHtml(name) {
+  let html = loadUi(codeDir, name);
+  html = Buffer.isBuffer(html) ? html.toString('utf8') : String(html || '');
+  html = html
+    .replace(/Criado por\s*Cau[eêé](?:\s*BR)?/gi, 'Criado por Cauehbr')
+    .replace(/Criado por\s*Kau[eêéiíy]+(?:\s*BR)?/gi, 'Criado por Cauehbr');
+  if (!html.includes('id="dfs-credit-fix"')) {
+    html = html.replace(/<\/body>/i, `<script id="dfs-credit-fix">
+(function () {
+  function fixCredit() {
+    var credit = document.querySelector('.credit');
+    if (!credit) return;
+    var ver = document.getElementById('app-version');
+    if (!ver) {
+      ver = document.createElement('span');
+      ver.className = 'app-version';
+      ver.id = 'app-version';
+      credit.insertBefore(ver, credit.firstChild);
+    }
+    var nameEl = null;
+    Array.prototype.forEach.call(credit.querySelectorAll('span'), function (span) {
+      if (span.id === 'app-version') return;
+      if (/Criado por|Cau|Kau/i.test(span.textContent || '')) nameEl = span;
+    });
+    if (!nameEl) {
+      nameEl = document.createElement('span');
+      credit.appendChild(nameEl);
+    }
+    nameEl.textContent = 'Criado por Cauehbr';
+    fetch('/app/versao', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var version = String((data && data.version) || '').trim();
+        ver.textContent = version ? ('Versão ' + version) : 'Versão —';
+      })
+      .catch(function () {
+        if (!/^Versão\\s/.test(ver.textContent || '')) ver.textContent = 'Versão —';
+      });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fixCredit);
+  else fixCredit();
+  setTimeout(fixCredit, 400);
+  setTimeout(fixCredit, 1200);
+})();
+</script></body>`);
+  }
+  return html;
+}
 const defaultOrigin = 'https://renovanow.online';
 const port = 8765;
 function loadBudgetTemplates() {
@@ -87,12 +143,42 @@ function panelOrigin(value) {
     return '';
   }
 }
+function machineId() {
+  const fromEnv = String(process.env.DFS_MACHINE_ID || '').trim();
+  if (fromEnv) return fromEnv;
+  try {
+    return String(fs.readFileSync(path.join(dataDir, 'pc-id.txt'), 'utf8') || '').trim();
+  } catch (e) {
+    return '';
+  }
+}
+function forgetLocalAuth() {
+  try { fs.unlinkSync(sessionFile); } catch (e) {}
+  try { fs.unlinkSync(catalogFile); } catch (e) {}
+  try { fs.unlinkSync(queueStateFile); } catch (e) {}
+  try { fs.unlinkSync(queuePendingFile); } catch (e) {}
+}
 function readSession() {
-  try { return JSON.parse(fs.readFileSync(sessionFile, 'utf8')); } catch (e) { return null; }
+  try {
+    const session = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
+    if (!session || !session.token || !session.userId) return null;
+    const mid = machineId();
+    // Sem id deste PC (não abriu pelo exe) ou sessão de outro computador: não libera offline.
+    if (!mid || !session.machineId || session.machineId !== mid) {
+      forgetLocalAuth();
+      return null;
+    }
+    return session;
+  } catch (e) {
+    return null;
+  }
 }
 function writeSession(session) {
+  const mid = machineId();
+  if (!mid) throw new Error('Abra pelo aplicativo instalado neste computador.');
+  const next = { ...(session || {}), machineId: mid };
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(sessionFile, JSON.stringify(session));
+  fs.writeFileSync(sessionFile, JSON.stringify(next));
 }
 function publicSession(session) {
   if (!session || !session.token || !session.userId) return { ok: false };
@@ -331,8 +417,10 @@ async function pullCatalog(session) {
   const budget = {
     templateIdContas: String(budgetDoc.templateIdContas || packed.defaults.CONTAS || 'contas-formal'),
     templateIdMontante: String(budgetDoc.templateIdMontante || packed.defaults.MONTANTE || 'montante-formal'),
+    templateIdMultiplo: String(budgetDoc.templateIdMultiplo || packed.defaults.MULTIPLO || 'multi-formal'),
     messageContas: String(budgetDoc.messageContas || ''),
     messageMontante: String(budgetDoc.messageMontante || ''),
+    messageMultiplo: String(budgetDoc.messageMultiplo || ''),
     templateBodies: budgetDoc.templateBodies && typeof budgetDoc.templateBodies === 'object' ? budgetDoc.templateBodies : {},
     templates: packed.templates || {},
     defaults: packed.defaults || {},
@@ -392,10 +480,16 @@ async function pullCatalog(session) {
       synced: pixOk,
     },
   };
-  fs.mkdirSync(dataDir, { recursive: true });
-  // Regrava o catálogo inteiro: chave local a mais some; a que faltava entra.
-  try { fs.unlinkSync(catalogFile); } catch (e) {}
-  fs.writeFileSync(catalogFile, JSON.stringify(catalog));
+  const hasUseful =
+    (catalog.ranges && catalog.ranges.length) ||
+    (catalog.rates && catalog.rates.length) ||
+    (catalog.pix && catalog.pix.length);
+  // Site em manutenção às vezes devolve vazio — não apaga o cadastro bom deste PC.
+  if (hasUseful) {
+    fs.mkdirSync(dataDir, { recursive: true });
+    try { fs.unlinkSync(catalogFile); } catch (e) {}
+    fs.writeFileSync(catalogFile, JSON.stringify(catalog));
+  }
   return catalog;
 }
 
@@ -515,29 +609,103 @@ async function appendQueueLog(session, payload) {
     });
   } catch (e) {}
 }
-async function loadQueueState(session) {
-  const [settingsDoc, contasDoc, montanteDoc] = await Promise.all([
-    readDoc(session, 'queueSettings', 'global'),
-    readDoc(session, 'queueSectors', 'contas'),
-    readDoc(session, 'queueSectors', 'montante'),
-  ]);
-  const resetTime = (settingsDoc && settingsDoc.resetTime) || '00:00';
-  const lastResetAt = settingsDoc && settingsDoc.lastResetAt;
-  const contas = filterActiveCycleQueueOperators((contasDoc && contasDoc.operators) || [], resetTime, lastResetAt);
-  const montante = filterActiveCycleQueueOperators((montanteDoc && montanteDoc.operators) || [], resetTime, lastResetAt);
+function readQueueStateCache() {
+  try {
+    return JSON.parse(fs.readFileSync(queueStateFile, 'utf8'));
+  } catch (e) {
+    return null;
+  }
+}
+function writeQueueStateCache(state) {
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(queueStateFile, JSON.stringify(state));
+  } catch (e) {}
+}
+function readQueuePending() {
+  try {
+    const data = JSON.parse(fs.readFileSync(queuePendingFile, 'utf8'));
+    return Array.isArray(data.items) ? data.items : [];
+  } catch (e) {
+    return [];
+  }
+}
+function writeQueuePending(items) {
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(queuePendingFile, JSON.stringify({ items: items || [] }));
+  } catch (e) {}
+}
+function queueStateFromOps(session, contas, montante, meta) {
   const meId = String(session.userId || '');
-  const meContas = contas.find((op) => String(op.userId) === meId) || null;
-  const meMontante = montante.find((op) => String(op.userId) === meId) || null;
+  const contasOps = Array.isArray(contas) ? contas : [];
+  const montanteOps = Array.isArray(montante) ? montante : [];
   return {
     ok: true,
     me: { id: meId, name: session.name || '' },
-    resetTime,
-    lastResetAt: lastResetAt || '',
-    contas,
-    montante,
-    meContas,
-    meMontante,
+    resetTime: (meta && meta.resetTime) || '00:00',
+    lastResetAt: (meta && meta.lastResetAt) || '',
+    lastResetType: (meta && meta.lastResetType) || '',
+    contas: contasOps,
+    montante: montanteOps,
+    meContas: contasOps.find((op) => String(op.userId) === meId) || null,
+    meMontante: montanteOps.find((op) => String(op.userId) === meId) || null,
   };
+}
+async function loadQueueState(session) {
+  try {
+    const [settingsDoc, contasDoc, montanteDoc] = await Promise.all([
+      readDoc(session, 'queueSettings', 'global'),
+      readDoc(session, 'queueSectors', 'contas'),
+      readDoc(session, 'queueSectors', 'montante'),
+    ]);
+    const resetTime = (settingsDoc && settingsDoc.resetTime) || '00:00';
+    const lastResetAt = settingsDoc && settingsDoc.lastResetAt;
+    const lastResetType = (settingsDoc && settingsDoc.lastResetType) || '';
+    const contas = filterActiveCycleQueueOperators((contasDoc && contasDoc.operators) || [], resetTime, lastResetAt);
+    const montante = filterActiveCycleQueueOperators((montanteDoc && montanteDoc.operators) || [], resetTime, lastResetAt);
+    const state = queueStateFromOps(session, contas, montante, { resetTime, lastResetAt, lastResetType });
+    writeQueueStateCache(state);
+    return state;
+  } catch (e) {
+    const cached = readQueueStateCache();
+    if (cached && cached.ok) {
+      return { ...cached, offline: true, message: 'Site fora do ar — fila do último estado neste PC.' };
+    }
+    throw e;
+  }
+}
+async function flushQueuePending(session) {
+  const items = readQueuePending();
+  if (!items.length) return;
+  const left = [];
+  for (const item of items) {
+    try {
+      await writeQueueSector(session, item.sectorId, item.operators, item.updatedBy);
+      if (item.log) await appendQueueLog(session, item.log);
+    } catch (e) {
+      left.push(item);
+    }
+  }
+  writeQueuePending(left);
+}
+async function loadQueueAlertSettings(session) {
+  const user = await readDoc(session, 'users', String(session.userId || ''));
+  return (user && user.queueAlertSettings) || null;
+}
+async function saveQueueAlertSettings(session, settings) {
+  const res = await panelRequest('write', {
+    op: 'set',
+    collection: 'users',
+    id: String(session.userId || ''),
+    data: { queueAlertSettings: settings },
+    merge: true,
+    dfs_token: session.token,
+  });
+  if (res.status >= 400) {
+    throw new Error((res.json && res.json.message) || 'Não gravei a configuração do toque.');
+  }
+  return settings;
 }
 async function queueAction(session, action, sector) {
   const sectorId = sector === 'montante' ? 'montante' : 'contas';
@@ -547,8 +715,15 @@ async function queueAction(session, action, sector) {
   const meId = String(session.userId || '');
   const meName = String(session.name || 'Operador');
   if (!meId) throw new Error('Entre de novo para usar a fila.');
-  const state = await loadQueueState(session);
-  let ops = sectorId === 'contas' ? state.contas.slice() : state.montante.slice();
+  let state;
+  try {
+    state = await loadQueueState(session);
+  } catch (e) {
+    const cached = readQueueStateCache();
+    if (!cached || !cached.ok) throw e;
+    state = { ...cached, offline: true };
+  }
+  let ops = sectorId === 'contas' ? (state.contas || []).slice() : (state.montante || []).slice();
   const todayStr = localDateString();
   const nowIso = new Date().toISOString();
   let logAction = action;
@@ -556,7 +731,7 @@ async function queueAction(session, action, sector) {
 
   if (action === 'enter') {
     if (ops.some((op) => String(op.userId) === meId)) {
-      return { ok: true, already: true, ...(await loadQueueState(session)) };
+      return { ok: true, already: true, ...state };
     }
     ops = insertAtActiveEnd(ops, {
       userId: meId,
@@ -592,8 +767,7 @@ async function queueAction(session, action, sector) {
     logAction = 'pass';
   }
 
-  await writeQueueSector(session, sectorId, ops, meName);
-  await appendQueueLog(session, {
+  const log = {
     sector: sectorId,
     action: logAction,
     operatorId: meId,
@@ -601,8 +775,34 @@ async function queueAction(session, action, sector) {
     actorId: meId,
     actorName: meName,
     note,
-  });
-  return { ok: true, ...(await loadQueueState(session)) };
+  };
+  const nextContas = sectorId === 'contas' ? ops : (state.contas || []);
+  const nextMontante = sectorId === 'montante' ? ops : (state.montante || []);
+  const localState = queueStateFromOps(session, nextContas, nextMontante, state);
+  writeQueueStateCache(localState);
+
+  try {
+    await writeQueueSector(session, sectorId, ops, meName);
+    await appendQueueLog(session, log);
+    try { await flushQueuePending(session); } catch (e) {}
+    return { ok: true, ...(await loadQueueState(session)) };
+  } catch (e) {
+    const pending = readQueuePending();
+    pending.push({
+      sectorId,
+      operators: ops,
+      updatedBy: meName,
+      log,
+      at: Date.now(),
+    });
+    writeQueuePending(pending);
+    return {
+      ok: true,
+      offline: true,
+      message: 'Site fora do ar — ação ficou neste PC e sobe quando voltar.',
+      ...localState,
+    };
+  }
 }
 function sendJson(res, status, payload) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -676,8 +876,66 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url === '/painel/sair' && req.method === 'POST') {
-    try { fs.unlinkSync(sessionFile); } catch (e) {}
+    forgetLocalAuth();
     sendJson(res, 200, { ok: true });
+    return;
+  }
+  if (url === '/painel/usar' && req.method === 'POST') {
+    readBody(req).then(async (body) => {
+      const token = String(body.token || '').trim();
+      if (!token) {
+        sendJson(res, 400, { message: 'A sessão do painel não veio.' });
+        return;
+      }
+      try {
+        const me = await panelRequest('auth/me', { dfs_token: token });
+        const json = me.json || {};
+        const profile = json.profile || {};
+        const auth = json.auth || {};
+        if (me.status >= 400 || !(auth.uid || profile.id)) {
+          sendJson(res, me.status >= 400 ? me.status : 401, { message: json.message || 'A sessão do painel não valeu.' });
+          return;
+        }
+        const links = Array.isArray(profile.companyLinks) ? profile.companyLinks : [];
+        const link = links.find((item) => item && item.companyId && item.companyId === profile.companyId) || links[0] || null;
+        let companyId = String(profile.companyId || (link && link.companyId) || '').trim();
+        let companyName = (link && (link.companyName || link.name)) || profile.companyName || '';
+        const slug = companySlug(readSavedLink()) || String(readSite().companySlug || '').trim() || 'elite';
+        if (slug) {
+          try {
+            const companyRes = await panelRequest('query', {
+              collection: 'companies',
+              filters: [{ field: 'loginSlug', op: '==', value: slug }],
+              limit: 1,
+              dfs_token: token,
+            });
+            let company = rowsOf(companyRes)[0];
+            if (!company) {
+              const all = await panelRequest('query', { collection: 'companies', limit: 0, dfs_token: token });
+              company = rowsOf(all).find((item) => companySlug(item.loginSlug || '') === slug) || null;
+            }
+            if (company && company.id) {
+              companyId = String(company.id);
+              companyName = String(company.name || company.nome || companyName);
+            }
+          } catch (e) {}
+        }
+        writeSession({
+          token,
+          userId: auth.uid || profile.id || '',
+          name: auth.displayName || profile.name || '',
+          email: auth.email || '',
+          companyId,
+          companyName,
+          companySlug: slug,
+        });
+        const session = readSession();
+        try { await pullCatalog(session); } catch (e) {}
+        sendJson(res, 200, publicSession(readSession() || session));
+      } catch (e) {
+        sendJson(res, 502, { message: 'Não consegui falar com o painel.' });
+      }
+    }).catch(() => sendJson(res, 400, { message: 'Não li a sessão.' }));
     return;
   }
   if (url === '/painel/entrar' && req.method === 'POST') {
@@ -694,6 +952,7 @@ const server = http.createServer((req, res) => {
           password: String(body.password || ''),
           companySlug: slug,
           recaptchaToken: String(body.recaptchaToken || ''),
+          desktopApp: true,
         });
         const json = result.json || {};
         if (result.status >= 400 || !json.token) {
@@ -753,7 +1012,11 @@ const server = http.createServer((req, res) => {
         const cached = JSON.parse(fs.readFileSync(catalogFile, 'utf8'));
         // Só reaproveita cache da mesma empresa — senão apaga Pix velho.
         if (cached && cached.ok && String(cached.companyId || '') === companyId) {
-          sendJson(res, 200, cached);
+          sendJson(res, 200, {
+            ...cached,
+            offline: true,
+            message: 'Site fora do ar — usando o último cadastro deste PC.',
+          });
           return;
         }
       } catch (e) {}
@@ -778,12 +1041,23 @@ const server = http.createServer((req, res) => {
   }
   if ((url === '/' || url === '/calculadora.html') && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end(fs.readFileSync(htmlFile));
+    res.end(uiHtml('calculadora'));
     return;
   }
   if ((url === '/fila' || url === '/fila.html') && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end(fs.readFileSync(filaFile));
+    res.end(uiHtml('fila'));
+    return;
+  }
+  if ((url === '/logo.png' || url === '/elite-cpa-logo-4.png') && req.method === 'GET') {
+    try {
+      const buf = fs.readFileSync(logoFile);
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' });
+      res.end(buf);
+    } catch (e) {
+      res.writeHead(404);
+      res.end();
+    }
     return;
   }
   if (url === '/fila/abrir' && (req.method === 'POST' || req.method === 'GET')) {
@@ -825,9 +1099,22 @@ const server = http.createServer((req, res) => {
       sendJson(res, 200, { ok: false, message: 'Entre na Calculadora para ver a fila.' });
       return;
     }
-    loadQueueState(session)
+    flushQueuePending(session)
+      .catch(() => {})
+      .then(() => loadQueueState(session))
       .then((state) => sendJson(res, 200, state))
-      .catch(() => sendJson(res, 502, { ok: false, message: 'Não li a fila do site.' }));
+      .catch(() => {
+        const cached = readQueueStateCache();
+        if (cached && cached.ok) {
+          sendJson(res, 200, {
+            ...cached,
+            offline: true,
+            message: 'Site fora do ar — fila do último estado neste PC.',
+          });
+          return;
+        }
+        sendJson(res, 502, { ok: false, message: 'Não li a fila do site.' });
+      });
     return;
   }
   if (url === '/fila/acao' && req.method === 'POST') {
@@ -844,6 +1131,34 @@ const server = http.createServer((req, res) => {
         sendJson(res, 400, { ok: false, message: e.message || 'Não atualizei a fila.' });
       }
     }).catch(() => sendJson(res, 400, { ok: false, message: 'Não li a ação da fila.' }));
+    return;
+  }
+  if (url === '/fila/config' && req.method === 'GET') {
+    const session = readSession();
+    if (!session || !session.token) {
+      sendJson(res, 200, { ok: false, message: 'Entre na Calculadora para ver a configuração.' });
+      return;
+    }
+    loadQueueAlertSettings(session)
+      .then((settings) => sendJson(res, 200, { ok: true, settings: settings || null, meId: String(session.userId || '') }))
+      .catch(() => sendJson(res, 502, { ok: false, message: 'Não li a configuração do toque.' }));
+    return;
+  }
+  if (url === '/fila/config' && req.method === 'POST') {
+    const session = readSession();
+    if (!session || !session.token) {
+      sendJson(res, 401, { ok: false, message: 'Entre na Calculadora para salvar a configuração.' });
+      return;
+    }
+    readBody(req).then(async (body) => {
+      try {
+        const settings = body && body.settings ? body.settings : body;
+        await saveQueueAlertSettings(session, settings);
+        sendJson(res, 200, { ok: true, settings });
+      } catch (e) {
+        sendJson(res, 400, { ok: false, message: e.message || 'Não gravei a configuração do toque.' });
+      }
+    }).catch(() => sendJson(res, 400, { ok: false, message: 'Não li a configuração do toque.' }));
     return;
   }
   res.writeHead(404);

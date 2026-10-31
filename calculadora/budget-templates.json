@@ -1,7 +1,8 @@
 {
   "defaults": {
     "CONTAS": "contas-formal",
-    "MONTANTE": "montante-formal"
+    "MONTANTE": "montante-formal",
+    "MULTIPLO": "multi-formal"
   },
   "templates": {
     "contas-classico": {
@@ -67,6 +68,18 @@
     "montante-detalhado": {
       "kind": "MONTANTE",
       "body": "📊 Resumo do Montante\r\n\r\n🏦 Pagamento\r\nPix {{tipoPix}}: \\`\\`\\`{{chavePix}}\\`\\`\\`\r\n{{nomeTitular}} — {{banco}}\r\n\r\n📈 Valores\r\n• Montante base: R$ {{montante}}\r\n• Contas no pacote: {{qtdContas}}\r\n• Taxa de serviço: {{taxa}}%\r\n• Desconto: {{desconto}}%\r\n\r\n🎯 *A pagar: R$ {{valorFinal}}*"
+    },
+    "multi-formal": {
+      "kind": "MULTIPLO",
+      "body": "💬 *ORÇAMENTO MÚLTIPLO*\r\n\r\nChave Pix - {{tipoPix}}\r\nChave: \\`\\`\\`{{chavePix}}\\`\\`\\`\r\nNome: {{nomeTitular}}\r\nBanco: {{banco}}\r\n\r\n{{itemsBody}}\r\n\r\n✅ *Total: R$ {{totalGeral}}*\r\n\r\n*MARCAR ESTA MENSAGEM COM O COMPROVANTE*"
+    },
+    "multi-classico": {
+      "kind": "MULTIPLO",
+      "body": "📋 --- ORÇAMENTO MÚLTIPLO ---\r\nChave Pix - {{tipoPix}}\r\nChave : \\`\\`\\`{{chavePix}}\\`\\`\\`\r\nNome: {{nomeTitular}}\r\nBanco: {{banco}}\r\n\r\n{{itemsBody}}\r\n\r\n💰 TOTAL GERAL: R$ {{totalGeral}}"
+    },
+    "multi-whatsapp": {
+      "kind": "MULTIPLO",
+      "body": "💬 *Orçamento Múltiplo* ({{itemCount}} itens)\r\n\r\n🔑 Pix ({{tipoPix}}):\r\n\\`\\`\\`{{chavePix}}\\`\\`\\`\r\n👤 {{nomeTitular}} · 🏦 {{banco}}\r\n\r\n{{itemsBody}}\r\n\r\n✅ *TOTAL GERAL: R$ {{totalGeral}}*\r\nQualquer dúvida é só chamar 🙌"
     }
   }
 }

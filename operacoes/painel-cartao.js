@@ -1,5 +1,12 @@
 (function () {
   if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+  // No login do site: não mostra o cartão Operações.
+  var hash = String(location.hash || '').toLowerCase();
+  if (hash.indexOf('/login') >= 0 || hash.indexOf('/register') >= 0 || hash.indexOf('/reset-password') >= 0) {
+    var stuck = document.getElementById('dfs-enviar-programa');
+    if (stuck && stuck.parentNode) stuck.parentNode.removeChild(stuck);
+    return;
+  }
   if (!document.body) {
     document.addEventListener('DOMContentLoaded', function () {
       if (window.dfsMontarCartao) window.dfsMontarCartao();
@@ -7,6 +14,12 @@
   }
   window.dfsMontarCartao = function () {
   if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+  var h = String(location.hash || '').toLowerCase();
+  if (h.indexOf('/login') >= 0 || h.indexOf('/register') >= 0 || h.indexOf('/reset-password') >= 0) {
+    var old = document.getElementById('dfs-enviar-programa');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    return;
+  }
   if (!document.body) return;
   if (document.getElementById('dfs-enviar-programa')) return;
   var box = document.createElement('div');
@@ -16,7 +29,7 @@
     + '<p id="dfs-enviar-hint" style="margin:0 0 10px;color:#a1a1aa;font-size:13px;line-height:1.4">Escolha o dia. Cada operação entra com a data e o horário do programa.</p>'
     + '<select id="dfs-enviar-dia" style="width:100%;margin:0 0 10px;padding:8px 10px;border-radius:8px;border:1px solid #3f3f46;background:#09090b;color:#fafafa;font:14px Segoe UI,sans-serif"></select>'
     + '<button id="dfs-enviar-go" type="button" style="width:100%;padding:10px 12px;border:0;border-radius:10px;background:#34d399;color:#052e16;font:700 14px Segoe UI,sans-serif;cursor:pointer">Enviar</button>'
-    + '<p id="dfs-enviar-status" style="margin:10px 0 0;min-height:18px;color:#a1a1aa;font-size:13px"></p>';
+    + '<p id="dfs-enviar-status" style="margin:10px 0 0;min-height:18px;color:#a1a1aa;font:13px Segoe UI,sans-serif"></p>';
   box.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;width:360px;padding:16px;border:1px solid #34d399;border-radius:16px;background:#18181b;color:#fafafa;font:14px Segoe UI,sans-serif;box-shadow:0 16px 40px rgba(0,0,0,.45)';
   (document.body || document.documentElement).appendChild(box);
   window.dfsSetDias = function (days) {

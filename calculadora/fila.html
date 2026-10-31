@@ -3,153 +3,347 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Fila</title>
+<title>Fila Operacional</title>
 <style>
-  :root { --bg:#09090b; --panel:#111113; --line:#27272a; --muted:#a1a1aa; --text:#fafafa; --emerald:#34d399; --blue:#2563eb; }
+  :root {
+    --bg:#09090b; --panel:#0c0c0e; --line:#27272a; --muted:#a1a1aa; --text:#fafafa;
+    --emerald:#34d399; --emerald2:#10b981; --blue:#2563eb; --zinc800:#27272a; --zinc900:#18181b;
+  }
   * { box-sizing:border-box; }
   html, body { height:100%; overflow:hidden; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:"Segoe UI", system-ui, sans-serif; }
-  .wrap { height:100%; padding:12px; display:flex; flex-direction:column; gap:10px; }
-  .head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
-  h1 { margin:0; font-size:18px; font-weight:800; }
-  .sub { margin:4px 0 0; color:var(--muted); font-size:11px; line-height:1.35; }
-  .live {
-    display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px;
-    border:1px solid rgba(52,211,153,.35); background:rgba(52,211,153,.08);
-    color:var(--emerald); font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+  button, input, select { font:inherit; color:inherit; }
+  button { cursor:pointer; }
+  *::-webkit-scrollbar { width:8px; height:8px; }
+  *::-webkit-scrollbar-track { background:transparent; }
+  *::-webkit-scrollbar-thumb {
+    background:#3f3f46; border-radius:999px; border:2px solid transparent; background-clip:padding-box;
   }
-  .live .dot { width:7px; height:7px; border-radius:50%; background:var(--emerald); animation:pulse 1.2s ease-out infinite; }
-  @keyframes pulse {
-    0% { box-shadow:0 0 0 0 rgba(52,211,153,.55); }
-    70% { box-shadow:0 0 0 8px rgba(52,211,153,0); }
-    100% { box-shadow:0 0 0 0 rgba(52,211,153,0); }
+  *::-webkit-scrollbar-thumb:hover { background:#52525b; border:2px solid transparent; background-clip:padding-box; }
+  *::-webkit-scrollbar-corner { background:transparent; }
+  .shell {
+    height:100%; display:flex; flex-direction:column; overflow:hidden;
+    background:rgba(9,9,11,.98); border:0;
   }
-  .tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  button { font:inherit; color:inherit; cursor:pointer; }
+  .toolbar {
+    display:flex; align-items:center; gap:6px; padding:5px 8px;
+    background:#18181b; border-bottom:1px solid rgba(39,39,42,.8); flex-shrink:0;
+  }
+  .tabs {
+    display:flex; gap:4px; flex:1; min-width:0; padding:0; background:transparent; border:0;
+  }
   .tabs button {
-    height:38px; border-radius:12px; border:1px solid var(--line); background:#18181b;
-    font-weight:800; font-size:12px; letter-spacing:.04em; text-transform:uppercase;
+    flex:1; height:28px; border-radius:8px; border:1px solid transparent; background:transparent;
+    color:#a1a1aa; font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+    display:inline-flex; align-items:center; justify-content:center; gap:5px;
   }
-  .tabs button.on.contas { background:#059669; border-color:transparent; color:#fff; }
-  .tabs button.on.montante { background:var(--blue); border-color:transparent; color:#fff; }
-  .alert-bar {
-    display:none; flex-direction:column; gap:8px; padding:10px 12px; border-radius:14px;
-    border:1px solid rgba(239,68,68,.4); background:rgba(239,68,68,.12);
+  .tabs button svg { width:12px; height:12px; }
+  .tabs button.on.contas {
+    background:rgba(16,185,129,.15); border-color:rgba(16,185,129,.2); color:#34d399;
   }
-  .alert-bar.on { display:flex; }
-  .alert-bar strong { color:#fecaca; font-size:12px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
-  .alert-bar span { color:#e4e4e7; font-size:11px; font-weight:700; }
-  .alert-actions { display:flex; gap:8px; flex-wrap:wrap; }
-  .panel {
-    flex:1; min-height:0; overflow:auto; background:var(--panel); border:1px solid var(--line);
-    border-radius:16px; padding:12px; display:flex; flex-direction:column; gap:12px;
-    transition: box-shadow .25s ease, border-color .25s ease;
+  .tabs button.on.montante {
+    background:rgba(37,99,235,.15); border-color:rgba(37,99,235,.25); color:#93c5fd;
   }
-  .panel.flash { border-color:rgba(52,211,153,.55); box-shadow:0 0 0 1px rgba(52,211,153,.25) inset; }
-  .me {
-    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
-    padding:12px; border-radius:14px; border:1px solid #3f3f46; background:#18181b;
+  .head-actions { display:flex; align-items:center; gap:4px; flex-shrink:0; }
+  .icon-btn {
+    width:28px; height:28px; border-radius:8px; border:1px solid #3f3f46;
+    background:#27272a; color:#d4d4d8; display:grid; place-items:center; padding:0;
   }
-  .me.first { border-color:rgba(52,211,153,.35); background:rgba(16,185,129,.08); }
-  .me-left { display:flex; align-items:center; gap:10px; min-width:0; }
-  .dot-status { width:8px; height:8px; border-radius:50%; background:#52525b; flex-shrink:0; }
-  .dot-status.on { background:var(--emerald); animation:pulse 1.2s ease-out infinite; }
-  .me strong { display:block; font-size:12px; }
-  .me em { display:block; margin-top:2px; font-style:normal; color:var(--muted); font-size:10px; font-weight:700; }
-  .me-btns { display:flex; gap:6px; flex-wrap:wrap; }
+  .icon-btn:hover { color:#fff; border-color:#52525b; }
+  .icon-btn.on { border-color:rgba(52,211,153,.45); color:var(--emerald); background:rgba(16,185,129,.12); }
+  .icon-btn.mute { color:#71717a; border-color:#27272a; }
+  .body {
+    flex:1; min-height:0; overflow:auto; padding:10px; display:flex; flex-direction:column; gap:8px;
+    scrollbar-width:thin; scrollbar-color:#3f3f46 transparent;
+  }
+  .body.flash { box-shadow:inset 0 0 0 1px rgba(52,211,153,.35); }
+  #live-view, #config-view {
+    display:flex; flex-direction:column; gap:8px; min-height:0;
+  }
+  .card {
+    background:rgba(24,24,27,.55); border:1px solid rgba(39,39,42,.8); border-radius:12px; padding:8px;
+  }
+  .reset-card { padding:6px 8px; }
+  .reset-row { display:flex; align-items:flex-start; gap:6px; }
+  .reset-ico {
+    width:18px; height:18px; border-radius:6px; background:#27272a; border:1px solid #3f3f46;
+    display:grid; place-items:center; color:var(--emerald); flex-shrink:0;
+  }
+  .reset-title {
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+    font-size:9px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:#e4e4e7;
+  }
+  .badge {
+    font-size:8px; font-family:ui-monospace, Consolas, monospace; font-weight:700;
+    padding:1px 5px; border-radius:5px; background:rgba(16,185,129,.1); color:var(--emerald);
+    border:1px solid rgba(16,185,129,.2);
+  }
+  .reset-sub {
+    margin-top:1px; font-size:8px; color:#71717a; line-height:1.3;
+  }
+  .next-card {
+    padding:10px; border-radius:12px; border:1px solid #27272a; background:rgba(24,24,27,.8);
+  }
+  .next-card.mine {
+    border-color:rgba(16,185,129,.4); background:rgba(16,185,129,.1); color:#6ee7b7;
+  }
+  .next-label {
+    display:block; font-size:9px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#71717a; margin-bottom:4px;
+  }
+  .next-name-row {
+    display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:6px; color:#fff;
+  }
+  .next-name { font-size:15px; font-weight:900; line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pos-badge {
+    font-size:11px; font-family:ui-monospace, Consolas, monospace; font-weight:900; color:var(--emerald2);
+    background:rgba(16,185,129,.05); border:1px solid rgba(16,185,129,.1); border-radius:7px; padding:1px 7px; flex-shrink:0;
+  }
+  .hint-line {
+    display:flex; align-items:center; gap:6px; padding-top:5px; border-top:1px solid rgba(39,39,42,.5);
+    font-size:10px; color:#71717a; font-style:italic;
+  }
+  .alert-box {
+    padding:8px 10px; border-radius:10px; text-align:center; margin-bottom:8px;
+    background:rgba(239,68,68,.2); border:1px solid rgba(239,68,68,.4);
+  }
+  .alert-box strong { display:block; color:#f87171; font-size:12px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+  .alert-box span { display:block; margin-top:3px; color:#e4e4e7; font-size:11px; font-weight:700; font-family:ui-monospace, Consolas, monospace; }
+  .btn-row { display:flex; gap:6px; }
   .btn {
-    height:32px; padding:0 10px; border-radius:10px; border:1px solid #3f3f46; background:#27272a;
-    font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:5px;
+    height:30px; padding:0 10px; border-radius:10px; border:1px solid #3f3f46; background:#27272a;
+    font-size:10px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; gap:5px;
   }
   .btn:disabled { opacity:.45; cursor:not-allowed; }
   .btn.green { background:#059669; border-color:transparent; color:#fff; }
+  .btn.emerald { background:#10b981; border-color:transparent; color:#09090b; }
   .btn.red { background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.3); color:#fca5a5; }
-  .btn.join-full {
-    width:100%; height:40px; border-radius:14px; justify-content:center;
-    font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+  .btn.full { width:100%; }
+  .btn.join {
+    width:100%; height:32px; border-radius:10px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; font-weight:900;
   }
-  .join-full.contas { background:#059669; border:0; color:#fff; }
-  .join-full.montante { background:var(--blue); border:0; color:#fff; }
+  .btn.join.contas { background:#059669; border:1px solid rgba(16,185,129,.2); color:#fff; }
+  .btn.join.montante { background:#2563eb; border:1px solid rgba(37,99,235,.25); color:#fff; }
+  .me-card {
+    display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;
+    padding:8px 10px; border-radius:12px; border:1px solid rgba(39,39,42,.5); background:rgba(24,24,27,.5);
+  }
+  .me-left { display:flex; align-items:center; gap:8px; min-width:0; }
+  .dot { width:7px; height:7px; border-radius:50%; background:#71717a; flex-shrink:0; }
+  .dot.on { background:#10b981; animation:pulse 1.2s ease-out infinite; }
+  @keyframes pulse {
+    0% { box-shadow:0 0 0 0 rgba(16,185,129,.5); }
+    70% { box-shadow:0 0 0 8px rgba(16,185,129,0); }
+    100% { box-shadow:0 0 0 0 rgba(16,185,129,0); }
+  }
+  .me-left strong { display:block; font-size:11px; }
+  .me-left em { display:block; margin-top:1px; font-style:normal; color:#71717a; font-size:9px; font-weight:700; }
+  .me-btns { display:flex; gap:5px; flex-wrap:wrap; }
   .section-title {
-    margin:0; font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#71717a;
+    margin:2px 0 0; font-size:9px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#71717a;
   }
-  .list { display:flex; flex-direction:column; gap:8px; }
+  .list { display:flex; flex-direction:column; gap:4px; }
   .row {
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-    padding:10px 12px; border-radius:12px; border:1px solid #27272a; background:rgba(24,24,27,.55);
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:6px 8px; border-radius:8px; border:1px solid #1f1f22; background:rgba(24,24,27,.35);
   }
-  .row.first { border-color:rgba(52,211,153,.3); background:rgba(16,185,129,.06); }
-  .row.paused { opacity:.45; }
-  .row-left { display:flex; align-items:center; gap:10px; min-width:0; }
+  .row.first { border-color:rgba(16,185,129,.3); background:rgba(16,185,129,.05); }
+  .row.paused { opacity:.4; }
+  .row-left { display:flex; align-items:center; gap:8px; min-width:0; }
   .pos {
-    width:22px; height:22px; border-radius:8px; display:grid; place-items:center;
-    font-size:10px; font-weight:900; border:1px solid #3f3f46; background:#09090b; color:#71717a; flex-shrink:0;
+    width:18px; height:18px; border-radius:5px; display:grid; place-items:center;
+    font-size:9px; font-weight:900; font-family:ui-monospace, Consolas, monospace;
+    border:1px solid #27272a; background:#09090b; color:#71717a; flex-shrink:0;
   }
-  .row.first .pos { border-color:rgba(52,211,153,.3); background:rgba(16,185,129,.1); color:var(--emerald); }
-  .name { font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .name.me { color:var(--emerald); }
+  .row.first .pos { border-color:rgba(16,185,129,.2); background:rgba(16,185,129,.1); color:#34d399; }
+  .name { font-size:11px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .name.me { color:#34d399; }
   .name.paused { text-decoration:line-through; color:#52525b; }
   .tag {
-    font-size:9px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
-    padding:3px 6px; border-radius:6px; border:1px solid #27272a; background:#18181b; color:#71717a;
+    font-size:8px; font-weight:900; letter-spacing:.06em; text-transform:uppercase;
+    padding:1px 5px; border-radius:5px; border:1px solid #27272a; background:#18181b; color:#71717a;
   }
-  .tag.vez { color:var(--emerald); background:rgba(16,185,129,.15); border-color:rgba(52,211,153,.3); }
-  .hint { margin:0; color:#52525b; font-size:11px; }
+  .tag.vez {
+    color:#34d399; background:rgba(16,185,129,.15); border-color:rgba(16,185,129,.3); animation:pulse 1.4s ease-out infinite;
+  }
+  .empty {
+    padding:8px 10px; border-radius:10px; border:1px solid #27272a; background:rgba(24,24,27,.3);
+    display:flex; gap:8px; align-items:flex-start; color:#a1a1aa; font-size:11px;
+  }
+  .empty small { display:block; margin-top:2px; color:#52525b; font-size:9px; }
   .foot {
-    display:flex; justify-content:space-between; align-items:center; gap:8px;
-    color:#52525b; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    flex-shrink:0; padding:6px 10px; border-top:1px solid #27272a;
+    display:flex; justify-content:space-between; gap:8px;
+    color:#52525b; font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
   }
-  .empty-box {
-    padding:12px; border-radius:12px; border:1px solid #27272a; background:rgba(24,24,27,.4);
-    color:var(--muted); font-size:11px;
+  .cfg-title {
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding-bottom:6px; border-bottom:1px solid #27272a; margin-bottom:2px;
   }
+  .cfg-title span { font-size:11px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:#10b981; }
+  .cfg-title button { border:0; background:transparent; color:#a1a1aa; font-size:10px; font-weight:700; cursor:pointer; }
+  .cfg-box {
+    background:rgba(24,24,27,.3); border:1px solid #18181b; border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:8px;
+  }
+  .cfg-label {
+    display:block; font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#a1a1aa;
+  }
+  .cfg-box label.check {
+    display:flex; align-items:center; gap:10px; font-size:12px; font-weight:700; color:#d4d4d8; cursor:pointer; user-select:none;
+  }
+  .cfg-box select, .cfg-box input[type="text"] {
+    width:100%; height:38px; border-radius:12px; border:1px solid #18181b; background:#09090b;
+    color:#fff; padding:0 12px; font-size:12px; outline:none;
+  }
+  .cfg-box input[type="range"] { width:100%; accent-color:#10b981; height:4px; cursor:pointer; }
+  .cfg-sub { display:flex; gap:4px; background:rgba(24,24,27,.6); border:1px solid rgba(39,39,42,.5); border-radius:12px; padding:4px; }
+  .cfg-sub button {
+    flex:1; height:30px; border:0; border-radius:8px; background:transparent; color:#71717a;
+    font-size:10px; font-weight:900; letter-spacing:.04em; text-transform:uppercase;
+  }
+  .cfg-sub button.on.contas { background:#27272a; color:#34d399; border:1px solid rgba(16,185,129,.1); }
+  .cfg-sub button.on.montante { background:#27272a; color:#60a5fa; border:1px solid rgba(59,130,246,.15); }
+  .vol-row { display:flex; justify-content:space-between; align-items:center; }
+  .vol-row em { font-style:normal; font-family:ui-monospace, Consolas, monospace; font-size:12px; font-weight:700; color:#d4d4d8; }
+  .interval-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .interval-grid button {
+    height:30px; border-radius:8px; border:1px solid #18181b; background:#09090b; color:#a1a1aa;
+    font-size:12px; font-family:ui-monospace, Consolas, monospace; font-weight:700;
+  }
+  .interval-grid button.on { background:rgba(16,185,129,.1); border-color:rgba(16,185,129,.3); color:#34d399; }
+  .drop {
+    border:1px dashed #27272a; border-radius:12px; padding:14px; text-align:center; position:relative; cursor:pointer;
+  }
+  .drop input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+  .drop p { margin:0; font-size:11px; font-weight:700; color:#a1a1aa; }
+  .drop small { display:block; margin-top:4px; font-size:9px; color:#71717a; }
+  .hidden { display:none !important; }
+  .toast {
+    position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
+    background:#18181b; border:1px solid #27272a; color:#e4e4e7; font-size:11px; font-weight:700;
+    padding:8px 12px; border-radius:10px; z-index:20; pointer-events:none; opacity:0; transition:opacity .2s;
+  }
+  .toast.on { opacity:1; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="head">
-    <div>
-      <h1>Fila operacional</h1>
-      <p class="sub" id="line">Igual ao site · atualiza sozinha</p>
+<div class="shell">
+  <div class="toolbar">
+    <div class="tabs">
+      <button type="button" class="contas on" data-sector="contas">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Contas
+      </button>
+      <button type="button" class="montante" data-sector="montante">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        Montante
+      </button>
     </div>
-    <div class="live"><span class="dot"></span>Realtime</div>
-  </div>
-  <div class="tabs">
-    <button type="button" class="contas on" data-sector="contas">Contas</button>
-    <button type="button" class="montante" data-sector="montante">Montante</button>
-  </div>
-  <div class="alert-bar" id="alert-bar">
-    <strong>É a sua vez!</strong>
-    <span id="alert-text">Posição: 1º</span>
-    <div class="alert-actions">
-      <button type="button" class="btn green" id="btn-next-alert">Finalizar Turno (Próximo)</button>
-      <button type="button" class="btn red" id="stop-alert">Parar Alerta</button>
+    <div class="head-actions">
+      <button type="button" class="icon-btn on" id="btn-sound" title="Mutar notificações sonoras" aria-label="Som">
+        <svg id="ico-vol-on" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+        <svg id="ico-vol-off" class="hidden" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+      </button>
+      <button type="button" class="icon-btn" id="btn-config" title="Configurações de Som do Alerta" aria-label="Configuração">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+      </button>
     </div>
   </div>
-  <div class="panel" id="panel">
-    <div id="me-box"></div>
-    <p class="section-title">Sequência atual da fila</p>
-    <div class="list" id="list"></div>
-    <p class="hint" id="empty"></p>
+
+  <div class="body" id="panel">
+    <div id="live-view"></div>
+    <div id="config-view" class="hidden"></div>
   </div>
+
   <div class="foot">
     <span>Realtime ativo</span>
-    <span id="status">Atualizando…</span>
+    <span id="status">Sincronizando Fila</span>
   </div>
 </div>
+<audio id="alert-audio" preload="auto"></audio>
+<div class="toast" id="toast"></div>
 <script>
+const defaultAlert = { soundType:'default', volume:0.6, repeat:true, interval:3000, startTime:0, endTime:20 };
+const defaultSettings = { useSameConfig:true, contas:{...defaultAlert}, montante:{...defaultAlert} };
+
 let sector = 'contas';
 let state = null;
 let busy = false;
+let showConfig = false;
+let configSubSector = 'contas';
+let soundEnabled = localStorage.getItem('queueSoundEnabled') !== 'false';
+let settings = loadLocalSettings();
 let alertOn = false;
 let alertSector = '';
-let prevPos = { contas: null, montante: null };
-let readyPos = { contas: false, montante: false };
+let prevPos = { contas:null, montante:null };
+let readyPos = { contas:false, montante:false };
 let beepTimer = null;
 let audioCtx = null;
-let alertCache = { active: false, sector: '', stopped: false };
+let alertCache = { active:false, sector:'', stopped:false };
 let lastFinger = '';
+let toastTimer = null;
+let configLoaded = false;
 
+function loadLocalSettings() {
+  try {
+    const raw = localStorage.getItem('queueAlertSettings_app') || localStorage.getItem('queueAlertSettings_default');
+    if (raw) return normalizeSettings(JSON.parse(raw));
+  } catch (e) {}
+  return JSON.parse(JSON.stringify(defaultSettings));
+}
+function normalizeSettings(raw) {
+  const base = JSON.parse(JSON.stringify(defaultSettings));
+  if (!raw || typeof raw !== 'object') return base;
+  base.useSameConfig = raw.useSameConfig !== false;
+  base.contas = { ...defaultAlert, ...(raw.contas || {}) };
+  base.montante = { ...defaultAlert, ...(raw.montante || {}) };
+  return base;
+}
+function cacheKey() {
+  const id = state && state.me && state.me.id ? String(state.me.id) : 'app';
+  return 'queueAlertSettings_' + id;
+}
+function persistLocal() {
+  try {
+    localStorage.setItem(cacheKey(), JSON.stringify(settings));
+    localStorage.setItem('queueAlertSettings_app', JSON.stringify(settings));
+  } catch (e) {}
+}
+async function persistRemote() {
+  persistLocal();
+  try {
+    await fetch('/fila/config', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ settings }),
+    });
+  } catch (e) {}
+}
+async function pullRemoteConfig() {
+  try {
+    const data = await fetch('/fila/config?ts=' + Date.now(), { cache:'no-store' }).then((r) => r.json());
+    if (data && data.ok && data.settings) {
+      settings = normalizeSettings(data.settings);
+      persistLocal();
+    } else if (data && data.meId) {
+      try {
+        const cached = localStorage.getItem('queueAlertSettings_' + data.meId);
+        if (cached) settings = normalizeSettings(JSON.parse(cached));
+      } catch (e) {}
+    }
+  } catch (e) {}
+  configLoaded = true;
+}
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), 1800);
+}
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 function sectorLabel(id) { return id === 'montante' ? 'Montante' : 'Contas'; }
 function meIn(s) {
   if (!state) return null;
@@ -159,12 +353,67 @@ function opsOf(s) {
   if (!state) return [];
   return s === 'montante' ? (state.montante || []) : (state.contas || []);
 }
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+function activeSettingsFor(which) {
+  if (settings.useSameConfig) return settings.contas;
+  return which === 'montante' ? settings.montante : settings.contas;
+}
+function configTarget() {
+  return settings.useSameConfig ? settings.contas : (configSubSector === 'montante' ? settings.montante : settings.contas);
+}
+function updateActiveField(field, value) {
+  if (settings.useSameConfig) {
+    settings.contas = { ...settings.contas, [field]: value };
+    settings.montante = { ...settings.montante, [field]: value };
+  } else if (configSubSector === 'montante') {
+    settings.montante = { ...settings.montante, [field]: value };
+  } else {
+    settings.contas = { ...settings.contas, [field]: value };
+  }
+  persistRemote();
+  paint();
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+function formatSecondsToTime(secs) {
+  if (isNaN(secs) || secs < 0) return '00:00';
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return pad2(m) + ':' + pad2(s);
+}
+function parseTimeToSeconds(val) {
+  if (!val) return 0;
+  if (String(val).includes(':')) {
+    const parts = String(val).split(':');
+    if (parts.length === 2) return (parseInt(parts[0], 10) || 0) * 60 + (parseFloat(parts[1]) || 0);
+  }
+  return parseFloat(val) || 0;
+}
+function calculateNextReset(resetTime, now) {
+  const parts = String(resetTime || '00:00').split(':');
+  const h = parseInt(parts[0], 10) || 0;
+  const m = parseInt(parts[1], 10) || 0;
+  const target = new Date(now);
+  target.setHours(h, m, 0, 0);
+  if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1);
+  return pad2(target.getDate()) + '/' + pad2(target.getMonth() + 1) + '/' + target.getFullYear() +
+    ' às ' + pad2(target.getHours()) + ':' + pad2(target.getMinutes());
+}
+function getLastResetDisplay(resetTime, lastResetAt, lastResetType, now) {
+  if (lastResetAt) {
+    const d = new Date(lastResetAt);
+    if (!isNaN(d.getTime())) {
+      const typeLabel = lastResetType === 'manual' ? 'Manual' : 'Automático';
+      return typeLabel + ' — ' + pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear() +
+        ' às ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    }
+  }
+  const parts = String(resetTime || '00:00').split(':');
+  const h = parseInt(parts[0], 10) || 0;
+  const m = parseInt(parts[1], 10) || 0;
+  const lastCycle = new Date(now);
+  lastCycle.setHours(h, m, 0, 0);
+  if (lastCycle.getTime() > now.getTime()) lastCycle.setDate(lastCycle.getDate() - 1);
+  return 'Automático — ' + pad2(lastCycle.getDate()) + '/' + pad2(lastCycle.getMonth() + 1) + '/' + lastCycle.getFullYear() +
+    ' às ' + pad2(lastCycle.getHours()) + ':' + pad2(lastCycle.getMinutes());
 }
 function fingerprint(data) {
   if (!data || !data.ok) return 'off';
@@ -172,17 +421,14 @@ function fingerprint(data) {
   return pack(data.contas) + '##' + pack(data.montante);
 }
 async function readFilaAlert() {
-  try {
-    alertCache = await fetch('/fila/alerta?ts=' + Date.now(), { cache: 'no-store' }).then((r) => r.json());
-  } catch (e) {}
-  return alertCache || { active: false, sector: '', stopped: false };
+  try { alertCache = await fetch('/fila/alerta?ts=' + Date.now(), { cache:'no-store' }).then((r) => r.json()); } catch (e) {}
+  return alertCache || { active:false, sector:'', stopped:false };
 }
 async function writeFilaAlert(data) {
-  alertCache = data || { active: false, sector: '', stopped: false };
+  alertCache = data || { active:false, sector:'', stopped:false };
   try {
     await fetch('/fila/alerta', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method:'POST', headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify(alertCache),
     });
   } catch (e) {}
@@ -194,52 +440,142 @@ function ensureAudio() {
   audioCtx = new Ctx();
   return audioCtx;
 }
-function beepOnce() {
-  const ctx = ensureAudio();
-  if (!ctx) return;
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-  const now = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = 'square';
-  osc.frequency.setValueAtTime(880, now);
-  osc.frequency.exponentialRampToValueAtTime(440, now + 0.18);
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.12, now + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(now);
-  osc.stop(now + 0.24);
+function isMuted() {
+  return localStorage.getItem('queueSoundEnabled') === 'false';
 }
-function paintAlertBar() {
-  const bar = document.getElementById('alert-bar');
-  const text = document.getElementById('alert-text');
-  if (alertOn) {
-    bar.classList.add('on');
-    text.textContent = 'Sua vez na fila de ' + sectorLabel(alertSector || sector) + ' · Posição: 1º';
-  } else {
-    bar.classList.remove('on');
+function playCustomAlertSound(cfg) {
+  if (isMuted()) return;
+  const soundType = (cfg && cfg.soundType) || 'default';
+  const volume = typeof (cfg && cfg.volume) === 'number' ? cfg.volume : 0.6;
+  const audio = document.getElementById('alert-audio');
+
+  if (soundType === 'custom' && cfg.customSoundUrl) {
+    try {
+      audio.pause();
+      audio.volume = volume;
+      audio.src = cfg.customSoundUrl;
+      const start = cfg.startTime != null ? cfg.startTime : 0;
+      const end = cfg.endTime != null ? cfg.endTime : 20;
+      const onUpdate = () => {
+        if (audio.currentTime >= end) {
+          audio.pause();
+          audio.removeEventListener('timeupdate', onUpdate);
+        }
+      };
+      audio.onloadedmetadata = () => {
+        audio.currentTime = start;
+        audio.addEventListener('timeupdate', onUpdate);
+        audio.play().catch(() => {});
+      };
+      if (audio.readyState >= 1) {
+        audio.currentTime = start;
+        audio.addEventListener('timeupdate', onUpdate);
+        audio.play().catch(() => {});
+      }
+    } catch (e) {}
+    return;
   }
+
+  try {
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const now = ctx.currentTime;
+    const tone = (type, freq, at, dur, peak) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      if (typeof freq === 'function') freq(osc, at);
+      else osc.frequency.setValueAtTime(freq, at);
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(peak, at + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(at); osc.stop(at + dur + 0.02);
+    };
+    if (soundType === 'doorbell') {
+      tone('sine', 587.33, now, 0.85, volume * 0.25);
+      tone('sine', 440, now + 0.35, 1.0, volume * 0.25);
+    } else if (soundType === 'digital') {
+      [880, 880, 1046.5].forEach((f, i) => {
+        const at = now + i * 0.12;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(f, at);
+        gain.gain.setValueAtTime(0, at);
+        gain.gain.linearRampToValueAtTime(volume * 0.08, at + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.09);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(at); osc.stop(at + 0.1);
+      });
+    } else if (soundType === 'short') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(1200, now + 0.08);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.2, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 0.15);
+    } else if (soundType === 'siren') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.linearRampToValueAtTime(750, now + 0.25);
+      osc.frequency.linearRampToValueAtTime(600, now + 0.5);
+      osc.frequency.linearRampToValueAtTime(750, now + 0.75);
+      osc.frequency.linearRampToValueAtTime(600, now + 1.0);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.12, now + 0.05);
+      gain.gain.setValueAtTime(volume * 0.12, now + 0.9);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now); osc.stop(now + 1.1);
+    } else {
+      tone('sine', 659.25, now, 0.5, volume * 0.15);
+      tone('sine', 987.77, now + 0.15, 0.6, volume * 0.18);
+    }
+  } catch (e) {}
+}
+function stopAlertAudio() {
+  const audio = document.getElementById('alert-audio');
+  try { audio.pause(); audio.removeAttribute('src'); audio.load(); } catch (e) {}
+  if (beepTimer) { clearInterval(beepTimer); beepTimer = null; }
 }
 function startAlert(which) {
   alertOn = true;
   alertSector = which;
-  writeFilaAlert({ active: true, sector: which || 'contas', stopped: false });
-  paintAlertBar();
-  if (beepTimer) clearInterval(beepTimer);
-  beepOnce();
-  beepTimer = setInterval(beepOnce, 1800);
+  writeFilaAlert({ active:true, sector:which || 'contas', stopped:false });
+  restartAlertLoop();
+  paint();
+}
+function restartAlertLoop() {
+  stopAlertAudio();
+  if (!alertOn || !alertSector) return;
+  const cfg = activeSettingsFor(alertSector);
+  ensureAudio();
+  if (cfg.soundType === 'custom' && cfg.customSoundUrl) {
+    playCustomAlertSound(cfg);
+    return;
+  }
+  playCustomAlertSound(cfg);
+  if (cfg.repeat) {
+    beepTimer = setInterval(() => playCustomAlertSound(cfg), cfg.interval || 3000);
+  }
 }
 async function stopAlert() {
   const stillFirst =
     (meIn('contas') && meIn('contas').active !== false && Number(meIn('contas').position) === 1) ||
     (meIn('montante') && meIn('montante').active !== false && Number(meIn('montante').position) === 1);
   alertOn = false;
-  await writeFilaAlert({ active: !!stillFirst, sector: alertSector || sector, stopped: true });
+  await writeFilaAlert({ active:!!stillFirst, sector:alertSector || sector, stopped:true });
   alertSector = '';
-  paintAlertBar();
-  if (beepTimer) { clearInterval(beepTimer); beepTimer = null; }
+  stopAlertAudio();
+  paint();
 }
 async function trackTurn() {
   if (!state || !state.me || !state.me.id) return;
@@ -264,83 +600,252 @@ async function trackTurn() {
   const saved = await readFilaAlert();
   if (!stillFirst) {
     if (alertOn) await stopAlert();
-    await writeFilaAlert({ active: false, sector: '', stopped: false });
+    await writeFilaAlert({ active:false, sector:'', stopped:false });
     return;
   }
   if (saved.stopped) {
     if (alertOn) {
       alertOn = false;
-      paintAlertBar();
-      if (beepTimer) { clearInterval(beepTimer); beepTimer = null; }
+      stopAlertAudio();
+      paint();
     }
     return;
   }
   if (saved.active && !saved.stopped && !alertOn) startAlert(saved.sector || sector);
 }
-function paint() {
+function paintSoundButton() {
+  const btn = document.getElementById('btn-sound');
+  const on = document.getElementById('ico-vol-on');
+  const off = document.getElementById('ico-vol-off');
+  btn.classList.toggle('on', soundEnabled);
+  btn.classList.toggle('mute', !soundEnabled);
+  on.classList.toggle('hidden', !soundEnabled);
+  off.classList.toggle('hidden', soundEnabled);
+  btn.title = soundEnabled ? 'Mutar notificações sonoras' : 'Ativar notificações sonoras';
+}
+function paintConfig() {
+  const view = document.getElementById('config-view');
+  const active = configTarget();
+  const volPct = Math.round((active.volume || 0) * 100);
+  view.innerHTML =
+    '<div class="cfg-title"><span>Configurações da Fila</span><button type="button" id="cfg-back">Voltar</button></div>' +
+    '<div class="cfg-box"><label class="check"><input type="checkbox" id="cfg-same"' + (settings.useSameConfig ? ' checked' : '') + ' /> Usar mesma configuração para Contas e Montante</label></div>' +
+    (!settings.useSameConfig
+      ? '<div class="cfg-sub">' +
+          '<button type="button" class="contas' + (configSubSector === 'contas' ? ' on' : '') + '" data-cfg-sector="contas">Ajustes Fila Contas</button>' +
+          '<button type="button" class="montante' + (configSubSector === 'montante' ? ' on' : '') + '" data-cfg-sector="montante">Ajustes Fila Montante</button>' +
+        '</div>'
+      : '') +
+    '<div class="cfg-box">' +
+      '<label class="cfg-label">1. Som da Minha Vez</label>' +
+      '<select id="cfg-sound">' +
+        '<option value="default"' + (active.soundType === 'default' ? ' selected' : '') + '>Toque Padrão</option>' +
+        '<option value="doorbell"' + (active.soundType === 'doorbell' ? ' selected' : '') + '>Campainha</option>' +
+        '<option value="digital"' + (active.soundType === 'digital' ? ' selected' : '') + '>Notificação Digital</option>' +
+        '<option value="short"' + (active.soundType === 'short' ? ' selected' : '') + '>Alerta Curto</option>' +
+        '<option value="siren"' + (active.soundType === 'siren' ? ' selected' : '') + '>Sirene Leve</option>' +
+        '<option value="custom"' + (active.soundType === 'custom' ? ' selected' : '') + '>Personalizado (MP3/WAV)</option>' +
+      '</select>' +
+    '</div>' +
+    (active.soundType === 'custom'
+      ? '<div class="cfg-box">' +
+          '<label class="cfg-label">5. Som Personalizado (MP3/WAV)</label>' +
+          '<div class="drop"><input type="file" id="cfg-file" accept=".mp3,.wav,audio/*" />' +
+            '<p>' + (active.customSoundName ? ('🎵 ' + escapeHtml(active.customSoundName)) : 'Clique ou Arraste o arquivo') + '</p>' +
+            '<small>Limites: Máximo 5MB e trecho selecionado de até 30s</small>' +
+          '</div>' +
+          (active.customSoundUrl
+            ? '<div class="vol-row"><span class="cfg-label">Início</span><span class="cfg-label">Fim</span></div>' +
+              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+                '<input type="text" id="cfg-start" value="' + formatSecondsToTime(active.startTime || 0) + '" />' +
+                '<input type="text" id="cfg-end" value="' + formatSecondsToTime(active.endTime != null ? active.endTime : 20) + '" />' +
+              '</div>' +
+              '<button type="button" class="btn green full" id="cfg-test-slice">Testar trecho</button>'
+            : '') +
+        '</div>'
+      : '<div class="cfg-box" style="flex-direction:row;align-items:center;justify-content:space-between">' +
+          '<div><span class="cfg-label">2. Testar Som</span><small style="display:block;margin-top:4px;color:#71717a;font-size:9px">Toque para validar o som no volume atual</small></div>' +
+          '<button type="button" class="btn emerald" id="cfg-test">Testar Som</button>' +
+        '</div>') +
+    '<div class="cfg-box">' +
+      '<div class="vol-row"><span class="cfg-label">3. Volume</span><em>' + volPct + '%</em></div>' +
+      '<input type="range" id="cfg-vol" min="0" max="1" step="0.05" value="' + (active.volume || 0) + '" />' +
+    '</div>' +
+    '<div class="cfg-box">' +
+      '<label class="check"><input type="checkbox" id="cfg-repeat"' + (active.repeat ? ' checked' : '') + ' /> 4. Repetir até eu parar</label>' +
+      (active.repeat
+        ? '<span class="cfg-label">Intervalo de Repetição</span><div class="interval-grid">' +
+            [2,3,5,10].map((sec) =>
+              '<button type="button" class="' + (active.interval === sec * 1000 ? 'on' : '') + '" data-interval="' + (sec * 1000) + '">' + sec + 's</button>'
+            ).join('') +
+          '</div>'
+        : '') +
+    '</div>' +
+    '<button type="button" class="btn full" id="cfg-close" style="background:#18181b;border-color:#27272a">Confirmar e Fechar</button>';
+
+  document.getElementById('cfg-back').onclick = () => { showConfig = false; paint(); };
+  document.getElementById('cfg-close').onclick = () => { showConfig = false; toast('Preferências salvas com sucesso!'); paint(); };
+  document.getElementById('cfg-same').onchange = (e) => {
+    settings.useSameConfig = !!e.target.checked;
+    if (settings.useSameConfig) settings.montante = { ...settings.contas };
+    persistRemote();
+    toast(settings.useSameConfig ? 'Mesma configuração para ambos os setores!' : 'Configurações separadas por setor ativadas.');
+    paint();
+  };
+  view.querySelectorAll('[data-cfg-sector]').forEach((btn) => {
+    btn.onclick = () => { configSubSector = btn.getAttribute('data-cfg-sector'); paint(); };
+  });
+  document.getElementById('cfg-sound').onchange = (e) => updateActiveField('soundType', e.target.value);
+  document.getElementById('cfg-vol').oninput = (e) => updateActiveField('volume', parseFloat(e.target.value));
+  document.getElementById('cfg-repeat').onchange = (e) => updateActiveField('repeat', !!e.target.checked);
+  view.querySelectorAll('[data-interval]').forEach((btn) => {
+    btn.onclick = () => updateActiveField('interval', Number(btn.getAttribute('data-interval')));
+  });
+  const testBtn = document.getElementById('cfg-test');
+  if (testBtn) testBtn.onclick = () => { ensureAudio(); playCustomAlertSound({ ...active, repeat:false }); };
+  const testSlice = document.getElementById('cfg-test-slice');
+  if (testSlice) testSlice.onclick = () => { ensureAudio(); playCustomAlertSound(active); };
+  const file = document.getElementById('cfg-file');
+  if (file) file.onchange = (e) => handleCustomUpload(e.target.files && e.target.files[0]);
+  const start = document.getElementById('cfg-start');
+  const end = document.getElementById('cfg-end');
+  if (start) start.onchange = () => {
+    const duration = active.customSoundDuration || 0;
+    let validStart = Math.max(0, Math.min(parseTimeToSeconds(start.value), duration));
+    let validEnd = active.endTime != null ? active.endTime : Math.min(duration, 20);
+    if (validEnd - validStart > 30) validEnd = validStart + 30;
+    if (validEnd < validStart) validEnd = Math.min(duration, validStart + 20);
+    updateActiveField('startTime', validStart);
+    updateActiveField('endTime', validEnd);
+  };
+  if (end) end.onchange = () => {
+    const duration = active.customSoundDuration || 0;
+    const currentStart = active.startTime || 0;
+    let validEnd = Math.max(0, Math.min(parseTimeToSeconds(end.value), duration));
+    if (validEnd < currentStart) validEnd = currentStart;
+    if (validEnd - currentStart > 30) { toast('O trecho máximo permitido é de 30 segundos.'); validEnd = currentStart + 30; }
+    updateActiveField('endTime', validEnd);
+  };
+}
+function handleCustomUpload(file) {
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('Arquivo maior que 5MB.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const url = String(reader.result || '');
+    const audio = new Audio();
+    audio.src = url;
+    audio.onloadedmetadata = () => {
+      const duration = audio.duration || 20;
+      const patch = {
+        soundType:'custom',
+        customSoundUrl:url,
+        customSoundName:file.name,
+        customSoundDuration:duration,
+        startTime:0,
+        endTime:Math.min(duration, 20),
+      };
+      if (settings.useSameConfig) {
+        settings.contas = { ...settings.contas, ...patch };
+        settings.montante = { ...settings.montante, ...patch };
+      } else if (configSubSector === 'montante') {
+        settings.montante = { ...settings.montante, ...patch };
+      } else {
+        settings.contas = { ...settings.contas, ...patch };
+      }
+      persistRemote();
+      toast('Arquivo carregado com sucesso');
+      paint();
+    };
+  };
+  reader.readAsDataURL(file);
+}
+function paintLive() {
+  const view = document.getElementById('live-view');
   const ops = opsOf(sector);
   const mine = meIn(sector);
-  const meBox = document.getElementById('me-box');
-  const list = document.getElementById('list');
-  const empty = document.getElementById('empty');
-  const line = document.getElementById('line');
   const who = (state && state.me && state.me.name) || 'Você';
-  const first = ops.find((op) => op.active !== false);
-
-  if (!state || !state.ok) {
-    meBox.innerHTML = '<div class="empty-box">' + escapeHtml((state && state.message) || 'Entre na Calculadora para ver a fila do site.') + '</div>';
-    list.innerHTML = '';
-    empty.textContent = '';
-    line.textContent = 'Sem sessão';
-    return;
-  }
-
-  line.textContent = 'Conectado: ' + who + ' · mesma fila do site';
+  const first = ops.find((op) => op.active !== false) || null;
   const isFirst = !!(mine && mine.active !== false && Number(mine.position) === 1);
   const isActive = !!(mine && mine.active !== false);
   const activeCount = ops.filter((op) => op.active !== false).length;
+  const now = new Date();
+  const resetTime = (state && state.resetTime) || '00:00';
+  const lastResetAt = (state && state.lastResetAt) || '';
+  const lastResetType = (state && state.lastResetType) || '';
+
+  if (!state || !state.ok) {
+    view.innerHTML = '<div class="empty">' + escapeHtml((state && state.message) || 'Entre na Calculadora para ver a fila do site.') + '</div>';
+    return;
+  }
+
+  let html = '';
+  html +=
+    '<div class="card reset-card" title="A fila operacional é reiniciada diariamente. Os operadores precisam entrar novamente após o reset.">' +
+      '<div class="reset-row">' +
+        '<div class="reset-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
+        '<div style="min-width:0;flex:1">' +
+          '<div class="reset-title">Reset Diário <span class="badge">' + escapeHtml(resetTime) + '</span></div>' +
+          '<div class="reset-sub">' + escapeHtml(calculateNextReset(resetTime, now)) +
+            ' · Último: ' + escapeHtml(getLastResetDisplay(resetTime, lastResetAt, lastResetType, now)) + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  if (ops.length && first) {
+    html +=
+      '<div class="next-card' + (isFirst ? ' mine' : '') + '">' +
+        '<span class="next-label">Próximo da vez</span>' +
+        '<div class="next-name-row">' +
+          '<span class="next-name">' + escapeHtml(first.name || 'Operador') + '</span>' +
+          '<span class="pos-badge">Pos. 1</span>' +
+        '</div>';
+    if (isFirst) {
+      html +=
+        '<div class="alert-box"><strong>🔔 É sua vez!</strong><span>Posição: 1º</span></div>' +
+        '<div class="btn-row">' +
+          '<button type="button" class="btn emerald" style="flex:1" id="btn-pass"' + (busy ? ' disabled' : '') + '>Finalizar Turno (Próximo)</button>' +
+          (alertOn ? '<button type="button" class="btn red" id="btn-stop-alert">Parar Alerta</button>' : '') +
+        '</div>';
+    } else {
+      html +=
+        '<div class="hint-line">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+          'Apenas ' + escapeHtml(first.name) + ' pode clicar em próximo.' +
+        '</div>';
+    }
+    html += '</div>';
+  } else {
+    html +=
+      '<div class="empty">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>' +
+        '<div><strong style="display:block;font-size:11px;color:#a1a1aa">Fila Vazia ou Sem Ativos</strong>' +
+        '<small>Quem entrar no site ou neste app aparece aqui na hora.</small></div>' +
+      '</div>';
+  }
 
   if (!mine) {
-    meBox.innerHTML = '<button type="button" class="btn join-full ' + sector + '" id="btn-enter"' + (busy ? ' disabled' : '') + '>Entrar na Fila</button>';
+    html += '<button type="button" class="btn join ' + sector + '" id="btn-enter"' + (busy ? ' disabled' : '') + '>' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>' +
+      'Entrar na Fila</button>';
   } else {
-    const statusTxt = isActive ? 'Disponível' : 'Pausado';
-    const detail = isActive
-      ? ('Posição ' + mine.position + ' de ' + activeCount + ' na fila')
-      : 'Pausado no fim da fila, sem número';
-    meBox.innerHTML =
-      '<div class="me' + (isFirst ? ' first' : '') + '">' +
+    html +=
+      '<div class="me-card">' +
         '<div class="me-left">' +
-          '<span class="dot-status' + (isActive ? ' on' : '') + '"></span>' +
-          '<div><strong>Seu status: ' + statusTxt + '</strong><em>' + escapeHtml(detail) + '</em></div>' +
+          '<span class="dot' + (isActive ? ' on' : '') + '"></span>' +
+          '<div><strong>Seu status: ' + (isActive ? 'Disponível' : 'Pausado') + '</strong>' +
+          '<em>' + (isActive ? ('Posição ' + mine.position + ' de ' + activeCount + ' na fila') : 'Pausado no fim da fila, sem número') + '</em></div>' +
         '</div>' +
         '<div class="me-btns">' +
-          (isFirst
-            ? '<button type="button" class="btn green" id="btn-pass"' + (busy ? ' disabled' : '') + '>Finalizar Turno (Próximo)</button>'
-            : '') +
           '<button type="button" class="btn" id="btn-pause"' + (busy ? ' disabled' : '') + '>' + (isActive ? 'Pausar' : 'Retomar') + '</button>' +
           '<button type="button" class="btn red" id="btn-leave"' + (busy ? ' disabled' : '') + '>Sair</button>' +
         '</div>' +
-      '</div>' +
-      (!isFirst && first
-        ? '<p class="hint" style="margin-top:8px">Apenas ' + escapeHtml(first.name) + ' pode clicar em próximo.</p>'
-        : '');
+      '</div>';
   }
 
-  const enter = document.getElementById('btn-enter');
-  const leave = document.getElementById('btn-leave');
-  const pause = document.getElementById('btn-pause');
-  const pass = document.getElementById('btn-pass');
-  if (enter) enter.onclick = () => run('enter');
-  if (leave) leave.onclick = () => run('leave');
-  if (pause) pause.onclick = () => run('pause');
-  if (pass) pass.onclick = () => run('pass');
-
-  if (!ops.length) {
-    list.innerHTML = '';
-    empty.innerHTML = '<div class="empty-box">Fila vazia neste setor. Quem entrar no site aparece aqui na hora.</div>';
-  } else {
-    empty.textContent = '';
-    list.innerHTML = ops.map((op) => {
+  if (ops.length) {
+    html += '<p class="section-title">Sequência Atual da Fila</p><div class="list">';
+    html += ops.map((op) => {
       const firstRow = op.active !== false && Number(op.position) === 1;
       const paused = op.active === false;
       const me = state.me && String(op.userId) === String(state.me.id);
@@ -356,16 +861,37 @@ function paint() {
         (tag ? '<div class="tag' + (firstRow ? ' vez' : '') + '">' + tag + '</div>' : '<span></span>') +
       '</div>';
     }).join('');
+    html += '</div>';
   }
-  paintAlertBar();
+
+  view.innerHTML = html;
+  const enter = document.getElementById('btn-enter');
+  const leave = document.getElementById('btn-leave');
+  const pause = document.getElementById('btn-pause');
+  const pass = document.getElementById('btn-pass');
+  const stop = document.getElementById('btn-stop-alert');
+  if (enter) enter.onclick = () => run('enter');
+  if (leave) leave.onclick = () => run('leave');
+  if (pause) pause.onclick = () => run('pause');
+  if (pass) pass.onclick = () => run('pass');
+  if (stop) stop.onclick = () => stopAlert();
+}
+function paint() {
+  paintSoundButton();
+  document.getElementById('btn-config').classList.toggle('on', showConfig);
+  document.getElementById('live-view').classList.toggle('hidden', showConfig);
+  document.getElementById('config-view').classList.toggle('hidden', !showConfig);
+  if (showConfig) paintConfig();
+  else paintLive();
 }
 async function refresh() {
   try {
-    const data = await fetch('/fila/estado?ts=' + Date.now(), { cache: 'no-store' }).then((r) => r.json());
+    const data = await fetch('/fila/estado?ts=' + Date.now(), { cache:'no-store' }).then((r) => r.json());
     const finger = fingerprint(data);
     const changed = finger !== lastFinger && lastFinger !== '';
     lastFinger = finger;
     state = data;
+    if (!configLoaded) await pullRemoteConfig();
     await trackTurn();
     paint();
     if (changed) {
@@ -375,9 +901,7 @@ async function refresh() {
       panel.classList.add('flash');
       setTimeout(() => panel.classList.remove('flash'), 450);
     }
-    document.getElementById('status').textContent = data && data.ok
-      ? new Date().toLocaleTimeString('pt-BR')
-      : ((data && data.message) || 'Sem sessão');
+    document.getElementById('status').textContent = data && data.ok ? 'Sincronizando Fila' : ((data && data.message) || 'Sem sessão');
   } catch (e) {
     document.getElementById('status').textContent = 'Sem conexão';
   }
@@ -390,8 +914,8 @@ async function run(action) {
   try {
     ensureAudio();
     const res = await fetch('/fila/acao', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({ action, sector }),
     });
     const json = await res.json();
@@ -400,7 +924,7 @@ async function run(action) {
     lastFinger = fingerprint(json);
     await trackTurn();
     paint();
-    document.getElementById('status').textContent = 'Igual ao site · ' + new Date().toLocaleTimeString('pt-BR');
+    document.getElementById('status').textContent = 'Sincronizando Fila';
   } catch (e) {
     document.getElementById('status').textContent = e.message || 'Falha ao sincronizar.';
     await refresh();
@@ -416,13 +940,20 @@ document.querySelectorAll('.tabs button').forEach((btn) => {
     paint();
   });
 });
-document.getElementById('stop-alert').addEventListener('click', () => stopAlert());
-document.getElementById('btn-next-alert').addEventListener('click', async () => {
-  await stopAlert();
-  await run('pass');
+document.getElementById('btn-sound').addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  localStorage.setItem('queueSoundEnabled', String(soundEnabled));
+  toast(soundEnabled ? 'Som das notificações ativado!' : 'Som das notificações desativado!');
+  paintSoundButton();
+  if (!soundEnabled) stopAlertAudio();
+});
+document.getElementById('btn-config').addEventListener('click', () => {
+  showConfig = !showConfig;
+  paint();
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
-refresh();
+paint();
+pullRemoteConfig().then(() => refresh());
 setInterval(refresh, 1000);
 </script>
 </body>

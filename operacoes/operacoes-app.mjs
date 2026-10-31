@@ -3,7 +3,7 @@ import fs from 'fs';
 import http from 'http';
 import https from 'https';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(dir, 'dados');
@@ -11,10 +11,301 @@ const dataFile = path.join(dataDir, 'operacoes.json');
 const sessionFile = path.join(dataDir, 'painel-sessao.json');
 const rememberFile = path.join(dataDir, 'lembrar-login.json');
 const siteFile = path.join(dataDir, 'painel-site.json');
+const catalogCacheFile = path.join(dataDir, 'painel-cadastro-cache.json');
 const defaultOrigin = 'https://renovanow.online';
-const htmlFile = path.join(dir, 'contas-operacoes.html');
-const versionFile = path.join(dir, 'app-versao.txt');
-const logoFile = path.join(dir, '..', '..', 'releases', 'elite-cpa-logo-4.png');
+const versionFile = [
+  path.join(dir, 'app-versao-operacoes.txt'),
+  path.join(dir, 'app-versao.txt'),
+].find((file) => fs.existsSync(file)) || path.join(dir, 'app-versao-operacoes.txt');
+const logoLocal = path.join(dir, 'elite-cpa-logo-4.png');
+const logoFile = fs.existsSync(logoLocal)
+  ? logoLocal
+  : path.join(dir, '..', '..', 'releases', 'elite-cpa-logo-4.png');
+const sealJs = fs.existsSync(path.join(dir, 'ui-seal.mjs'))
+  ? path.join(dir, 'ui-seal.mjs')
+  : path.join(dir, '..', 'ui-seal.mjs');
+const { loadUi } = await import(pathToFileURL(sealJs).href);
+function uiHtml(name) {
+  const raw = loadUi(dir, name);
+  let html = Buffer.isBuffer(raw) ? raw.toString('utf8') : String(raw || '');
+  if (name !== 'contas-operacoes' && name !== 'contas-operacoes.html') return html;
+
+  html = html.replace(
+    /if\s*\(\s*session\.ok\s*&&\s*\(\s*session\.remember\s*\|\|\s*flag\s*===\s*'1'\s*\)\s*\)/g,
+    'if (session.ok)'
+  );
+
+  // Some a 2ª linha visual; mantém pull-from/to hidden pra UI selada antiga não quebrar o boot.
+  if (/class=["']pull-row["']/.test(html)) {
+    html = html.replace(
+      /<div class="pull-row">[\s\S]*?<\/div>/,
+      '<div class="pull-row" style="display:none!important" aria-hidden="true">'
+        + '<input id="pull-from" type="hidden" />'
+        + '<input id="pull-to" type="hidden" />'
+        + '</div>'
+    );
+  } else if (!/id=["']pull-from["']/.test(html)) {
+    html = html.replace(
+      /<body[^>]*>/i,
+      '$&<div class="pull-row" style="display:none!important" aria-hidden="true">'
+        + '<input id="pull-from" type="hidden" />'
+        + '<input id="pull-to" type="hidden" />'
+        + '</div>'
+    );
+  }
+
+  // NÃO reescreve o listener com regex (isso quebrava o JS e a tela perdia o login).
+  // Só garante botão + aviso e um script final seguro.
+  if (!/id=["']pull-site["']/.test(html) && /id=["']custom-dates["']/.test(html)) {
+    html = html.replace(
+      /(<div class="custom-dates"[^>]*>)([\s\S]*?)(<\/div>)/,
+      '$1$2<button class="ghost" id="pull-site" type="button">Puxar do site</button>$3'
+    );
+  }
+  if (!/id=["']pull-status["']/.test(html) && /id=["']pull-site["']/.test(html)) {
+    html = html.replace(
+      /(<button[^>]*id=["']pull-site["'][^>]*>[\s\S]*?<\/button>)/,
+      '$1<span class="pull-status" id="pull-status" aria-live="polite"></span>'
+    );
+  }
+  if (!html.includes('.pull-status{') && !html.includes('.pull-status {')) {
+    html = html.replace(
+      /<\/style>/i,
+      '.pull-status{margin:0;min-height:18px;font-size:12px;font-weight:700;color:#a1a1aa;max-width:min(420px,100%)}'
+        + '.pull-status.ok{color:#34d399}.pull-status.warn{color:#fbbf24}'
+        + '.pull-status.err{color:#fb7185}.pull-status.busy{color:#93c5fd}</style>'
+    );
+  }
+
+  // boot antigo: getElementById('pull-from').value estourava sem o input.
+  html = html.replace(
+    /if\s*\(!document\.getElementById\('pull-from'\)\.value\)\s*document\.getElementById\('pull-from'\)\.value\s*=\s*today\s*;/g,
+    "try { var __pf=document.getElementById('pull-from'); var __ps=document.getElementById('custom-start'); if (__pf && !__pf.value) __pf.value = (__ps && __ps.value) || today; } catch(__e){}"
+  );
+  html = html.replace(
+    /if\s*\(!document\.getElementById\('pull-to'\)\.value\)\s*document\.getElementById\('pull-to'\)\.value\s*=\s*today\s*;/g,
+    "try { var __pt=document.getElementById('pull-to'); var __pe=document.getElementById('custom-end'); if (__pt && !__pt.value) __pt.value = (__pe && __pe.value) || today; } catch(__e){}"
+  );
+
+  html = html.replace(
+    /from:\s*document\.getElementById\('pull-from'\)\.value,\s*to:\s*document\.getElementById\('pull-to'\)\.value,/g,
+    "from: ((document.getElementById('custom-start')||document.getElementById('pull-from')||{}).value), to: ((document.getElementById('custom-end')||document.getElementById('pull-to')||{}).value),"
+  );
+
+  // Listener duro antigo: deixa de estourar se o botão não existir.
+  html = html.replace(
+    /document\.getElementById\('pull-site'\)\.addEventListener\(/g,
+    "(document.getElementById('pull-site')||{addEventListener:function(){}}).addEventListener("
+  );
+
+  // Filtro por dia YYYY-MM-DD (UI selada antiga quebrava timezone e sumia a lista).
+  if (!html.includes('function opDayKey')) {
+    html = html.replace(
+      /function inPeriod\(op\)\s*\{[\s\S]*?\n\}/,
+      "function opDayKey(op){var raw=String((op&&op.date)||'');var m=raw.match(/(\\d{4})-(\\d{2})-(\\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];var d=new Date(raw);return isNaN(d.getTime())?'':ymd(d);}"
+        + "function inPeriod(op){if(state.dateRange==='all')return true;var day=opDayKey(op);if(!day)return false;var b=bounds();return day>=ymd(b.start)&&day<=ymd(b.end);}"
+    );
+  }
+
+  if (!html.includes('id="dfs-pull-safe"')) {
+    html = html.replace(/<\/body>/i, `<script id="dfs-pull-safe">
+(function () {
+  function setPullStatus(text, kind) {
+    var el = document.getElementById('pull-status');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'pull-status' + (kind ? (' ' + kind) : '');
+  }
+  function showPulledPeriod(from, to, saved) {
+    state = normalize(saved);
+    state.dateRange = 'custom';
+    state.customStart = from;
+    state.customEnd = to;
+    state.viewStamp = Date.now();
+    usingFile = true;
+    try {
+      if (typeof currentUserId !== 'undefined' && currentUserId) {
+        localStorage.setItem(storageKey(currentUserId), JSON.stringify(state));
+      }
+    } catch (e) {}
+    if (typeof rememberView === 'function') rememberView();
+    var startInput = document.getElementById('custom-start');
+    var endInput = document.getElementById('custom-end');
+    if (startInput) startInput.value = from;
+    if (endInput) endInput.value = to;
+    if (typeof paint === 'function') paint();
+    return (typeof periodOps === 'function') ? periodOps().length : ((state.ops || []).length);
+  }
+  function bindPull() {
+    var old = document.getElementById('pull-site');
+    if (!old || old.getAttribute('data-dfs-pull') === '1') return;
+    var btn = old.cloneNode(true);
+    btn.setAttribute('data-dfs-pull', '1');
+    old.parentNode.replaceChild(btn, old);
+    if (!document.getElementById('pull-status') && btn.parentNode) {
+      var span = document.createElement('span');
+      span.className = 'pull-status';
+      span.id = 'pull-status';
+      span.setAttribute('aria-live', 'polite');
+      btn.parentNode.insertBefore(span, btn.nextSibling);
+    }
+    btn.addEventListener('click', async function () {
+      var session = { ok: false };
+      try { session = await panelJson('/painel/status'); } catch (e) { session = { ok: false }; }
+      if (!session.ok) {
+        setPullStatus('Entre na conta pra puxar.', 'warn');
+        var modal = document.getElementById('panel-modal');
+        if (modal) modal.classList.add('gate');
+        if (typeof openPanel === 'function') await openPanel({ login: true });
+        return;
+      }
+      var fromEl = document.getElementById('custom-start') || document.getElementById('pull-from');
+      var toEl = document.getElementById('custom-end') || document.getElementById('pull-to');
+      var from = (fromEl && fromEl.value) || (typeof ymd === 'function' ? ymd(new Date()) : '');
+      var to = (toEl && toEl.value) || from;
+      if (!from || !to || from > to) {
+        setPullStatus('Escolha a data inicial e a final.', 'warn');
+        return;
+      }
+      var pf = document.getElementById('pull-from');
+      var pt = document.getElementById('pull-to');
+      if (pf) pf.value = from;
+      if (pt) pt.value = to;
+      btn.disabled = true;
+      btn.textContent = 'Puxando…';
+      setPullStatus('Puxando…', 'busy');
+      try {
+        var result = await panelJson('/painel/puxar', { from: from, to: to, module: screen });
+        var response = await fetch('/dados/operacoes.json?ts=' + Date.now(), { cache: 'no-store' });
+        if (!response.ok) throw new Error('Puxei no site, mas não reli o histórico deste PC.');
+        var saved = await response.json();
+        var visible = showPulledPeriod(from, to, saved);
+        var msg = ((result && result.message) || 'Concluído.') + ' Mostrando ' + visible + ' neste período.';
+        setPullStatus(msg, visible ? 'ok' : 'warn');
+        if (typeof copyNote === 'function') copyNote(msg);
+      } catch (e) {
+        var em = (e && e.message) || 'Não puxei do site.';
+        setPullStatus(em, 'err');
+        if (typeof copyNote === 'function') copyNote(em);
+      }
+      btn.disabled = false;
+      btn.textContent = 'Puxar do site';
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(bindPull, 0); });
+  else setTimeout(bindPull, 0);
+})();
+</script></body>`);
+  }
+  // Sempre: crédito certo + menu da faixa por cima (UI do site/cache pode estar velha).
+  html = html
+    .replace(/Criado por\s*Cau[eêé](?:\s*BR)?/gi, 'Criado por Cauehbr')
+    .replace(/Criado por\s*Kau[eêéiíy]+(?:\s*BR)?/gi, 'Criado por Cauehbr');
+  if (!html.includes('id="dfs-ui-fix"')) {
+    html = html.replace(/<\/body>/i, `<style id="dfs-ui-fix-css">
+.range-menu{position:fixed!important;z-index:2147483000!important;margin:0!important;max-height:220px!important;box-shadow:0 18px 44px rgba(0,0,0,.55)!important}
+.grid,.fields,.panel,.wrap,form{overflow:visible!important}
+section.panel:has(.range-trigger.open){position:relative;z-index:4000}
+section.panel:has(.range-trigger.open)~section.panel{z-index:1}
+</style>
+<script id="dfs-ui-fix">
+(function(){
+  function pin(menu, trigger, open){
+    if(!menu) return;
+    if(!open || !trigger){
+      menu.style.top=menu.style.left=menu.style.width=menu.style.maxHeight='';
+      return;
+    }
+    if(menu.parentElement !== document.body) document.body.appendChild(menu);
+    var box=trigger.getBoundingClientRect();
+    var gap=4;
+    var below=window.innerHeight-box.bottom-12;
+    var above=box.top-12;
+    var prefer=below>=140||below>=above;
+    var maxH=Math.max(120,Math.min(220, prefer?below:above));
+    menu.style.width=Math.round(box.width)+'px';
+    menu.style.left=Math.round(box.left)+'px';
+    menu.style.maxHeight=maxH+'px';
+    menu.style.top=prefer
+      ? Math.round(box.bottom+gap)+'px'
+      : Math.round(Math.max(8, box.top-gap-maxH))+'px';
+  }
+  function hook(renderName, openName, menuId, triggerId){
+    var tries=0;
+    (function wait(){
+      tries++;
+      if(typeof window[renderName] !== 'function'){
+        if(tries<80) return setTimeout(wait,100);
+        return;
+      }
+      var orig=window[renderName];
+      window[renderName]=function(){
+        var out=orig.apply(this, arguments);
+        try{
+          var trigger=document.getElementById(triggerId);
+          var open=!!(trigger && trigger.classList.contains('open'));
+          pin(document.getElementById(menuId), trigger, open);
+        }catch(e){}
+        return out;
+      };
+    })();
+  }
+  function isOpen(triggerId){
+    var t=document.getElementById(triggerId);
+    return !!(t && t.classList.contains('open'));
+  }
+  function syncAll(){
+    try{
+      pin(document.getElementById('range-menu'), document.getElementById('range-trigger'), isOpen('range-trigger'));
+      pin(document.getElementById('taxa-menu'), document.getElementById('taxa-trigger'), isOpen('taxa-trigger'));
+    }catch(e){}
+  }
+  hook('renderRanges','rangeOpen','range-menu','range-trigger');
+  hook('renderTaxas','taxaOpen','taxa-menu','taxa-trigger');
+  // Menu no body: seleciona a faixa/taxa aqui (não depende do range-box).
+  document.addEventListener('click', function(event){
+    try{
+      var t=event.target;
+      var rangeMenu=document.getElementById('range-menu');
+      var rangeOpt=t && t.closest && t.closest('[data-range-id]');
+      if(rangeOpt && rangeMenu && rangeMenu.contains(rangeOpt)){
+        event.preventDefault();
+        event.stopPropagation();
+        var hidden=document.getElementById('range');
+        if(hidden){
+          hidden.value=rangeOpt.getAttribute('data-range-id')||'';
+          try{ rangeOpen=false; }catch(e){ try{ window.rangeOpen=false; }catch(e2){} }
+          if(typeof renderRanges==='function') renderRanges();
+          else if(typeof window.renderRanges==='function') window.renderRanges();
+          hidden.dispatchEvent(new Event('change'));
+        }
+        setTimeout(syncAll, 0);
+        return;
+      }
+      var taxaMenu=document.getElementById('taxa-menu');
+      var taxaOpt=t && t.closest && t.closest('[data-taxa-id]');
+      if(taxaOpt && taxaMenu && taxaMenu.contains(taxaOpt)){
+        event.preventDefault();
+        event.stopPropagation();
+        var taxa=document.getElementById('taxa');
+        if(taxa){
+          taxa.value=taxaOpt.getAttribute('data-taxa-id')||'';
+          try{ taxaOpen=false; }catch(e){ try{ window.taxaOpen=false; }catch(e2){} }
+          if(typeof renderTaxas==='function') renderTaxas();
+          else if(typeof window.renderTaxas==='function') window.renderTaxas();
+          taxa.dispatchEvent(new Event('change'));
+        }
+        setTimeout(syncAll, 0);
+      }
+    }catch(e){}
+  }, true);
+  window.addEventListener('resize', syncAll);
+  window.addEventListener('scroll', syncAll, true);
+})();
+</script></body>`);
+  }
+  return html;
+}
 function readAppVersion() {
   try {
     const text = fs.readFileSync(versionFile, 'utf8').trim().replace(/^\uFEFF/, '');
@@ -80,12 +371,42 @@ let catalogKey = '';
 fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(dataFile)) fs.writeFileSync(dataFile, '{}\n');
 
+function machineId() {
+  const fromEnv = String(process.env.DFS_MACHINE_ID || '').trim();
+  if (fromEnv) return fromEnv;
+  try {
+    return String(fs.readFileSync(path.join(dataDir, 'pc-id.txt'), 'utf8') || '').trim();
+  } catch (e) {
+    return '';
+  }
+}
+function forgetLocalAuth() {
+  try { fs.unlinkSync(sessionFile); } catch (e) {}
+  try { fs.unlinkSync(catalogCacheFile); } catch (e) {}
+  siteCatalog = null;
+  catalogKey = '';
+}
 function readSession() {
-  try { return JSON.parse(fs.readFileSync(sessionFile, 'utf8')); } catch (e) { return null; }
+  try {
+    const session = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
+    if (!session || !session.token || !session.userId) return null;
+    const mid = machineId();
+    // Sem id deste PC (não abriu pelo exe) ou sessão de outro computador: não libera offline.
+    if (!mid || !session.machineId || session.machineId !== mid) {
+      forgetLocalAuth();
+      return null;
+    }
+    return session;
+  } catch (e) {
+    return null;
+  }
 }
 function writeSession(session) {
+  const mid = machineId();
+  if (!mid) throw new Error('Abra pelo aplicativo instalado neste computador.');
+  const next = { ...(session || {}), machineId: mid };
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(sessionFile, JSON.stringify(session));
+  fs.writeFileSync(sessionFile, JSON.stringify(next));
 }
 function readRemember() {
   try { return !!JSON.parse(fs.readFileSync(rememberFile, 'utf8')).save; } catch (e) { return false; }
@@ -214,9 +535,79 @@ function claimExistingHistory() {
   }
   fs.writeFileSync(ownerPath, JSON.stringify({ userId: id }));
 }
+function legacyHistoryRoots() {
+  const roots = [];
+  const push = (value) => {
+    try {
+      const resolved = path.resolve(value);
+      if (!resolved || resolved === path.resolve(dataDir)) return;
+      if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) return;
+      if (!roots.includes(resolved)) roots.push(resolved);
+    } catch (e) {}
+  };
+  // Suíte nova (Elite CPA System) vs pasta antiga operacoes-contas.
+  push(path.join(dir, '..', 'operacoes-contas', 'dados'));
+  push(path.join(dir, '..', '..', 'operacoes-contas', 'dados'));
+  push(path.join(dir, '..', 'Elite CPA System', 'dados'));
+  return roots;
+}
+function adoptRicherHistory() {
+  const id = profileId();
+  if (!id) return { imported: 0, total: 0 };
+  claimExistingHistory();
+  const dest = path.join(dataDir, 'perfis', id, 'operacoes.json');
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  if (!fs.existsSync(dest)) fs.writeFileSync(dest, JSON.stringify({ ops: [] }));
+  const destLoaded = readOpsFile(dest);
+  if (!destLoaded.ok) return { imported: 0, total: 0 };
+  const before = (destLoaded.data.ops || []).length;
+  const sources = [dataFile];
+  legacyHistoryRoots().forEach((root) => {
+    sources.push(path.join(root, 'perfis', id, 'operacoes.json'));
+    sources.push(path.join(root, 'operacoes.json'));
+  });
+  let incoming = destLoaded.data;
+  let best = before;
+  sources.forEach((src) => {
+    try {
+      if (!src || !fs.existsSync(src)) return;
+      if (path.resolve(src) === path.resolve(dest)) return;
+      const loaded = readOpsFile(src);
+      if (!loaded.ok) return;
+      const count = (loaded.data.ops || []).length;
+      if (count > best) {
+        incoming = loaded.data;
+        best = count;
+      }
+    } catch (e) {}
+  });
+  if (best <= before) return { imported: 0, total: before };
+  const merged = mergeState(destLoaded.data, incoming);
+  try {
+    commitJson(merged, dest, merged.removedIds || []);
+  } catch (e) {
+    // Se a proteção de dias bloquear, copia o arquivo mais rico por cima.
+    try {
+      fs.copyFileSync(
+        sources.find((src) => {
+          try {
+            return src && fs.existsSync(src) && path.resolve(src) !== path.resolve(dest)
+              && (readOpsFile(src).data.ops || []).length === best;
+          } catch (err) { return false; }
+        }) || dest,
+        dest
+      );
+    } catch (err) {
+      return { imported: 0, total: before, error: e.message || 'Não trouxe o histórico antigo.' };
+    }
+  }
+  const after = (readOpsFile(dest).data.ops || []).length;
+  return { imported: Math.max(0, after - before), total: after };
+}
 function activeDataFile() {
   const id = profileId();
   if (!id) return null;
+  adoptRicherHistory();
   const dest = path.join(dataDir, 'perfis', id, 'operacoes.json');
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   if (!fs.existsSync(dest)) fs.writeFileSync(dest, JSON.stringify({ ops: [] }));
@@ -302,6 +693,12 @@ function mergeState(disk, incoming) {
     next.viewStamp = diskStamp;
   }
   next.removedIds = removedIds;
+  const deleteIds = []
+    .concat(Array.isArray(base.panelDeleteIds) ? base.panelDeleteIds : [])
+    .concat(Array.isArray(body.panelDeleteIds) ? body.panelDeleteIds : [])
+    .map((id) => String(id || '').trim())
+    .filter(Boolean);
+  next.panelDeleteIds = [...new Set(deleteIds)];
   return next;
 }
 function opDay(op) {
@@ -478,14 +875,26 @@ function panelRangeName(range) {
   const span = start === end ? String(start) : start + ' a ' + end;
   return group ? span + ' ' + group : span;
 }
+function rateLabelOf(rate) {
+  if (!rate) return '';
+  const mult = Number(rate.multiplicador) || 0;
+  const taxa = Number(rate.taxa) || 0;
+  const base = mult.toLocaleString('pt-BR') + ' x ' + taxa.toLocaleString('pt-BR') + '%';
+  return rate.observacao ? base + ' · ' + rate.observacao : base;
+}
 function operationForPanel(op, state) {
+  const moduleName = op && op.module === 'montante' ? 'montante' : 'contas';
   const ranges = Array.isArray(state.ranges) ? state.ranges : [];
   const range = ranges.find((item) => item.id === op.range);
   const links = (Array.isArray(op.links) ? op.links : [op.link]).map((item) => String(item || '').trim()).filter(Boolean);
   const date = panelDate(op.date);
+  const rollover = moduleName === 'montante'
+    ? String(op.rangeLabel || op.taxaLabel || '').trim()
+    : '';
   return {
     date,
     createdAt: date,
+    module: moduleName,
     accountName: op.client || '',
     phone: op.phone || '',
     houseLink: links[0] || '',
@@ -503,8 +912,9 @@ function operationForPanel(op, state) {
     netProfit: Number(op.net) || 0,
     bankAccountId: '',
     notes: '',
-    depositRange: panelRangeName(range) || '',
-    rollover: '',
+    depositRange: moduleName === 'montante' ? '' : (panelRangeName(range) || ''),
+    rollover,
+    taxa: moduleName === 'montante' ? (Number(op.taxa) || 0) : 0,
     promocao: false,
     verificado: !!op.verificado,
     discountApplied: Number(op.discount) || 0,
@@ -632,9 +1042,18 @@ function pickCampaign(campaigns, parts) {
   });
   return live[0] || null;
 }
-function catalogBlock(catalog) {
+function catalogBlock(catalog, moduleHint) {
   if (!catalog || !catalog.clientsOk) return 'O site não devolveu os clientes. Não enviei.';
-  if (!catalog.rangesOk || !catalog.ranges.length) return 'O site não devolveu as faixas de depósito. Não enviei.';
+  const wanted = moduleHint === 'montante' ? 'montante' : (moduleHint === 'contas' ? 'contas' : '');
+  const hasRanges = !!(catalog.rangesOk && catalog.ranges && catalog.ranges.length);
+  const hasRates = !!(Array.isArray(catalog.rates) && catalog.rates.length);
+  if (wanted === 'montante') {
+    if (!hasRates) return 'O site não devolveu as taxas do Montante. Não enviei.';
+  } else if (wanted === 'contas') {
+    if (!hasRanges) return 'O site não devolveu as faixas de depósito. Não enviei.';
+  } else if (!hasRanges && !hasRates) {
+    return 'O site não devolveu faixas nem taxas. Não enviei.';
+  }
   if (!catalog.campaignsOk) return 'O site não devolveu o desconto do dia. Não enviei.';
   return '';
 }
@@ -819,8 +1238,139 @@ function discountFor(op, siteRange, catalog) {
   if (!Number.isFinite(percent)) return { error: 'O site não devolveu o desconto do dia. Não enviei.' };
   return { percent };
 }
+function matchSiteRate(op, catalog) {
+  const rates = Array.isArray(catalog.rates) ? catalog.rates : [];
+  if (!rates.length) return { error: 'O site não devolveu as taxas do Montante. Não enviei.' };
+  const taxa = Number(op.taxa);
+  const label = foldText(op.rangeLabel || op.taxaLabel || '');
+  const byTaxa = rates.filter((item) => Number(item.taxa) === taxa);
+  if (byTaxa.length === 1) return { rate: byTaxa[0] };
+  if (label) {
+    const byLabel = rates.filter((item) => foldText(rateLabelOf(item)) === label);
+    if (byLabel.length === 1) return { rate: byLabel[0] };
+    if (byTaxa.length > 1) {
+      const narrowed = byTaxa.filter((item) => foldText(rateLabelOf(item)) === label);
+      if (narrowed.length === 1) return { rate: narrowed[0] };
+    }
+  }
+  if (byTaxa.length > 1) return { error: 'Há mais de uma taxa ' + taxa + '% no site. Escolha a taxa de novo.' };
+  if (Number.isFinite(taxa) && taxa > 0) return { error: 'A taxa ' + taxa + '% não está no cadastro do site. Não enviei.' };
+  return { error: 'Escolha a taxa do Montante antes de enviar.' };
+}
+function montanteQtyFromRules(deposit, catalog) {
+  const rules = (Array.isArray(catalog.accountRules) && catalog.accountRules.length)
+    ? catalog.accountRules.slice().sort((a, b) => a.montante - b.montante)
+    : [];
+  let matched = null;
+  rules.forEach((rule) => {
+    if (Number(deposit) + 1e-9 >= Number(rule.montante)) matched = rule;
+  });
+  return matched ? (Number(matched.qtdContas) || 0) : 0;
+}
+function ruleIsMontante(rule) {
+  const raw = String((rule && rule.module) || '').trim().toLowerCase();
+  return raw === 'montante' || raw === 'montantes';
+}
+function montanteRuleMatches(rule, value) {
+  const limit = Number(rule && rule.montante);
+  if (!Number.isFinite(limit)) return false;
+  const below = String(rule.montanteCompare || '') === 'abaixo';
+  return below ? Number(value) < limit : Number(value) >= limit;
+}
+function campaignAppliesMontante(campaign) {
+  if (!campaign) return false;
+  if (campaign.category === 'Montantes') return true;
+  if ((Number(campaign.discountMontantes) || 0) > 0) return true;
+  return Array.isArray(campaign.groupDiscounts) && campaign.groupDiscounts.some(ruleIsMontante);
+}
+function montanteDiscountFor(op, catalog) {
+  const deposit = Number(op.deposit) || 0;
+  const parts = momentParts(op.date);
+  if (!parts || !(deposit > 0)) {
+    const manual = Number(op.discount);
+    if (Number.isFinite(manual)) return { percent: manual };
+    return { error: 'Informe o desconto do Montante.' };
+  }
+  const live = (catalog.campaigns || []).filter((campaign) => (
+    (campaign.status === 'Ativa' || campaign.status === 'Agendada')
+    && campaignWindow(campaign, parts)
+    && campaignAppliesMontante(campaign)
+  ));
+  if (!live.length) {
+    const manual = Number(op.discount);
+    if (Number.isFinite(manual)) return { percent: manual };
+    return { percent: 0 };
+  }
+  live.sort((a, b) => {
+    const kind = (campaign) => (campaign.panelKind === 'semanal' ? 1 : 0);
+    if (kind(a) !== kind(b)) return kind(a) - kind(b);
+    return (a.status === 'Ativa' ? 0 : 1) - (b.status === 'Ativa' ? 0 : 1);
+  });
+  const rules = (Array.isArray(live[0].groupDiscounts) ? live[0].groupDiscounts : []).filter(ruleIsMontante);
+  if (!rules.length) {
+    const percent = Number(live[0].discountMontantes);
+    if (Number.isFinite(percent)) return { percent };
+    const manual = Number(op.discount);
+    return Number.isFinite(manual) ? { percent: manual } : { percent: 0 };
+  }
+  const matched = rules.filter((rule) => montanteRuleMatches(rule, deposit));
+  if (!matched.length) return { percent: 0 };
+  matched.sort((a, b) => (Number(b.percent) || 0) - (Number(a.percent) || 0));
+  return { percent: Number(matched[0].percent) || 0 };
+}
+function sitePayloadMontante(op, state, catalog) {
+  const blocked = catalogBlock(catalog, 'montante');
+  if (blocked) return { error: blocked };
+  const client = matchClient(op, catalog);
+  if (client.error) return client;
+  if (client.create) return { create: client.create };
+  const matched = matchSiteRate(op, catalog);
+  if (matched.error) return matched;
+  const taxa = Number(matched.rate.taxa) || 0;
+  if (!(taxa > 0)) return { error: 'A taxa do site veio zerada. Não enviei.' };
+  const discount = montanteDiscountFor(op, catalog);
+  if (discount.error) return discount;
+  const deposit = Number(op.deposit) || 0;
+  if (!(deposit > 0)) return { error: 'Informe o montante antes de enviar.' };
+  const qty = Number(op.qty) > 0 ? Number(op.qty) : montanteQtyFromRules(deposit, catalog);
+  const subtotal = deposit * (taxa / 100);
+  const blogger = roundMoney(Math.max(0, subtotal - subtotal * (discount.percent / 100)));
+  const withdrawal = Number(op.withdrawal) || 0;
+  const gross = roundMoney((withdrawal + blogger) - deposit);
+  const commissionRate = Math.max(0, Number(state.rate) || 0);
+  const raw = roundMoney((gross * commissionRate) / 100);
+  const commission = gross >= 0 ? Math.abs(raw) : raw;
+  const net = roundMoney(gross - commission);
+  const phone = sitePhone(client.client);
+  const rollover = rateLabelOf(matched.rate);
+  const base = operationForPanel(op, state);
+  return {
+    data: {
+      ...base,
+      module: 'montante',
+      accountName: client.client.name,
+      phone,
+      requestedAccounts: qty,
+      deposit,
+      withdrawal,
+      blogger,
+      commission,
+      commissionRate,
+      grossProfit: gross,
+      netProfit: net,
+      depositRange: '',
+      rollover,
+      taxa,
+      discountApplied: discount.percent,
+      clientId: client.client.id,
+      clientName: client.client.name,
+      clientPhone: phone,
+    },
+  };
+}
 function sitePayload(op, state, catalog) {
-  const blocked = catalogBlock(catalog);
+  if (op && op.module === 'montante') return sitePayloadMontante(op, state, catalog);
+  const blocked = catalogBlock(catalog, 'contas');
   if (blocked) return { error: blocked };
   const client = matchClient(op, catalog);
   if (client.error) return client;
@@ -848,6 +1398,7 @@ function sitePayload(op, state, catalog) {
   return {
     data: {
       ...base,
+      module: 'contas',
       accountName: client.client.name,
       phone,
       blogger,
@@ -861,6 +1412,15 @@ function sitePayload(op, state, catalog) {
       clientPhone: phone,
     },
   };
+}
+function panelDataReady(data, moduleName) {
+  if (!data || !data.clientId || data.clientId === 'none') return false;
+  if (!Number.isFinite(Number(data.discountApplied))) return false;
+  if (moduleName === 'montante') return !!String(data.rollover || '').trim();
+  return !!String(data.depositRange || '').trim();
+}
+function moduleOfOp(op) {
+  return op && op.module === 'montante' ? 'montante' : 'contas';
 }
 function mapCompanyDocs(result) {
   const json = result.json || {};
@@ -952,7 +1512,21 @@ async function pullCatalog(session, key) {
     })).filter((item) => item.montante > 0).sort((a, b) => a.montante - b.montante) : [],
   };
   siteCatalog = catalog;
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(catalogCacheFile, JSON.stringify(catalog));
+  } catch (e) {}
   return catalog;
+}
+function readCatalogCache(key) {
+  try {
+    const cached = JSON.parse(fs.readFileSync(catalogCacheFile, 'utf8'));
+    if (!cached || !cached.key) return null;
+    if (key && cached.key !== key) return null;
+    return cached;
+  } catch (e) {
+    return null;
+  }
 }
 function ensureCatalog(session, options) {
   settleCompany(session);
@@ -968,7 +1542,16 @@ function ensureCatalog(session, options) {
   if (!fresh && siteCatalog && siteCatalog.key === key) return Promise.resolve(siteCatalog);
   if (catalogFlight && catalogKey === key) return catalogFlight;
   catalogKey = key;
-  catalogFlight = pullCatalog(session, key).finally(() => { catalogFlight = null; });
+  catalogFlight = pullCatalog(session, key)
+    .catch((err) => {
+      const cached = readCatalogCache(key) || (siteCatalog && siteCatalog.key === key ? siteCatalog : null);
+      if (cached) {
+        siteCatalog = { ...cached, offline: true };
+        return siteCatalog;
+      }
+      throw err;
+    })
+    .finally(() => { catalogFlight = null; });
   return catalogFlight;
 }
 function publicCatalog(session, catalog) {
@@ -1062,17 +1645,22 @@ function localOpFromSite(doc, session) {
 }
 function pullOwnedOps(session, from, to, moduleName) {
   return companyOperations(session).then((docs) => {
+    const adopted = adoptRicherHistory();
     const state = readOps();
     const known = new Set((state.ops || []).map((op) => op.panelId).filter(Boolean));
     const wanted = moduleName === 'montante' ? 'montante' : 'contas';
     let added = 0;
+    let owned = 0;
+    let inRange = 0;
     docs.forEach((doc) => {
       const data = doc.data || {};
       const moduleOf = data.module === 'montante' ? 'montante' : 'contas';
       if (moduleOf !== wanted) return;
       if (!ownedBySession(data, session)) return;
+      owned += 1;
       const day = localMinute(data.date).slice(0, 10);
       if (!day || day < from || day > to) return;
+      inRange += 1;
       if (known.has(doc.id)) return;
       const op = localOpFromSite(doc, session);
       if (!op.client || !op.date) return;
@@ -1080,8 +1668,19 @@ function pullOwnedOps(session, from, to, moduleName) {
       known.add(doc.id);
       added += 1;
     });
-    if (added) writeOps(state);
-    return { added, total: (state.ops || []).filter((op) => (op.module === 'montante' ? 'montante' : 'contas') === wanted).length };
+    // writeOps só carimba panelId — NÃO grava operação nova. persistState mescla e salva.
+    if (added) {
+      const saved = persistState(state);
+      if (!saved) throw new Error('Puxei do site, mas não consegui gravar no aplicativo.');
+    }
+    return {
+      added,
+      owned,
+      inRange,
+      scanned: Array.isArray(docs) ? docs.length : 0,
+      adopted: adopted.imported || 0,
+      total: (readOps().ops || []).filter((op) => (op.module === 'montante' ? 'montante' : 'contas') === wanted).length,
+    };
   });
 }
 function dayKey(op) {
@@ -1099,7 +1698,10 @@ function localMinute(value) {
     if (!Number.isNaN(date.getTime())) return formatLocal(date);
   }
   const text = String(value).trim();
+  // Só a data (YYYY-MM-DD): não usa Date() UTC, senão vira o dia anterior no Brasil.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text + 'T00:00';
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) return text;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(text)) return text.slice(0, 16);
   const date = new Date(text);
   if (Number.isNaN(date.getTime())) return panelDate(text);
   return formatLocal(date);
@@ -1323,8 +1925,26 @@ const server = http.createServer((req, res) => {
       return;
     }
     ensureCatalog(session, { fresh: true })
-      .then((catalog) => sendJson(res, 200, publicCatalog(session, catalog)))
-      .catch(() => sendJson(res, 200, { ok: false, name: session.name || '', message: 'O site não devolveu o cadastro.' }));
+      .then((catalog) => {
+        const pub = publicCatalog(session, catalog);
+        if (catalog && catalog.offline) {
+          pub.offline = true;
+          pub.message = (pub.message ? pub.message + ' ' : '') + 'Site fora do ar — usando o último cadastro deste PC.';
+        }
+        sendJson(res, 200, pub);
+      })
+      .catch(() => {
+        const key = session.companyId + '|' + session.userId;
+        const cached = readCatalogCache(key);
+        if (cached) {
+          const pub = publicCatalog(session, cached);
+          pub.offline = true;
+          pub.message = 'Site fora do ar — usando o último cadastro deste PC.';
+          sendJson(res, 200, pub);
+          return;
+        }
+        sendJson(res, 200, { ok: false, name: session.name || '', message: 'O site não devolveu o cadastro.' });
+      });
     return;
   }
   if (url === '/painel/captcha' && req.method === 'GET') {
@@ -1384,10 +2004,8 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url === '/painel/sair' && req.method === 'POST') {
-    try { fs.unlinkSync(sessionFile); } catch (e) {}
+    forgetLocalAuth();
     writeRemember(false);
-    siteCatalog = null;
-    catalogKey = '';
     sendJson(res, 200, { ok: true });
     return;
   }
@@ -1415,11 +2033,21 @@ const server = http.createServer((req, res) => {
       const moduleName = body.module === 'montante' ? 'montante' : 'contas';
       try {
         const result = await pullOwnedOps(session, from, to, moduleName);
+        const bits = [];
+        if (result.adopted) bits.push(result.adopted + ' do histórico antigo deste PC');
+        if (result.added) bits.push(result.added + ' novas do site');
         sendJson(res, 200, {
           added: result.added,
-          message: result.added
-            ? result.added + ' operações suas entraram no aplicativo.'
-            : 'Nesse período não havia operação sua nova no site.',
+          adopted: result.adopted || 0,
+          from,
+          to,
+          message: bits.length
+            ? bits.join(' e ') + ' entraram no aplicativo.'
+            : (result.inRange
+              ? 'Nesse período as suas operações do site já estavam aqui.'
+              : (result.owned
+                ? 'Você tem operações no site, mas fora de ' + from.split('-').reverse().join('/') + ' a ' + to.split('-').reverse().join('/') + '. Ajuste o período.'
+                : 'Nesse período não havia operação sua no site.')),
         });
       } catch (e) {
         sendJson(res, 502, { message: e.message || 'Não consegui ler as operações do site.' });
@@ -1508,6 +2136,7 @@ const server = http.createServer((req, res) => {
           password: String(body.password || ''),
           companySlug: slug,
           recaptchaToken: String(body.recaptchaToken || ''),
+          desktopApp: true,
         });
         const json = result.json || {};
         if (result.status >= 400 || !json.token) {
@@ -1578,7 +2207,8 @@ const server = http.createServer((req, res) => {
         return;
       }
       const wanted = String(body.day || '');
-      const loaded = readOpsFile();
+      const profileFile = activeDataFile();
+      const loaded = profileFile ? readOpsFile(profileFile) : { ok: false, data: null };
       if (!loaded.ok) {
         sendJson(res, 500, { message: 'Não li as operações daqui. Nada foi regravado.' });
         return;
@@ -1648,32 +2278,37 @@ const server = http.createServer((req, res) => {
             panelId: crypto.randomBytes(10).toString('hex'),
             data: preparedById.get(String(op.id)),
           }));
-          if (items.some((item) => !item.data || !String(item.data.depositRange || '').trim() || !Number.isFinite(Number(item.data.discountApplied)) || !item.data.clientId || item.data.clientId === 'none')) {
-            sendJson(res, 400, { message: 'O site não devolveu cliente, faixa ou desconto. Não enviei.' });
+          if (items.some((item) => {
+            const local = slice.find((op) => String(op.id) === String(item.localId));
+            return !panelDataReady(item.data, moduleOfOp(local));
+          })) {
+            sendJson(res, 400, { message: 'O site não devolveu cliente, faixa/taxa ou desconto. Não enviei.' });
             return;
           }
-          const ops = items.map((item) => ({
-            type: 'set',
-            collection: 'operations',
-            id: item.panelId,
-            data: {
-              ...(item.data || {}),
+          const ops = items.map((item) => {
+            const local = slice.find((op) => String(op.id) === String(item.localId));
+            return {
+              type: 'set',
+              collection: 'operations',
               id: item.panelId,
-              module: 'contas',
-              operatorId: session.userId,
-              companyId: session.companyId,
-            },
-            merge: false,
-          }));
+              data: {
+                ...(item.data || {}),
+                id: item.panelId,
+                module: moduleOfOp(local),
+                operatorId: session.userId,
+                companyId: session.companyId,
+              },
+              merge: false,
+            };
+          });
           const result = await panelRequest('batch', { ops, dfs_token: session.token });
           const json = result.json || {};
           if (result.status >= 400 || !Array.isArray(json.results)) {
-            if (result.status === 401) {
-              try { fs.unlinkSync(sessionFile); } catch (e) {}
-            }
+            // Site fora / manutenção: NÃO apaga a sessão local.
             sendJson(res, result.status >= 400 ? result.status : 502, {
               message: json.message || 'O painel não gravou.',
               sent,
+              offline: result.status >= 500 || result.status === 0,
             });
             return;
           }
@@ -1716,13 +2351,43 @@ const server = http.createServer((req, res) => {
         sendJson(res, 200, { sent: [] });
         return;
       }
-      const loaded = readOpsFile();
+      // Histórico fica em perfis/{userId}, não no operacoes.json da raiz.
+      const profileFile = activeDataFile();
+      const loaded = profileFile ? readOpsFile(profileFile) : { ok: false, data: null };
       if (!loaded.ok) {
         sendJson(res, 500, { message: 'Não li as operações daqui. Nada foi regravado.' });
         return;
       }
       const wantedIds = new Set(items.map((item) => String(item.localId)));
-      const pending = (loaded.data.ops || []).filter((op) => wantedIds.has(String(op.id)));
+      let pending = (loaded.data.ops || []).filter((op) => wantedIds.has(String(op.id)));
+      // Se o front acabou de gravar, aceita o payload do item como fallback.
+      if (pending.length !== items.length) {
+        const byId = new Map((loaded.data.ops || []).map((op) => [String(op.id), op]));
+        const rebuilt = [];
+        for (const item of items) {
+          const local = byId.get(String(item.localId));
+          if (local) rebuilt.push(local);
+          else if (item.data && typeof item.data === 'object') {
+            rebuilt.push({
+              id: item.localId,
+              module: item.data.module === 'montante' ? 'montante' : 'contas',
+              client: item.data.accountName || item.data.clientName || '',
+              phone: item.data.phone || item.data.clientPhone || '',
+              date: item.data.date || '',
+              deposit: item.data.deposit,
+              withdrawal: item.data.withdrawal,
+              qty: item.data.requestedAccounts,
+              discount: item.data.discountApplied,
+              rangeLabel: item.data.depositRange || item.data.rollover || '',
+              taxa: item.data.taxa,
+              verificado: !!item.data.verificado,
+              links: item.data.houseLinks || [item.data.houseLink || ''],
+              panelId: '',
+            });
+          }
+        }
+        pending = rebuilt;
+      }
       if (pending.length !== items.length) {
         sendJson(res, 400, { message: 'Não achei todas as operações daqui. Nada foi enviado.' });
         return;
@@ -1750,19 +2415,61 @@ const server = http.createServer((req, res) => {
         return;
       }
       const ready = prepareSiteOps(pending, loaded.data, catalog);
-      if (ready.problems.length) {
+      // Preferir o data já montado pelo app quando prepareSiteOps falhar por cache.
+      const preparedById = new Map();
+      ready.prepared.forEach((item) => preparedById.set(String(item.op.id), item.data));
+      items.forEach((item) => {
+        if (!preparedById.has(String(item.localId)) && item.data && typeof item.data === 'object') {
+          preparedById.set(String(item.localId), item.data);
+        }
+      });
+      if (ready.problems.length && preparedById.size < items.length) {
         sendJson(res, 400, { message: ready.problems.slice(0, 6).join(' ') });
         return;
       }
-      const preparedById = new Map(ready.prepared.map((item) => [String(item.op.id), item.data]));
-      const ops = items.map((item) => ({
+      const localById = new Map(pending.map((op) => [String(op.id), op]));
+      if (items.some((item) => !panelDataReady(preparedById.get(String(item.localId)), moduleOfOp(localById.get(String(item.localId)))))) {
+        sendJson(res, 400, { message: 'O site não devolveu cliente, faixa/taxa ou desconto. Não enviei.' });
+        return;
+      }
+      // Não cria de novo se já existe igual no site (evita duplicar).
+      let docs = [];
+      try { docs = await companyOperations(session); } catch (e) {
+        sendJson(res, 502, { message: e.message || 'Não li as operações do painel.', offline: true });
+        return;
+      }
+      const ourIds = new Set((loaded.data.ops || []).map((op) => op.panelId).filter(Boolean));
+      const now = new Date().toISOString();
+      const freshItems = [];
+      const linked = [];
+      items.forEach((item) => {
+        const op = localById.get(String(item.localId));
+        const already = op ? alreadyThere(docs, op, loaded.data, ourIds) : '';
+        if (already) linked.push({ localId: item.localId, panelId: already });
+        else freshItems.push(item);
+      });
+      if (linked.length) {
+        const linkMap = new Map(linked.map((item) => [String(item.localId), item.panelId]));
+        loaded.data = {
+          ...loaded.data,
+          ops: (loaded.data.ops || []).map((op) => linkMap.has(String(op.id))
+            ? { ...op, panelId: linkMap.get(String(op.id)), panelSentAt: now }
+            : op),
+        };
+        try { persistState(loaded.data); } catch (e) {}
+      }
+      if (!freshItems.length) {
+        sendJson(res, 200, { sent: linked, linked: linked.length, message: 'Já estavam no site.' });
+        return;
+      }
+      const ops = freshItems.map((item) => ({
         type: 'set',
         collection: 'operations',
         id: item.panelId,
         data: {
           ...(preparedById.get(String(item.localId)) || {}),
           id: item.panelId,
-          module: 'contas',
+          module: moduleOfOp(localById.get(String(item.localId))),
           operatorId: session.userId,
           companyId: session.companyId,
         },
@@ -1772,19 +2479,233 @@ const server = http.createServer((req, res) => {
         const result = await panelRequest('batch', { ops, dfs_token: session.token });
         const json = result.json || {};
         if (result.status >= 400 || !Array.isArray(json.results)) {
-          if (result.status === 401) {
-            try { fs.unlinkSync(sessionFile); } catch (e) {}
-          }
-          sendJson(res, result.status >= 400 ? result.status : 502, { message: json.message || 'O painel não gravou.' });
+          // Mantém login local se o site caiu / manutenção.
+          sendJson(res, result.status >= 400 ? result.status : 502, {
+            message: json.message || 'O painel não gravou.',
+            offline: result.status >= 500 || result.status === 0,
+          });
           return;
         }
-        const sent = items.map((item, index) => ({
+        const sent = freshItems.map((item, index) => ({
           localId: item.localId,
           panelId: (json.results[index] && json.results[index].id) || item.panelId,
-        }));
+        })).concat(linked);
+        const sentAt = new Date().toISOString();
+        const ids = new Map(sent.map((item) => [String(item.localId), item.panelId]));
+        const next = {
+          ...loaded.data,
+          ops: (loaded.data.ops || []).map((op) => ids.has(String(op.id))
+            ? { ...op, panelId: ids.get(String(op.id)), panelSentAt: sentAt }
+            : op),
+        };
+        try { persistState(next); } catch (e) {}
         sendJson(res, 200, { sent });
       } catch (e) {
-        sendJson(res, 502, { message: 'Não consegui falar com o painel.' });
+        sendJson(res, 502, { message: 'Não consegui falar com o painel.', offline: true });
+      }
+    }).catch(() => sendJson(res, 400, { message: 'Não li as operações.' }));
+    return;
+  }
+  // Apaga no site o mesmo panelId. Offline fica em panelDeleteIds até voltar.
+  if (url === '/painel/apagar' && req.method === 'POST') {
+    readBody(req).then(async (body) => {
+      const session = readSession();
+      if (!session || !session.token || !session.userId) {
+        sendJson(res, 401, { message: 'Entre no painel de novo.' });
+        return;
+      }
+      settleCompany(session);
+      if (!session.companyId) {
+        sendJson(res, 400, { message: 'Escolha a empresa antes de apagar.' });
+        return;
+      }
+      const panelIds = [...new Set((Array.isArray(body.panelIds) ? body.panelIds : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean))].slice(0, 8);
+      if (!panelIds.length) {
+        sendJson(res, 200, { deleted: [] });
+        return;
+      }
+      const profileFile = activeDataFile();
+      const loaded = profileFile ? readOpsFile(profileFile) : { ok: false, data: null };
+      let docs = [];
+      try { docs = await companyOperations(session); } catch (e) {
+        sendJson(res, 502, { message: e.message || 'Não li as operações do painel.', offline: true });
+        return;
+      }
+      const docById = new Map(docs.map((doc) => [String(doc.id), doc]));
+      const mine = panelIds.filter((id) => {
+        const doc = docById.get(id);
+        if (!doc) return true; // já sumiu no site
+        return ownedBySession(doc.data || {}, session);
+      });
+      const foreign = panelIds.filter((id) => !mine.includes(id));
+      if (foreign.length) {
+        sendJson(res, 403, { message: 'Tem operação de outro operador nessa lista. Não apaguei.' });
+        return;
+      }
+      const existing = mine.filter((id) => docById.has(id));
+      try {
+        if (existing.length) {
+          const result = await panelRequest('batch', {
+            ops: existing.map((id) => ({ type: 'delete', collection: 'operations', id })),
+            dfs_token: session.token,
+          });
+          const json = result.json || {};
+          if (result.status >= 400 || !Array.isArray(json.results)) {
+            sendJson(res, result.status >= 400 ? result.status : 502, {
+              message: json.message || 'O painel não apagou.',
+              offline: result.status >= 500 || result.status === 0,
+            });
+            return;
+          }
+        }
+        if (loaded.ok) {
+          const gone = new Set(mine);
+          const next = {
+            ...loaded.data,
+            panelDeleteIds: (loaded.data.panelDeleteIds || []).filter((id) => !gone.has(String(id))),
+          };
+          try { persistState(next); } catch (e) {}
+        }
+        sendJson(res, 200, { deleted: mine.map((panelId) => ({ panelId })) });
+      } catch (e) {
+        sendJson(res, 502, { message: 'Não consegui falar com o painel.', offline: true });
+      }
+    }).catch(() => sendJson(res, 400, { message: 'Não li o pedido de exclusão.' }));
+    return;
+  }
+  // Edita no site o mesmo id (merge). Não cria outro e não apaga.
+  if (url === '/painel/atualizar' && req.method === 'POST') {
+    readBody(req).then(async (body) => {
+      const session = readSession();
+      if (!session || !session.token || !session.userId) {
+        sendJson(res, 401, { message: 'Entre no painel de novo.' });
+        return;
+      }
+      settleCompany(session);
+      if (!session.companyId) {
+        sendJson(res, 400, { message: 'Escolha a empresa antes de editar.' });
+        return;
+      }
+      const items = Array.isArray(body.items) ? body.items.slice(0, 8) : [];
+      if (!items.length) {
+        sendJson(res, 200, { updated: [] });
+        return;
+      }
+      const profileFile = activeDataFile();
+      const loaded = profileFile ? readOpsFile(profileFile) : { ok: false, data: null };
+      if (!loaded.ok) {
+        sendJson(res, 500, { message: 'Não li as operações daqui. Nada foi editado no site.' });
+        return;
+      }
+      const byId = new Map((loaded.data.ops || []).map((op) => [String(op.id), op]));
+      const pending = [];
+      for (const item of items) {
+        const local = byId.get(String(item.localId));
+        const panelId = String((local && local.panelId) || item.panelId || '').trim();
+        if (!local || !panelId) {
+          sendJson(res, 400, { message: 'Só edito no site operação que já foi enviada.' });
+          return;
+        }
+        pending.push({ op: local, panelId, dataHint: item.data });
+      }
+      let catalog;
+      try {
+        catalog = await ensureCatalog(session);
+      } catch (e) {
+        sendJson(res, 502, { message: 'O site não devolveu o cadastro. Não editei.', offline: true });
+        return;
+      }
+      const blocked = catalogBlock(catalog);
+      if (blocked) {
+        sendJson(res, 400, { message: blocked });
+        return;
+      }
+      try {
+        const placed = await ensureSiteClients(pending.map((item) => item.op), catalog, session);
+        if (placed.problems.length) {
+          sendJson(res, 400, { message: placed.problems.slice(0, 6).join(' ') });
+          return;
+        }
+      } catch (e) {
+        sendJson(res, 502, { message: e.message || 'O site não cadastrou o cliente. Não editei.' });
+        return;
+      }
+      const ready = prepareSiteOps(pending.map((item) => item.op), loaded.data, catalog);
+      const preparedById = new Map();
+      ready.prepared.forEach((item) => preparedById.set(String(item.op.id), item.data));
+      pending.forEach((item) => {
+        if (!preparedById.has(String(item.op.id)) && item.dataHint && typeof item.dataHint === 'object') {
+          preparedById.set(String(item.op.id), item.dataHint);
+        }
+      });
+      if (ready.problems.length && preparedById.size < pending.length) {
+        sendJson(res, 400, { message: ready.problems.slice(0, 6).join(' ') });
+        return;
+      }
+      if (pending.some((item) => !panelDataReady(preparedById.get(String(item.op.id)), moduleOfOp(item.op)))) {
+        sendJson(res, 400, { message: 'O site não devolveu cliente, faixa/taxa ou desconto. Não editei.' });
+        return;
+      }
+      let docs = [];
+      try { docs = await companyOperations(session); } catch (e) {
+        sendJson(res, 502, { message: e.message || 'Não li as operações do painel.', offline: true });
+        return;
+      }
+      const docById = new Map(docs.map((doc) => [String(doc.id), doc]));
+      const missing = pending.filter((item) => !docById.has(String(item.panelId)));
+      if (missing.length) {
+        sendJson(res, 404, { message: 'Não achei essa operação no site pra editar. Nada foi apagado.' });
+        return;
+      }
+      const ops = pending.map((item) => {
+        const existing = (docById.get(String(item.panelId)) || {}).data || {};
+        const built = { ...(preparedById.get(String(item.op.id)) || {}) };
+        // Não zera campos que o painel cuida (saques limpos, conta, notas, criação).
+        delete built.clearedAccounts;
+        delete built.withdrawnAccounts;
+        delete built.bankAccountId;
+        delete built.notes;
+        delete built.createdAt;
+        return {
+          type: 'update',
+          collection: 'operations',
+          id: item.panelId,
+          merge: true,
+          data: {
+            ...built,
+            id: item.panelId,
+            module: moduleOfOp(item.op),
+            operatorId: existing.operatorId || session.userId,
+            companyId: existing.companyId || session.companyId,
+            createdAt: existing.createdAt || built.date,
+          },
+        };
+      });
+      try {
+        const result = await panelRequest('batch', { ops, dfs_token: session.token });
+        const json = result.json || {};
+        if (result.status >= 400 || !Array.isArray(json.results)) {
+          sendJson(res, result.status >= 400 ? result.status : 502, {
+            message: json.message || 'O painel não gravou a edição.',
+            offline: result.status >= 500 || result.status === 0,
+          });
+          return;
+        }
+        const updated = pending.map((item) => ({ localId: item.op.id, panelId: item.panelId }));
+        const sentAt = new Date().toISOString();
+        const ids = new Set(updated.map((item) => String(item.localId)));
+        const next = {
+          ...loaded.data,
+          ops: (loaded.data.ops || []).map((op) => ids.has(String(op.id))
+            ? { ...op, panelDirty: false, panelSentAt: sentAt }
+            : op),
+        };
+        try { persistState(next); } catch (e) {}
+        sendJson(res, 200, { updated });
+      } catch (e) {
+        sendJson(res, 502, { message: 'Não consegui falar com o painel.', offline: true });
       }
     }).catch(() => sendJson(res, 400, { message: 'Não li as operações.' }));
     return;
@@ -1811,7 +2732,7 @@ const server = http.createServer((req, res) => {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',
     });
-    res.end(fs.readFileSync(htmlFile));
+    res.end(uiHtml('contas-operacoes'));
     return;
   }
   res.writeHead(404);
