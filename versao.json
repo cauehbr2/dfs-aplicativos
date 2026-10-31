@@ -18,12 +18,13 @@
                                   ]
                     },
     "operacoes":  {
-                      "version":  "1.0.62",
+                      "version":  "1.0.63",
                       "files":  [
                                     "app-versao.txt",
                                     "Operacoes.exe",
                                     "operacoes-app.pak",
                                     "painel-cartao.pak",
+                                    "contas-operacoes.ui.pak",
                                     "ui-seal.pak",
                                     "elite-cpa-logo-4.png",
                                     "icone.ico",
