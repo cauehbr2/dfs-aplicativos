@@ -1,12 +1,14 @@
-﻿{
+{
   "calculadora": {
-    "version": "1.1.27",
+    "version": "1.1.28",
     "remover": false,
     "files": [
       "app-versao.txt",
       "Calculadora.exe",
       "calculadora-app.pak",
       "budget-templates.pak",
+      "calculadora.ui.pak",
+      "fila.ui.pak",
       "ui-seal.pak",
       "node.exe",
       "elite-cpa-logo-4.png",
@@ -20,7 +22,7 @@
     ]
   },
   "operacoes": {
-    "version": "1.0.72",
+    "version": "1.0.73",
     "remover": false,
     "files": [
       "app-versao.txt",
