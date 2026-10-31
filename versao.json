@@ -1,6 +1,6 @@
 {
     "calculadora":  {
-                        "version":  "1.1.22",
+                        "version":  "1.1.23",
                         "remover":  false,
                         "files":  [
                                       "app-versao.txt",
@@ -8,6 +8,7 @@
                                       "calculadora-app.pak",
                                       "budget-templates.pak",
                                       "ui-seal.pak",
+                                      "node.exe",
                                       "elite-cpa-logo-4.png",
                                       "icone.ico",
                                       "icone.png",
@@ -19,7 +20,7 @@
                                   ]
                     },
     "operacoes":  {
-                      "version":  "1.0.68",
+                      "version":  "1.0.69",
                       "remover":  false,
                       "files":  [
                                     "app-versao.txt",
@@ -28,6 +29,7 @@
                                     "painel-cartao.pak",
                                     "contas-operacoes.ui.pak",
                                     "ui-seal.pak",
+                                    "node.exe",
                                     "elite-cpa-logo-4.png",
                                     "icone.ico",
                                     "icone.png",
