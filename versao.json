@@ -1,4 +1,4 @@
-﻿{
+{
     "calculadora":  {
                         "version":  "1.0.121",
                         "files":  [
@@ -18,7 +18,7 @@
                                   ]
                     },
     "operacoes":  {
-                      "version":  "1.0.61",
+                      "version":  "1.0.62",
                       "files":  [
                                     "app-versao.txt",
                                     "Operacoes.exe",
