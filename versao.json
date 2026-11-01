@@ -22,7 +22,7 @@
     ]
   },
   "operacoes": {
-    "version": "1.0.73",
+    "version": "1.0.74",
     "remover": false,
     "files": [
       "app-versao.txt",
