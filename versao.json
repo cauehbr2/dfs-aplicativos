@@ -43,7 +43,7 @@
                                 ]
                   },
     "pedidos":  {
-                    "version":  "1.0.9",
+                    "version":  "1.0.10",
                     "remover":  false,
                     "files":  [
                                   "app-versao.txt",

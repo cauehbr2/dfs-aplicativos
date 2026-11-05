@@ -375,12 +375,13 @@ function scoped() {
   const type = document.getElementById('type').dataset.value || 'all';
   const priority = document.getElementById('priority').dataset.value || 'all';
   return state.orders.filter((order) => {
+    if (!visibleOrder(order)) return false;
     if (type !== 'all' && order.type !== type) return false;
     if (priority !== 'all' && order.priority !== priority) return false;
     if (!inPeriod(order)) return false;
     if (!term) return true;
     const bag = [order.orderCode, order.clientName, order.assignedOperatorName, order.responsibleOperatorName, order.notes, order.companyName];
-    if (manager()) bag.push(order.phone);
+    if (oversight()) bag.push(order.phone);
     return bag.join(' ').toLowerCase().includes(term);
   });
 }
@@ -390,7 +391,7 @@ function tabOf(order, listName) {
   if (listName === 'aguardando') return order.status === 'Aguardando operador' || order.status === 'Registrado' || order.status === 'Retornado para fila';
   if (listName === 'designados') return order.status === 'Designado';
   if (listName === 'meus') return mine && open;
-  if (listName === 'assumidos') return order.status === 'Assumido';
+  if (listName === 'assumidos') return order.status === 'Assumido' || order.status === 'Em andamento';
   if (listName === 'finalizados') return order.status === 'Finalizado';
   if (listName === 'concluidos') return order.status === 'Concluído';
   if (listName === 'cancelados') return order.status === 'Cancelado';
@@ -409,13 +410,36 @@ function when(iso) {
   if (!iso || Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' }).replace(',', ' às');
 }
-function manager() {
-  return state.me.role === 'ADM_MASTER' || state.me.role === 'SOCIO';
+function oversight() {
+  if (state.me.role === 'ADM_MASTER') return true;
+  return Array.isArray(state.me.permissions) && state.me.permissions.indexOf('order_queue_edit') >= 0;
+}
+function waitingOrder(order) {
+  return order.status === 'Aguardando operador' || order.status === 'Registrado' || order.status === 'Retornado para fila';
+}
+function visibleOrder(order) {
+  if (oversight()) return true;
+  const me = state.me.id;
+  if (!me) return false;
+  if (waitingOrder(order)) return true;
+  if (order.status === 'Designado') return order.assignedOperatorId === me;
+  return order.responsibleOperatorId === me;
 }
 function closed(order) {
   return order.status === 'Finalizado' || order.status === 'Concluído' || order.status === 'Cancelado';
 }
+function modMark(order) {
+  const contasOn = moduleOn(order, 'contas') ? ' on' : '';
+  const montanteOn = moduleOn(order, 'montante') ? ' on' : '';
+  if (oversight() || mine(order)) {
+    return '<button type="button" class="mod contas' + contasOn + '" data-mod="contas" data-id="' + esc(order.id) + '" title="Marcar o que foi acrescentado">Contas</button>'
+      + '<button type="button" class="mod montante' + montanteOn + '" data-mod="montante" data-id="' + esc(order.id) + '" title="Marcar o que foi acrescentado">Montante</button>';
+  }
+  return '<span class="mod contas' + contasOn + '">Contas</span><span class="mod montante' + montanteOn + '">Montante</span>';
+}
 function mine(order) {
+  return state.me.id && order.responsibleOperatorId === state.me.id;
+}
   return state.me.id && order.responsibleOperatorId === state.me.id;
 }
 function moduleOn(order, module) {
@@ -458,15 +482,15 @@ function card(order) {
     ? '<span class="blogger ' + (contas ? 'contas' : 'montante') + '">Blogueira ' + (contas ? 'Contas' : 'Montante') + ': <strong>' + money.format(order.blogger) + '</strong></span>'
     : '';
   const pix = order.pixReceivedBy ? '<span class="pix">Pix: <strong>' + esc(order.pixReceivedBy) + '</strong></span>' : '';
-  const phone = manager() && order.phone ? '<span class="co">' + esc(order.phone) + '</span>' : '';
+  const phone = oversight() && order.phone ? '<span class="co">' + esc(order.phone) + '</span>' : '';
   const notes = order.notes ? '<p class="notes">"' + esc(order.notes) + '"</p>' : '';
   const links = (order.links || []).length
     ? '<div class="links">' + order.links.map((link) => '<div class="link"><a href="' + esc(hrefOf(link)) + '" target="_blank" rel="noreferrer">' + esc(link) + '</a><button type="button" class="icon copy" data-copy="' + esc(link) + '" title="Copiar link">' + copyIcon + '</button></div>').join('') + '</div>'
     : '';
   const finished = order.status === 'Finalizado' || order.status === 'Concluído';
-  const showCheck = order.status !== 'Cancelado' && (manager() || ((order.status === 'Assumido' || order.status === 'Em andamento') && mine(order)) || (finished && mine(order)));
+  const showCheck = order.status !== 'Cancelado' && (oversight() || ((order.status === 'Assumido' || order.status === 'Em andamento') && mine(order)) || (finished && mine(order)));
   const check = showCheck
-    ? '<label class="check" title="Pedido finalizado"><input type="checkbox" data-finish="' + esc(order.id) + '"' + (finished ? ' checked' : '') + ((order.status === 'Concluído' || (order.status === 'Finalizado' && !manager())) ? ' disabled' : '') + '></label>'
+    ? '<label class="check" title="Pedido finalizado"><input type="checkbox" data-finish="' + esc(order.id) + '"' + (finished ? ' checked' : '') + ((order.status === 'Concluído' || (order.status === 'Finalizado' && !oversight())) ? ' disabled' : '') + '></label>'
     : '';
   const doneNote = order.status === 'Finalizado'
     ? '<div class="done-note"><b>Pedido finalizado.</b> Completo. Aguardando o valor do saque.</div>'
@@ -476,19 +500,18 @@ function card(order) {
   const shotRow = '<div class="shots" data-shots="' + esc(order.id) + '" hidden></div>';
   const waiting = order.status === 'Aguardando operador' || order.status === 'Registrado' || order.status === 'Retornado para fila';
   const claim = (waiting || order.assignedOperatorId === state.me.id) && !order.responsibleOperatorId && !closed(order);
-  const other = order.status === 'Designado' && !order.responsibleOperatorId && order.assignedOperatorId && order.assignedOperatorId !== state.me.id && (manager() || order.companyId === state.me.companyId);
+  const other = order.status === 'Designado' && !order.responsibleOperatorId && order.assignedOperatorId && order.assignedOperatorId !== state.me.id && oversight();
   const buttons = ['<button type="button" class="abrir" data-open="' + esc(order.id) + '" title="Abrir pedido completo">' + eye + 'Abrir</button>'];
   if (claim) buttons.push('<button type="button" class="assumir" data-assumir="' + esc(order.id) + '" data-takeover="0">Assumir</button>');
   if (other) buttons.push('<button type="button" class="assumir other" data-assumir="' + esc(order.id) + '" data-takeover="1" title="Assumir porque ' + esc(order.assignedOperatorName || 'o operador') + ' está cheio ou ocupado">Outro assumir</button>');
-  if (order.status === 'Finalizado') buttons.push('<button type="button" class="concluir" data-concluir="' + esc(order.id) + '">✓ Concluído</button>');
-  if ((mine(order) || manager()) && !closed(order)) buttons.push('<button type="button" class="icon back" data-act="return" data-id="' + esc(order.id) + '" title="Retornar à fila">' + back + '</button>');
-  if ((manager() || mine(order)) && !closed(order)) buttons.push('<button type="button" class="icon stop" data-act="cancel" data-id="' + esc(order.id) + '" title="Cancelar pedido">' + ban + '</button>');
+  if (order.status === 'Finalizado' && (oversight() || mine(order))) buttons.push('<button type="button" class="concluir" data-concluir="' + esc(order.id) + '">✓ Concluído</button>');
+  if (oversight() && !closed(order)) buttons.push('<button type="button" class="icon back" data-act="return" data-id="' + esc(order.id) + '" title="Retornar à fila">' + back + '</button>');
+  if (oversight() && !closed(order)) buttons.push('<button type="button" class="icon stop" data-act="cancel" data-id="' + esc(order.id) + '" title="Cancelar pedido">' + ban + '</button>');
   buttons.push('<button type="button" class="icon" data-act="history" data-id="' + esc(order.id) + '" title="Histórico de movimentações">' + clock + '</button>');
   return '<article class="card ' + prio + (pending ? ' pendencia' : '') + '">'
     + '<div class="top"><div class="chips"><span class="code">' + esc(order.orderCode) + '</span>'
     + '<span class="chip ' + (contas ? 'contas' : 'montante') + '">' + (contas ? 'Op. Contas' : 'Op. Montantes') + '</span>'
-    + '<button type="button" class="mod contas' + (moduleOn(order, 'contas') ? ' on' : '') + '" data-mod="contas" data-id="' + esc(order.id) + '" title="Marcar o que foi acrescentado">Contas</button>'
-    + '<button type="button" class="mod montante' + (moduleOn(order, 'montante') ? ' on' : '') + '" data-mod="montante" data-id="' + esc(order.id) + '" title="Marcar o que foi acrescentado">Montante</button>'
+    + modMark(order)
     + (pending ? '<span class="pend">Pendência anterior</span>' : '')
     + '</div><div class="right">' + check + '<span class="prio ' + prio + '">' + (order.priority === 'Urgente' ? '🔥 ' : order.priority === 'Alta' ? '⚡ ' : '') + esc(order.priority || 'Normal') + '</span></div></div>'
     + '<div class="mid"><div><h3 class="client">' + esc(order.clientName) + '</h3>' + phone + '<div class="co">' + building + esc(order.companyName) + '</div></div>'
@@ -535,6 +558,7 @@ function saqueValues(order) {
 }
 function saqueBox(order) {
   if (order.status !== 'Finalizado') return '';
+  if (!oversight() && !mine(order)) return '';
   const values = saqueValues(order);
   const total = values.reduce((sum, item) => sum + moneyInput(item), 0);
   const rows = values.map((value, index) => '<div class="saque-row"><input data-saque="' + index + '" inputmode="decimal" placeholder="0,00" value="' + esc(value) + '">' + (values.length > 1 ? '<button type="button" data-remove-saque="' + index + '" title="Remover">×</button>' : '') + '</div>').join('');
@@ -659,7 +683,7 @@ function openOrder(order) {
     ? '<div class="block pair">' + field('Faixa de depósito', order.faixa) + field('Grupo', order.grupo) + field('Qtd. contas', order.qtd) + field('Valor por conta', money.format(order.valorPorConta || 0)) + '</div>'
     : '<div class="block pair">' + field('Montante', money.format(order.valorMontante || order.totalValue || 0)) + field('Quantidade', order.quantidade) + field('Taxa', order.rollover) + '</div>';
   const links = (order.links || []).map((link) => '<div class="link"><a href="' + esc(hrefOf(link)) + '" target="_blank" rel="noreferrer">' + esc(link) + '</a><button type="button" class="icon copy" data-copy="' + esc(link) + '" title="Copiar link">' + copyIcon + '</button></div>').join('');
-  document.getElementById('sheet-box').innerHTML = '<div class="sheet-head"><div><h3>Pedido completo</h3><p>' + esc(order.orderCode) + '</p></div><button type="button" class="back-btn" data-close>Fechar</button></div><div class="sheet-body"><div><span class="k">Marcar o que foi acrescentado</span><div class="mods"><button type="button" class="contas' + (moduleOn(order, 'contas') ? ' on' : '') + '" data-mod="contas" data-id="' + esc(order.id) + '">Op. Contas</button><button type="button" class="montante' + (moduleOn(order, 'montante') ? ' on' : '') + '" data-mod="montante" data-id="' + esc(order.id) + '">Op. Montantes</button></div></div><div class="pair">' + field('Cliente', order.clientName) + field('WhatsApp / Telefone', order.phone) + field('Empresa', order.companyName) + field('Prioridade', order.priority) + '</div>' + detail + '<div class="pair">' + field('Blogueira', money.format(order.blogger || 0)) + field('Operador', order.responsibleOperatorName || order.assignedOperatorName || 'Livre na fila') + field('Pix recebido por', order.pixReceivedBy) + field('Status', order.status) + '</div>' + (links ? '<div><span class="k">Links</span><div class="links">' + links + '</div></div>' : '') + (order.notes ? '<p class="notes">"' + esc(order.notes) + '"</p>' : '') + '</div>';
+  document.getElementById('sheet-box').innerHTML = '<div class="sheet-head"><div><h3>Pedido completo</h3><p>' + esc(order.orderCode) + '</p></div><button type="button" class="back-btn" data-close>Fechar</button></div><div class="sheet-body"><div><span class="k">Marcar o que foi acrescentado</span><div class="mods">' + modMark(order) + '</div></div><div class="pair">' + field('Cliente', order.clientName) + ((oversight() || mine(order)) ? field('WhatsApp / Telefone', order.phone) : '') + field('Empresa', order.companyName) + field('Prioridade', order.priority) + '</div>' + detail + '<div class="pair">' + field('Blogueira', money.format(order.blogger || 0)) + field('Operador', order.responsibleOperatorName || order.assignedOperatorName || 'Livre na fila') + field('Pix recebido por', order.pixReceivedBy) + field('Status', order.status) + '</div>' + (links ? '<div><span class="k">Links</span><div class="links">' + links + '</div></div>' : '') + (order.notes ? '<p class="notes">"' + esc(order.notes) + '"</p>' : '') + '</div>';
   document.getElementById('sheet').hidden = false;
   fetch('/pedidos/imagens?id=' + encodeURIComponent(order.id), { cache: 'no-store' }).then((res) => res.json()).then((payload) => {
     const images = (payload && payload.images) || [];

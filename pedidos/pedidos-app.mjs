@@ -293,10 +293,10 @@ async function acceptDesignated(session, orderId, options) {
   }
   const assigned = String(order.assignedOperatorId || '');
   const takeover = takeOver && !!assigned && assigned !== meId;
-  if (takeover && !isManager(session) && order.companyId !== session.companyId) {
-    throw new Error('Este pedido é de outra empresa.');
+  if (takeover && !canOversee(session)) {
+    throw new Error('Só ADM Master ou quem tem a tag de editar pedidos assume o de outra pessoa.');
   }
-  if (!takeover && assigned && assigned !== meId && !isManager(session)) {
+  if (!takeover && assigned && assigned !== meId && !canOversee(session)) {
     throw new Error('Este pedido está designado exclusivamente para ' + (order.assignedOperatorName || 'outro operador') + '.');
   }
   if (claim && order.operationId) {
@@ -415,6 +415,22 @@ function publicOrder(order) {
 function isManager(session) {
   return session.role === 'ADM_MASTER' || session.role === 'SOCIO';
 }
+function canOversee(session) {
+  if (!session) return false;
+  if (session.role === 'ADM_MASTER') return true;
+  return Array.isArray(session.permissions) && session.permissions.includes('order_queue_edit');
+}
+function waitingStatus(status) {
+  return status === 'Aguardando operador' || status === 'Registrado' || status === 'Retornado para fila';
+}
+function canSeeOrder(session, order) {
+  if (canOversee(session)) return true;
+  const me = String(session.userId || '');
+  if (!me) return false;
+  if (waitingStatus(order.status)) return true;
+  if (order.status === 'Designado') return String(order.assignedOperatorId || '') === me;
+  return String(order.responsibleOperatorId || '') === me;
+}
 async function writeOrder(session, order, data) {
   const now = new Date().toISOString();
   const updated = await panelRequest('write', {
@@ -449,6 +465,9 @@ async function toggleModule(session, id, module) {
   if (module !== 'contas' && module !== 'montante') throw new Error('Módulo inválido.');
   const order = await readOrder(session, id);
   if (!order) throw new Error('Pedido não encontrado.');
+  if (!canOversee(session) && order.responsibleOperatorId !== session.userId) {
+    throw new Error('Só ADM Master ou quem tem a tag de editar pedidos altera o módulo.');
+  }
   const added = markedModules(order);
   added[module] = !added[module];
   await writeOrder(session, order, { addedModules: added });
@@ -457,11 +476,11 @@ async function toggleModule(session, id, module) {
 async function finishOrder(session, id, done) {
   const order = await readOrder(session, id);
   if (!order) throw new Error('Pedido não encontrado.');
-  const admin = isManager(session);
+  const admin = canOversee(session);
   const mine = order.responsibleOperatorId === session.userId;
   if (order.status === 'Cancelado') throw new Error('Pedido cancelado.');
   if (order.status === 'Concluído') throw new Error('Este pedido já foi concluído.');
-  if (!done && !admin) throw new Error('Sócio ou administrador desmarca a finalização.');
+  if (!done && !admin) throw new Error('Só ADM Master ou quem tem a tag de editar pedidos desmarca a finalização.');
   if (done && order.status === 'Finalizado') return { ok: true, status: order.status };
   if (!done && order.status !== 'Finalizado') return { ok: true, status: order.status };
   const allowed = admin || (mine && (order.status === 'Assumido' || order.status === 'Em andamento' || order.status === 'Finalizado'));
@@ -585,6 +604,9 @@ async function storeSaque(session, id, values) {
   const order = await readOrder(session, id);
   if (!order) throw new Error('Pedido não encontrado.');
   if (order.status !== 'Finalizado') throw new Error('O saque entra no pedido finalizado.');
+  if (!canOversee(session) && order.responsibleOperatorId !== session.userId) {
+    throw new Error('Só quem finalizou o pedido, o ADM Master ou quem tem a tag lança o saque.');
+  }
   const saved = await saveOrderSaque(session, order, values, false);
   return { ok: true, withdrawal: saved.withdrawal };
 }
@@ -593,6 +615,9 @@ async function concludeOrder(session, id, values) {
   if (!order) throw new Error('Pedido não encontrado.');
   if (order.status === 'Concluído') return { ok: true, status: 'Concluído', withdrawal: moneyOf(order.withdrawal) };
   if (order.status !== 'Finalizado') throw new Error('Finalize o pedido antes de concluir.');
+  if (!canOversee(session) && order.responsibleOperatorId !== session.userId) {
+    throw new Error('Só quem finalizou o pedido, o ADM Master ou quem tem a tag conclui.');
+  }
   const saved = await saveOrderSaque(session, order, values, true);
   await writeOrder(session, order, { status: 'Concluído', concludedAt: new Date().toISOString(), withdrawal: saved.withdrawal, saques: saved.saques });
   const note = saved.withdrawal > 0
@@ -656,13 +681,11 @@ async function actOnOrder(session, id, action, reason) {
   const order = await readOrder(session, id);
   if (!order) throw new Error('Pedido não encontrado.');
   if (order.status === 'Finalizado' || order.status === 'Concluído' || order.status === 'Cancelado') throw new Error('Este pedido já foi finalizado ou cancelado.');
-  const admin = isManager(session);
-  const mine = order.responsibleOperatorId === session.userId;
+  if (!canOversee(session)) throw new Error('Só ADM Master ou quem tem a tag de editar pedidos cancela ou devolve o pedido.');
   const note = String(reason || '').trim();
   if (!note) throw new Error('Informe o motivo da ação.');
   const name = session.name || 'operador';
   if (action === 'return') {
-    if (!mine && !admin) throw new Error('Só quem assumiu o pedido retorna à fila.');
     await writeOrder(session, order, {
       status: 'Retornado para fila',
       responsibleOperatorId: null,
@@ -677,7 +700,6 @@ async function actOnOrder(session, id, action, reason) {
     return { ok: true, status: 'Retornado para fila' };
   }
   if (action === 'cancel') {
-    if (!mine && !admin) throw new Error('Só quem assumiu o pedido cancela.');
     await writeOrder(session, order, { status: 'Cancelado', cancelledAt: new Date().toISOString() });
     await addHistory(session, order, 'Pedido cancelado', 'Pedido cancelado por ' + name + '. Motivo: ' + note);
     return { ok: true, status: 'Cancelado' };
@@ -719,6 +741,7 @@ const server = http.createServer((req, res) => {
         if (session.role !== 'ADM_MASTER' && allowed.size) {
           orders = orders.filter((order) => allowed.has(String(order.companyId || '')));
         }
+        if (!canOversee(session)) orders = orders.filter((order) => canSeeOrder(session, order));
         orders.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
         if (!promoteStarted) {
           promoteStarted = true;
