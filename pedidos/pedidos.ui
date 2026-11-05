@@ -83,7 +83,10 @@
   .status.wait { color:#fcd34d; background:rgba(245,158,11,.2); border-color:rgba(245,158,11,.4); }
   .status.go { color:#34d399; background:rgba(16,185,129,.2); border-color:rgba(16,185,129,.4); }
   .status.design { color:#d8b4fe; background:rgba(168,85,247,.2); border-color:rgba(168,85,247,.4); }
-  .status.done { color:#a1a1aa; background:#27272a; border-color:#3f3f46; }
+  .status.done { color:#6ee7b7; background:rgba(6,78,59,.55); border-color:rgba(16,185,129,.45); }
+  .status.ok { color:#34d399; background:rgba(16,185,129,.18); border-color:rgba(52,211,153,.5); }
+  .done-note { display:flex; align-items:center; gap:8px; margin-top:10px; padding:10px 12px; border-radius:12px; border:1px solid rgba(16,185,129,.4); background:rgba(6,78,59,.45); color:#d1fae5; font-size:13px; font-weight:700; line-height:1.35; }
+  .done-note b { color:#34d399; }
   .status.cancel { color:#f87171; background:rgba(239,68,68,.2); border-color:rgba(239,68,68,.4); }
   .who { font-size:11px; border-radius:8px; padding:2px 8px; }
   .who.me { color:#6ee7b7; background:rgba(6,78,59,.6); border:1px solid rgba(6,95,70,.5); }
@@ -126,7 +129,8 @@
   .icon.stop:hover { background:rgba(239,68,68,.2); color:#f87171; }
   .copy { width:28px; height:28px; display:grid; place-items:center; padding:0; flex:none; }
   .abrir, .assumir { display:inline-flex; align-items:center; gap:4px; padding:6px 10px; font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
-  .assumir { background:#10b981; color:#09090b; border-color:transparent; font-weight:900; }
+  .assumir, .concluir { background:#10b981; color:#09090b; border-color:transparent; font-weight:900; }
+  .concluir { display:inline-flex; align-items:center; gap:4px; padding:6px 10px; font-size:10px; font-weight:900; letter-spacing:.04em; text-transform:uppercase; border-radius:12px; }
   .acts { display:flex; align-items:center; gap:6px; }
   .cycle { padding:2px 8px; border-radius:6px; background:#27272a; color:#d4d4d8; border:1px solid #3f3f46; font-size:10px; font-family:ui-monospace, Consolas, monospace; font-weight:500; letter-spacing:0; }
   .sheet { position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.9); padding:16px; }
@@ -300,6 +304,7 @@ const tabs = [
   ['designados', 'Designados'],
   ['assumidos', 'Assumidos / Em Andamento'],
   ['finalizados', 'Finalizados'],
+  ['concluidos', '✓ Concluído'],
   ['cancelados', 'Cancelados'],
 ];
 const state = { period: 'todos', tab: 'todos', orders: [], me: {}, companyName: '', images: {}, imageFresh: {}, imagesReady: false };
@@ -368,13 +373,14 @@ function scoped() {
   });
 }
 function tabOf(order, listName) {
-  const open = order.status !== 'Finalizado' && order.status !== 'Cancelado';
+  const open = order.status !== 'Finalizado' && order.status !== 'Concluído' && order.status !== 'Cancelado';
   const mine = state.me.id && (order.assignedOperatorId === state.me.id || order.responsibleOperatorId === state.me.id);
   if (listName === 'aguardando') return order.status === 'Aguardando operador' || order.status === 'Registrado' || order.status === 'Retornado para fila';
   if (listName === 'designados') return order.status === 'Designado';
   if (listName === 'meus') return mine && open;
   if (listName === 'assumidos') return order.status === 'Assumido';
   if (listName === 'finalizados') return order.status === 'Finalizado';
+  if (listName === 'concluidos') return order.status === 'Concluído';
   if (listName === 'cancelados') return order.status === 'Cancelado';
   return true;
 }
@@ -382,6 +388,7 @@ function statusClass(status) {
   if (status === 'Assumido' || status === 'Em andamento') return 'go';
   if (status === 'Designado') return 'design';
   if (status === 'Finalizado') return 'done';
+  if (status === 'Concluído') return 'ok';
   if (status === 'Cancelado') return 'cancel';
   return 'wait';
 }
@@ -394,7 +401,7 @@ function manager() {
   return state.me.role === 'ADM_MASTER' || state.me.role === 'SOCIO';
 }
 function closed(order) {
-  return order.status === 'Finalizado' || order.status === 'Cancelado';
+  return order.status === 'Finalizado' || order.status === 'Concluído' || order.status === 'Cancelado';
 }
 function mine(order) {
   return state.me.id && order.responsibleOperatorId === state.me.id;
@@ -444,10 +451,16 @@ function card(order) {
   const links = (order.links || []).length
     ? '<div class="links">' + order.links.map((link) => '<div class="link"><a href="' + esc(hrefOf(link)) + '" target="_blank" rel="noreferrer">' + esc(link) + '</a><button type="button" class="icon copy" data-copy="' + esc(link) + '" title="Copiar link">' + copyIcon + '</button></div>').join('') + '</div>'
     : '';
-  const showCheck = order.status !== 'Cancelado' && (manager() || ((order.status === 'Assumido' || order.status === 'Em andamento') && mine(order)) || (order.status === 'Finalizado' && mine(order)));
+  const finished = order.status === 'Finalizado' || order.status === 'Concluído';
+  const showCheck = order.status !== 'Cancelado' && (manager() || ((order.status === 'Assumido' || order.status === 'Em andamento') && mine(order)) || (finished && mine(order)));
   const check = showCheck
-    ? '<label class="check" title="' + (order.status === 'Finalizado' ? 'Finalizado' : 'Marcar como finalizado') + '"><input type="checkbox" data-finish="' + esc(order.id) + '"' + (order.status === 'Finalizado' ? ' checked' : '') + (order.status === 'Finalizado' && !manager() ? ' disabled' : '') + '></label>'
+    ? '<label class="check" title="Pedido finalizado"><input type="checkbox" data-finish="' + esc(order.id) + '"' + (finished ? ' checked' : '') + ((order.status === 'Concluído' || (order.status === 'Finalizado' && !manager())) ? ' disabled' : '') + '></label>'
     : '';
+  const doneNote = order.status === 'Finalizado'
+    ? '<div class="done-note"><b>Pedido finalizado.</b> Completo. Aguardando o valor do saque.</div>'
+    : order.status === 'Concluído'
+      ? '<div class="done-note"><b>Pedido concluído.</b> Finalizado e com o saque lançado.</div>'
+      : '';
   const shotRow = '<div class="shots" data-shots="' + esc(order.id) + '" hidden></div>';
   const waiting = order.status === 'Aguardando operador' || order.status === 'Registrado' || order.status === 'Retornado para fila';
   const claim = (waiting || order.assignedOperatorId === state.me.id) && !order.responsibleOperatorId && !closed(order);
@@ -455,6 +468,7 @@ function card(order) {
   const buttons = ['<button type="button" class="abrir" data-open="' + esc(order.id) + '" title="Abrir pedido completo">' + eye + 'Abrir</button>'];
   if (claim) buttons.push('<button type="button" class="assumir" data-assumir="' + esc(order.id) + '" data-takeover="0">Assumir</button>');
   if (other) buttons.push('<button type="button" class="assumir other" data-assumir="' + esc(order.id) + '" data-takeover="1" title="Assumir porque ' + esc(order.assignedOperatorName || 'o operador') + ' está cheio ou ocupado">Outro assumir</button>');
+  if (order.status === 'Finalizado' && (mine(order) || manager())) buttons.push('<button type="button" class="concluir" data-concluir="' + esc(order.id) + '">✓ Concluído</button>');
   if ((mine(order) || manager()) && !closed(order)) buttons.push('<button type="button" class="icon back" data-act="return" data-id="' + esc(order.id) + '" title="Retornar à fila">' + back + '</button>');
   if ((manager() || mine(order)) && !closed(order)) buttons.push('<button type="button" class="icon stop" data-act="cancel" data-id="' + esc(order.id) + '" title="Cancelar pedido">' + ban + '</button>');
   buttons.push('<button type="button" class="icon" data-act="history" data-id="' + esc(order.id) + '" title="Histórico de movimentações">' + clock + '</button>');
@@ -467,8 +481,8 @@ function card(order) {
     + '</div><div class="right">' + check + '<span class="prio ' + prio + '">' + (order.priority === 'Urgente' ? '🔥 ' : order.priority === 'Alta' ? '⚡ ' : '') + esc(order.priority || 'Normal') + '</span></div></div>'
     + '<div class="mid"><div><h3 class="client">' + esc(order.clientName) + '</h3>' + phone + '<div class="co">' + building + esc(order.companyName) + '</div></div>'
     + '<div class="money-wrap"><span class="money-k">Valor Previsto</span><span class="money">' + money.format(order.totalValue || 0) + '</span>' + from + '</div></div>'
-    + '<div class="meta"><span class="status ' + statusClass(order.status) + '">' + clock + esc(order.status) + '</span>' + who + off + faixa + pix + blog + '</div>'
-    + notes + links + shotRow
+    + '<div class="meta"><span class="status ' + statusClass(order.status) + '">' + clock + esc(order.status === 'Finalizado' ? 'Finalizado' : order.status) + '</span>' + who + off + faixa + pix + blog + '</div>'
+    + doneNote + notes + links + shotRow
     + '<div class="foot"><span>Registrado em ' + esc(when(order.createdAt)) + ' por <strong>' + esc(order.registeredByName || '—') + '</strong></span><div class="acts">' + buttons.join('') + '</div></div></article>';
 }
 function fillShots(root) {
@@ -673,6 +687,22 @@ document.body.addEventListener('click', async (event) => {
       paint();
       if (!document.getElementById('sheet').hidden) openOrder(order);
     } catch (err) { toast(err.message || 'Não foi possível marcar o módulo.'); }
+    return;
+  }
+  const conclude = event.target.closest('[data-concluir]');
+  if (conclude) {
+    const id = conclude.getAttribute('data-concluir');
+    const order = orderById(id);
+    conclude.disabled = true;
+    try {
+      const data = await postJson('/pedidos/concluir', { id });
+      if (order && data.status) order.status = data.status;
+      toast('Pedido concluído.');
+      paint();
+    } catch (err) {
+      conclude.disabled = false;
+      toast(err.message || 'Não foi possível concluir o pedido.');
+    }
     return;
   }
   const open = event.target.closest('[data-open]');

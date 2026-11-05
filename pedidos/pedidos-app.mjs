@@ -285,7 +285,7 @@ async function acceptDesignated(session, orderId, options) {
   const takeOver = !!(options && options.takeOver);
   const order = await readOrder(session, orderId);
   if (!order) throw new Error('Pedido não encontrado.');
-  if (order.status === 'Finalizado' || order.status === 'Cancelado') throw new Error('Este pedido já foi finalizado ou cancelado.');
+  if (order.status === 'Finalizado' || order.status === 'Concluído' || order.status === 'Cancelado') throw new Error('Este pedido já foi finalizado ou cancelado.');
   const meId = String(session.userId || '');
   const name = session.name || '';
   if (order.responsibleOperatorId && order.responsibleOperatorId !== meId) {
@@ -458,6 +458,7 @@ async function finishOrder(session, id, done) {
   const admin = isManager(session);
   const mine = order.responsibleOperatorId === session.userId;
   if (order.status === 'Cancelado') throw new Error('Pedido cancelado.');
+  if (order.status === 'Concluído') throw new Error('Este pedido já foi concluído.');
   if (!done && !admin) throw new Error('Sócio ou administrador desmarca a finalização.');
   if (done && order.status === 'Finalizado') return { ok: true, status: order.status };
   if (!done && order.status !== 'Finalizado') return { ok: true, status: order.status };
@@ -478,10 +479,81 @@ async function finishOrder(session, id, done) {
   await addHistory(session, order, 'Finalização desmarcada', 'Pedido voltou para ' + status + ' por ' + name + '.');
   return { ok: true, status };
 }
+function moneyOf(value) {
+  const n = typeof value === 'number' ? value : parseFloat(String(value || '').replace(/\./g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+}
+function withdrawalOf(op) {
+  const direct = moneyOf(op && op.withdrawal);
+  if (direct > 0) return direct;
+  const list = op && (Array.isArray(op.saques) ? op.saques : (op.calculatorData && Array.isArray(op.calculatorData.withdrawals) ? op.calculatorData.withdrawals : []));
+  if (!Array.isArray(list)) return 0;
+  return list.reduce((sum, item) => sum + moneyOf(item && typeof item === 'object' ? (item.value ?? item.amount ?? item.valor) : item), 0);
+}
+function markLocalConcluded(operationId, orderId, withdrawal) {
+  const files = [];
+  const root = path.join(dataDir, 'operacoes.json');
+  if (fs.existsSync(root)) files.push(root);
+  const perfis = path.join(dataDir, 'perfis');
+  if (fs.existsSync(perfis)) {
+    fs.readdirSync(perfis).forEach((name) => {
+      const file = path.join(perfis, name, 'operacoes.json');
+      if (fs.existsSync(file)) files.push(file);
+    });
+  }
+  files.forEach((file) => {
+    try {
+      const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const ops = Array.isArray(data.ops) ? data.ops : null;
+      if (!ops) return;
+      let changed = false;
+      ops.forEach((op) => {
+        const same = String(op.panelId || '') === String(operationId) || String(op.orderId || '') === String(orderId);
+        if (!same) return;
+        op.verificado = true;
+        if (!(moneyOf(op.withdrawal) > 0) && withdrawal > 0) op.withdrawal = withdrawal;
+        changed = true;
+      });
+      if (changed) fs.writeFileSync(file, JSON.stringify(data));
+    } catch (err) { /* o histórico local continua no painel */ }
+  });
+}
+async function concludeOrder(session, id) {
+  const order = await readOrder(session, id);
+  if (!order) throw new Error('Pedido não encontrado.');
+  if (order.status === 'Concluído') return { ok: true, status: 'Concluído' };
+  if (order.status !== 'Finalizado') throw new Error('Finalize o pedido antes de concluir.');
+  const admin = isManager(session);
+  const mine = order.responsibleOperatorId === session.userId;
+  if (!admin && !mine) throw new Error('Só quem finalizou o pedido conclui.');
+  if (!order.operationId) throw new Error('Este pedido não tem operação no histórico.');
+  const read = await panelRequest('read', { collection: 'operations', id: order.operationId, dfs_token: session.token });
+  const json = (read && read.json) || {};
+  const op = json.data && typeof json.data === 'object' ? json.data : (json.doc && json.doc.data) || null;
+  if (!op) throw new Error('A operação deste pedido não está no histórico.');
+  const withdrawal = withdrawalOf(op);
+  if (!(withdrawal > 0)) throw new Error('Lance o saque nas Operações antes de concluir o pedido.');
+  const patch = { verificado: true, updatedAt: new Date().toISOString() };
+  if (!(moneyOf(op.withdrawal) > 0)) patch.withdrawal = withdrawal;
+  const saved = await panelRequest('write', {
+    op: 'update',
+    collection: 'operations',
+    id: order.operationId,
+    merge: true,
+    data: patch,
+    dfs_token: session.token,
+  });
+  const savedJson = (saved && saved.json) || {};
+  if (saved.status >= 400 || savedJson.ok === false) throw new Error(savedJson.message || 'Não marquei a operação no histórico.');
+  markLocalConcluded(order.operationId, order.id, withdrawal);
+  await writeOrder(session, order, { status: 'Concluído', concludedAt: new Date().toISOString() });
+  await addHistory(session, order, 'Pedido concluído', 'Saque de R$ ' + withdrawal.toFixed(2).replace('.', ',') + ' confirmado. Operação marcada no histórico.');
+  return { ok: true, status: 'Concluído', withdrawal };
+}
 async function actOnOrder(session, id, action, reason) {
   const order = await readOrder(session, id);
   if (!order) throw new Error('Pedido não encontrado.');
-  if (order.status === 'Finalizado' || order.status === 'Cancelado') throw new Error('Este pedido já foi finalizado ou cancelado.');
+  if (order.status === 'Finalizado' || order.status === 'Concluído' || order.status === 'Cancelado') throw new Error('Este pedido já foi finalizado ou cancelado.');
   const admin = isManager(session);
   const mine = order.responsibleOperatorId === session.userId;
   const note = String(reason || '').trim();
@@ -583,6 +655,14 @@ const server = http.createServer((req, res) => {
     readBody(req).then((body) => toggleModule(session, String(body.id || ''), String(body.module || '')))
       .then((result) => sendJson(res, 200, result))
       .catch((err) => sendJson(res, 200, { ok: false, message: err.message || 'Não foi possível marcar o módulo.' }));
+    return;
+  }
+  if (url === '/pedidos/concluir' && req.method === 'POST') {
+    const session = readSession();
+    if (!session) { sendJson(res, 200, { ok: false, message: 'Entre na empresa para concluir o pedido.' }); return; }
+    readBody(req).then((body) => concludeOrder(session, String(body.id || '')))
+      .then((result) => sendJson(res, 200, result))
+      .catch((err) => sendJson(res, 200, { ok: false, message: err.message || 'Não foi possível concluir o pedido.' }));
     return;
   }
   if (url === '/pedidos/finalizar' && req.method === 'POST') {
