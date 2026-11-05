@@ -440,8 +440,6 @@ function modMark(order) {
 function mine(order) {
   return state.me.id && order.responsibleOperatorId === state.me.id;
 }
-  return state.me.id && order.responsibleOperatorId === state.me.id;
-}
 function moduleOn(order, module) {
   const added = order.addedModules;
   if (added && (added.contas !== undefined || added.montante !== undefined)) return !!added[module];
