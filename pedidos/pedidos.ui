@@ -787,7 +787,6 @@ document.getElementById('logout').addEventListener('click', async (event) => {
   if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('sair');
 });
 let acceptingId = '';
-let beepTimer = 0;
 let beepKey = '';
 function designated() {
   const me = state.me && state.me.id;
@@ -795,36 +794,18 @@ function designated() {
   return state.orders.filter((order) => order.assignedOperatorId === me && order.status === 'Designado' && order.assignmentAccepted !== true)
     .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
 }
-function playBeep() {
-  try {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    if (!playBeep.ctx) playBeep.ctx = new Ctx();
-    const ctx = playBeep.ctx;
-    if (ctx.state === 'suspended') ctx.resume();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.18, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.35);
-  } catch (err) {}
-}
-function stopBeep() {
-  if (beepTimer) clearInterval(beepTimer);
-  beepTimer = 0;
-  beepKey = '';
+function tellHost(message) {
+  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage(message);
 }
 function syncAlert() {
   const pending = designated();
   const box = document.getElementById('alert');
   if (!pending.length) {
     box.hidden = true;
-    stopBeep();
+    if (beepKey) {
+      beepKey = '';
+      tellHost('pedido-off');
+    }
     return;
   }
   const many = pending.length > 1;
@@ -839,9 +820,9 @@ function syncAlert() {
   const key = pending.map((order) => order.id).join('|');
   if (beepKey !== key) {
     beepKey = key;
-    playBeep();
-    if (beepTimer) clearInterval(beepTimer);
-    beepTimer = setInterval(playBeep, 1400);
+    const first = pending[0];
+    const name = String((first && first.clientName) || '').replace(/\t/g, ' ');
+    tellHost('pedido-on\t' + pending.length + '\t' + name + '\t' + key);
   }
 }
 document.getElementById('alert').addEventListener('click', async (event) => {
