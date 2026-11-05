@@ -549,36 +549,35 @@ function readyFromOp(op) {
   if (!checked && !(withdrawal > 0)) return null;
   return { verificado: checked, withdrawal };
 }
-async function saveOrderSaque(session, order, values, markChecked) {
-  if (!order.operationId) {
-    const typed = typedWithdrawal(values);
-    const withdrawal = typed == null ? moneyOf(order.withdrawal) : typed;
-    const saques = Array.isArray(values) ? values.map((item) => String(item || '').trim()).filter(Boolean) : [];
-    await writeOrder(session, order, { withdrawal, saques });
-    return { withdrawal, saques };
-  }
-  const read = await panelRequest('read', { collection: 'operations', id: order.operationId, dfs_token: session.token });
-  const json = (read && read.json) || {};
+async function readOperation(session, id) {
+  const read = await panelRequest('read', { collection: 'operations', id, dfs_token: session.token });
+  if (!read || read.status >= 400) return null;
+  const json = read.json || {};
   const op = json.data && typeof json.data === 'object' ? json.data : (json.doc && json.doc.data) || null;
-  if (!op) throw new Error('A operação deste pedido não está no histórico.');
+  return op && typeof op === 'object' ? op : null;
+}
+async function saveOrderSaque(session, order, values, markChecked) {
   const typed = typedWithdrawal(values);
-  const withdrawal = typed == null ? withdrawalOf(op) : typed;
+  const op = order.operationId ? await readOperation(session, order.operationId) : null;
+  const withdrawal = typed == null ? (op ? withdrawalOf(op) : moneyOf(order.withdrawal)) : typed;
   const saques = typed == null
-    ? (Array.isArray(op.saques) ? op.saques : (withdrawal > 0 ? [String(withdrawal)] : []))
+    ? (op && Array.isArray(op.saques) ? op.saques : (withdrawal > 0 ? [String(withdrawal)] : (Array.isArray(order.saques) ? order.saques : [])))
     : values.map((item) => String(item || '').trim()).filter(Boolean);
-  const patch = { withdrawal, saques, updatedAt: new Date().toISOString() };
-  if (markChecked) patch.verificado = true;
-  const saved = await panelRequest('write', {
-    op: 'update',
-    collection: 'operations',
-    id: order.operationId,
-    merge: true,
-    data: patch,
-    dfs_token: session.token,
-  });
-  const savedJson = (saved && saved.json) || {};
-  if (saved.status >= 400 || savedJson.ok === false) throw new Error(savedJson.message || 'Não gravei o saque na operação.');
-  patchLocalOp(order.operationId, order.id, { withdrawal, saques, verificado: markChecked === true });
+  if (order.operationId) {
+    const patch = { withdrawal, saques, updatedAt: new Date().toISOString() };
+    if (markChecked) patch.verificado = true;
+    const saved = await panelRequest('write', {
+      op: 'update',
+      collection: 'operations',
+      id: order.operationId,
+      merge: true,
+      data: patch,
+      dfs_token: session.token,
+    });
+    const savedJson = (saved && saved.json) || {};
+    if (saved.status >= 400 || savedJson.ok === false) throw new Error(savedJson.message || 'Não gravei o saque na operação.');
+    patchLocalOp(order.operationId, order.id, { withdrawal, saques, verificado: markChecked === true });
+  }
   await writeOrder(session, order, { withdrawal, saques });
   return { withdrawal, saques };
 }
@@ -586,9 +585,6 @@ async function storeSaque(session, id, values) {
   const order = await readOrder(session, id);
   if (!order) throw new Error('Pedido não encontrado.');
   if (order.status !== 'Finalizado') throw new Error('O saque entra no pedido finalizado.');
-  const admin = isManager(session);
-  const mine = order.responsibleOperatorId === session.userId;
-  if (!admin && !mine) throw new Error('Só quem finalizou o pedido lança o saque.');
   const saved = await saveOrderSaque(session, order, values, false);
   return { ok: true, withdrawal: saved.withdrawal };
 }
@@ -597,9 +593,6 @@ async function concludeOrder(session, id, values) {
   if (!order) throw new Error('Pedido não encontrado.');
   if (order.status === 'Concluído') return { ok: true, status: 'Concluído', withdrawal: moneyOf(order.withdrawal) };
   if (order.status !== 'Finalizado') throw new Error('Finalize o pedido antes de concluir.');
-  const admin = isManager(session);
-  const mine = order.responsibleOperatorId === session.userId;
-  if (!admin && !mine) throw new Error('Só quem finalizou o pedido conclui.');
   const saved = await saveOrderSaque(session, order, values, true);
   await writeOrder(session, order, { status: 'Concluído', concludedAt: new Date().toISOString(), withdrawal: saved.withdrawal, saques: saved.saques });
   const note = saved.withdrawal > 0
@@ -612,14 +605,17 @@ let promoteStarted = false;
 async function promoteExisting(session, orders) {
   const byPanel = new Map();
   const byOrder = new Map();
+  function take(id, orderId, info) {
+    rememberReady(byPanel, id, info);
+    rememberReady(byOrder, orderId, info);
+  }
   localOpFiles().forEach((file) => {
     try {
       const data = JSON.parse(fs.readFileSync(file, 'utf8'));
       (Array.isArray(data.ops) ? data.ops : []).forEach((op) => {
         const info = readyFromOp(op);
         if (!info) return;
-        rememberReady(byPanel, op.panelId, info);
-        rememberReady(byOrder, op.orderId, info);
+        take(op.panelId || op.id, op.orderId, info);
       });
     } catch (err) { /* arquivo local ilegível não trava a fila */ }
   });
@@ -628,26 +624,30 @@ async function promoteExisting(session, orders) {
     rowsOf(result).forEach((op) => {
       const info = readyFromOp(op);
       if (!info) return;
-      rememberReady(byPanel, op.id, info);
-      rememberReady(byOrder, op.orderId, info);
+      take(op.id, op.orderId, info);
     });
   } catch (err) { /* o histórico local ainda promove o que já está no computador */ }
+  for (const [id, info] of byPanel) {
+    if (!id || info.verificado || !(info.withdrawal > 0)) continue;
+    try {
+      const saved = await panelRequest('write', {
+        op: 'update',
+        collection: 'operations',
+        id,
+        merge: true,
+        data: { verificado: true, updatedAt: new Date().toISOString() },
+        dfs_token: session.token,
+      });
+      if (!saved || saved.status >= 400) continue;
+      patchLocalOp(id, '', { verificado: true });
+      info.verificado = true;
+    } catch (err) { /* segue para a próxima operação */ }
+  }
   for (const order of orders) {
+    if (order.status !== 'Finalizado') continue;
     const info = byPanel.get(String(order.operationId || '')) || byOrder.get(String(order.id || ''));
     if (!info) continue;
     try {
-      if (order.operationId && !info.verificado) {
-        const saved = await panelRequest('write', {
-          op: 'update',
-          collection: 'operations',
-          id: order.operationId,
-          merge: true,
-          data: { verificado: true, updatedAt: new Date().toISOString() },
-          dfs_token: session.token,
-        });
-        if (saved.status >= 400) continue;
-        patchLocalOp(order.operationId, order.id, { verificado: true });
-      }
       await writeOrder(session, order, { status: 'Concluído', concludedAt: new Date().toISOString() });
     } catch (err) { /* tenta o próximo pedido */ }
   }

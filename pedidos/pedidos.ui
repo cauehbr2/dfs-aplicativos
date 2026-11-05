@@ -480,7 +480,7 @@ function card(order) {
   const buttons = ['<button type="button" class="abrir" data-open="' + esc(order.id) + '" title="Abrir pedido completo">' + eye + 'Abrir</button>'];
   if (claim) buttons.push('<button type="button" class="assumir" data-assumir="' + esc(order.id) + '" data-takeover="0">Assumir</button>');
   if (other) buttons.push('<button type="button" class="assumir other" data-assumir="' + esc(order.id) + '" data-takeover="1" title="Assumir porque ' + esc(order.assignedOperatorName || 'o operador') + ' está cheio ou ocupado">Outro assumir</button>');
-  if (order.status === 'Finalizado' && (mine(order) || manager())) buttons.push('<button type="button" class="concluir" data-concluir="' + esc(order.id) + '">✓ Concluído</button>');
+  if (order.status === 'Finalizado') buttons.push('<button type="button" class="concluir" data-concluir="' + esc(order.id) + '">✓ Concluído</button>');
   if ((mine(order) || manager()) && !closed(order)) buttons.push('<button type="button" class="icon back" data-act="return" data-id="' + esc(order.id) + '" title="Retornar à fila">' + back + '</button>');
   if ((manager() || mine(order)) && !closed(order)) buttons.push('<button type="button" class="icon stop" data-act="cancel" data-id="' + esc(order.id) + '" title="Cancelar pedido">' + ban + '</button>');
   buttons.push('<button type="button" class="icon" data-act="history" data-id="' + esc(order.id) + '" title="Histórico de movimentações">' + clock + '</button>');
@@ -534,7 +534,7 @@ function saqueValues(order) {
   return [''];
 }
 function saqueBox(order) {
-  if (order.status !== 'Finalizado' || !(mine(order) || manager())) return '';
+  if (order.status !== 'Finalizado') return '';
   const values = saqueValues(order);
   const total = values.reduce((sum, item) => sum + moneyInput(item), 0);
   const rows = values.map((value, index) => '<div class="saque-row"><input data-saque="' + index + '" inputmode="decimal" placeholder="0,00" value="' + esc(value) + '">' + (values.length > 1 ? '<button type="button" data-remove-saque="' + index + '" title="Remover">×</button>' : '') + '</div>').join('');
