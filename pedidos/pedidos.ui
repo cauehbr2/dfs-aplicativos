@@ -197,6 +197,8 @@
   .blog.montante { color:#60a5fa; font-weight:700; }
   .alert-card .code { font-size:11px; color:#71717a; }
   .alert-card .notes { font-size:12px; color:#a1a1aa; font-style:italic; }
+  .alert-card .shot { width:100%; max-width:none; max-height:260px; }
+  .alert-shots { margin-top:4px; }
   .accept { margin-top:8px; width:100%; border:0; border-radius:12px; background:#10b981; color:#000; font-weight:900; letter-spacing:.06em; text-transform:uppercase; padding:12px; }
   .accept:disabled { opacity:.6; }
   .alert-foot { margin:12px 0 0; color:#71717a; font-size:12px; }
@@ -300,7 +302,7 @@ const tabs = [
   ['finalizados', 'Finalizados'],
   ['cancelados', 'Cancelados'],
 ];
-const state = { period: 'todos', tab: 'todos', orders: [], me: {}, companyName: '', images: {}, imagesReady: false };
+const state = { period: 'todos', tab: 'todos', orders: [], me: {}, companyName: '', images: {}, imageFresh: {}, imagesReady: false };
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
@@ -760,16 +762,23 @@ loadVersion();
 if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('ready');
 function loadImages() {
   const ids = [];
-  document.querySelectorAll('[data-shots]').forEach((box) => {
-    const id = box.getAttribute('data-shots');
-    if (!id || state.images[id] || ids.length >= 6) return;
+  const push = (id) => {
+    if (!id || ids.indexOf(id) >= 0 || ids.length >= 6) return;
+    const cached = state.images[id];
+    if (cached && cached.length) return;
+    if (cached && state.imageFresh[id] && Date.now() - state.imageFresh[id] < 4000) return;
     ids.push(id);
-  });
+  };
+  document.querySelectorAll('#alert [data-shots]').forEach((box) => push(box.getAttribute('data-shots')));
+  document.querySelectorAll('[data-shots]').forEach((box) => push(box.getAttribute('data-shots')));
   if (!ids.length || state.imagesLoading) return;
   state.imagesLoading = true;
   fetch('/pedidos/imagens?ids=' + encodeURIComponent(ids.join(',')), { cache: 'no-store' }).then((res) => res.json()).then((payload) => {
     const images = (payload && payload.images) || {};
-    ids.forEach((id) => { state.images[id] = images[id] || []; });
+    ids.forEach((id) => {
+      state.images[id] = images[id] || [];
+      state.imageFresh[id] = Date.now();
+    });
     state.imagesLoading = false;
     fillShots();
     setTimeout(loadImages, 500);
@@ -814,9 +823,11 @@ function syncAlert() {
   document.getElementById('alert-cards').innerHTML = pending.map((order) => {
     const montante = order.type === 'montante';
     const notes = order.notes ? '<p class="notes">"' + esc(order.notes) + '"</p>' : '';
-    return '<article class="alert-card"><h3>' + esc(order.clientName) + '</h3><p>' + (montante ? 'Op. Montante' : 'Op. Contas') + ' · ' + esc(order.companyName || 'Empresa') + '</p><p class="blog ' + (montante ? 'montante' : 'contas') + '">Blogueira ' + (montante ? 'Montante' : 'Contas') + ': ' + money.format(order.blogger || order.totalValue || 0) + '</p><p class="code">' + esc(order.orderCode) + '</p>' + notes + '<button type="button" class="accept" data-accept="' + esc(order.id) + '"' + (acceptingId ? ' disabled' : '') + '>' + (acceptingId === order.id ? 'Aceitando...' : 'Aceitar pedido') + '</button></article>';
+    return '<article class="alert-card"><h3>' + esc(order.clientName) + '</h3><p>' + (montante ? 'Op. Montante' : 'Op. Contas') + ' · ' + esc(order.companyName || 'Empresa') + '</p><p class="blog ' + (montante ? 'montante' : 'contas') + '">Blogueira ' + (montante ? 'Montante' : 'Contas') + ': ' + money.format(order.blogger || order.totalValue || 0) + '</p><p class="code">' + esc(order.orderCode) + '</p>' + notes + '<div class="shots alert-shots" data-shots="' + esc(order.id) + '" hidden></div><button type="button" class="accept" data-accept="' + esc(order.id) + '"' + (acceptingId ? ' disabled' : '') + '>' + (acceptingId === order.id ? 'Aceitando...' : 'Aceitar pedido') + '</button></article>';
   }).join('');
   box.hidden = false;
+  fillShots(box);
+  loadImages();
   const key = pending.map((order) => order.id).join('|');
   if (beepKey !== key) {
     beepKey = key;

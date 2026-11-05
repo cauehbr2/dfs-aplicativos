@@ -647,7 +647,15 @@ const server = http.createServer((req, res) => {
         sendJson(res, 200, { ok: true, images: part });
       } else sendJson(res, 200, { ok: true, images: {} });
     };
-    loadImageMap(session).then(sendMap).catch(() => sendJson(res, 200, { ok: false, images: id ? [] : {} }));
+    loadImageMap(session).then((map) => {
+      const wanted = id ? [id] : ids;
+      const missing = wanted.some((key) => !map[key] || !map[key].length);
+      if (missing && Date.now() - imageMapAt >= 4000) {
+        imageMap = null;
+        return loadImageMap(session, true).then(sendMap);
+      }
+      sendMap(map);
+    }).catch(() => sendJson(res, 200, { ok: false, images: id ? [] : {} }));
     return;
   }
   res.writeHead(404);
@@ -655,10 +663,11 @@ const server = http.createServer((req, res) => {
 });
 
 let imageMap = null;
+let imageMapAt = 0;
 let imageMapPromise = null;
-function loadImageMap(session) {
-  if (imageMap) return Promise.resolve(imageMap);
-  if (imageMapPromise) return imageMapPromise;
+function loadImageMap(session, force) {
+  if (!force && imageMap && Date.now() - imageMapAt < 4000) return Promise.resolve(imageMap);
+  if (!force && imageMapPromise) return imageMapPromise;
   const companyId = String(session.companyId || '');
   const filters = session.role === 'ADM_MASTER' || !companyId
     ? []
@@ -672,12 +681,14 @@ function loadImageMap(session) {
     const map = {};
     rowsOf(result).forEach((row) => {
       const orderId = String(row.orderId || '');
-      const dataUrl = String(row.dataUrl || '');
+      const dataUrl = String(row.dataUrl || row.url || '');
       if (!orderId || !dataUrl.startsWith('data:image/')) return;
       if (!map[orderId]) map[orderId] = [];
       if (map[orderId].length < 4) map[orderId].push(dataUrl);
     });
     imageMap = map;
+    imageMapAt = Date.now();
+    imageMapPromise = null;
     return map;
   }).catch((err) => {
     imageMapPromise = null;
