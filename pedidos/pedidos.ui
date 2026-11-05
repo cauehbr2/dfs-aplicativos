@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fila de Pedidos</title>
+<style>
+  :root { --bg:#09090b; --panel:#09090b; --line:#27272a; --muted:#a1a1aa; --text:#fafafa; }
+  * { box-sizing:border-box; }
+  html { color-scheme:dark; }
+  html, body { height:100%; margin:0; background:var(--bg); color:var(--text); font-family:"Segoe UI", system-ui, sans-serif; }
+  ::-webkit-scrollbar { width:8px; height:8px; }
+  ::-webkit-scrollbar-track { background:#09090b; }
+  ::-webkit-scrollbar-thumb { background:#27272a; border-radius:999px; }
+  ::-webkit-scrollbar-thumb:hover { background:#3f3f46; }
+  ::-webkit-scrollbar-button { width:0; height:0; display:none; }
+  ::-webkit-scrollbar-corner { background:#09090b; }
+  button, select, input { font:inherit; color:inherit; outline:none; }
+  button:focus, button:focus-visible, input:focus, input:focus-visible { outline:none; }
+  button { cursor:pointer; }
+  .shell { height:100%; display:flex; flex-direction:column; background:#09090b; }
+  .head { padding:22px 24px; border-bottom:1px solid rgba(39,39,42,.8); background:rgba(24,24,27,.4); display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  .brand { display:flex; align-items:center; gap:12px; min-width:0; }
+  .mark { width:48px; height:48px; border-radius:16px; display:grid; place-items:center; background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.2); color:#34d399; flex:none; }
+  .mark svg { width:24px; height:24px; }
+  h1 { margin:0; font-size:18px; font-weight:900; letter-spacing:.01em; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .count { padding:2px 10px; border-radius:999px; background:rgba(16,185,129,.2); color:#34d399; border:1px solid rgba(16,185,129,.3); font-size:10px; font-weight:900; letter-spacing:.06em; }
+  .sub { margin:4px 0 0; color:#a1a1aa; font-size:12px; }
+  .filters { padding:16px; border-bottom:1px solid rgba(39,39,42,.8); background:rgba(9,9,11,.9); display:flex; flex-direction:column; gap:12px; }
+  .row { display:flex; align-items:center; gap:6px; overflow:visible; flex-wrap:wrap; }
+  #tabs { gap:6px; }
+  .label { color:#71717a; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; display:inline-flex; align-items:center; gap:6px; margin-right:4px; flex:none; }
+  .pill, .tab, .field, .select, .company {
+    border:1px solid rgba(39,39,42,.8); background:#18181b; color:#a1a1aa; border-radius:8px;
+  }
+  .pill { padding:6px 10px; font-size:12px; font-weight:700; flex:none; }
+  .pill.on { background:#f4f4f5; color:#09090b; font-weight:900; border-color:transparent; }
+  .tab { padding:6px 9px; border-radius:10px; font-size:11px; font-weight:800; letter-spacing:.02em; text-transform:uppercase; display:inline-flex; align-items:center; gap:6px; flex:none; white-space:nowrap; }
+  .tab.on { background:#10b981; color:#09090b; font-weight:900; border-color:transparent; box-shadow:0 8px 18px rgba(16,185,129,.2); }
+  .badge { padding:1px 8px; border-radius:8px; font-family:ui-monospace, Consolas, monospace; font-size:10px; font-weight:800; background:#27272a; color:#d4d4d8; }
+  .tab.on .badge { background:rgba(9,9,11,.2); color:#09090b; }
+  .grid4 { display:grid; grid-template-columns:1.3fr 1fr 1fr 1fr; gap:12px; }
+  .search { position:relative; }
+  .search svg { position:absolute; left:12px; top:9px; width:16px; height:16px; color:#71717a; }
+  .field, .select, .company { width:100%; background:#18181b; border:1px solid #27272a; border-radius:12px; padding:8px 12px; font-size:12px; outline:none; }
+  .field { padding-left:36px; }
+  .field:focus, .pick.open .select { border-color:#10b981; }
+  .pick { position:relative; }
+  .pick .select { display:flex; align-items:center; justify-content:space-between; gap:8px; text-align:left; color:#e4e4e7; appearance:none; }
+  .pick .select:focus, .menu button:focus { outline:none; }
+  .pick .select svg { width:14px; height:14px; color:#71717a; flex:none; }
+  .menu { position:absolute; z-index:40; top:calc(100% + 6px); left:0; right:0; display:flex; flex-direction:column; gap:2px; padding:6px; background:#18181b; border:1px solid #3f3f46; border-radius:12px; box-shadow:0 16px 40px rgba(0,0,0,.5); }
+  .menu[hidden] { display:none; }
+  .menu button { display:block; width:100%; text-align:left; border:0; background:transparent; color:#d4d4d8; border-radius:8px; padding:8px 10px; font-size:12px; font-weight:700; }
+  .menu button:hover { background:rgba(16,185,129,.16); color:#a7f3d0; }
+  .menu button.on { background:#10b981; color:#09090b; }
+  .company { display:flex; align-items:center; gap:8px; color:#a1a1aa; background:rgba(24,24,27,.6); }
+  .company strong { color:#e4e4e7; font-weight:700; }
+  .list { flex:1; overflow:auto; padding:24px; }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .empty { height:256px; border:2px dashed rgba(39,39,42,.8); border-radius:24px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:rgba(24,24,27,.2); color:#71717a; }
+  .empty h4 { margin:8px 0 0; color:#d4d4d8; font-size:14px; letter-spacing:.06em; text-transform:uppercase; }
+  .empty p { margin:6px 0 0; font-size:12px; max-width:320px; }
+  .card { border-radius:16px; border:1px solid rgba(39,39,42,.8); background:rgba(24,24,27,.5); padding:20px; display:flex; flex-direction:column; gap:16px; }
+  .card.alta { background:rgba(245,158,11,.05); border-color:rgba(245,158,11,.3); }
+  .card.urgente { background:rgba(239,68,68,.05); border-color:rgba(239,68,68,.4); }
+  .top { display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; border-bottom:1px solid rgba(39,39,42,.6); padding-bottom:12px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .code { font-family:ui-monospace, Consolas, monospace; font-size:12px; font-weight:900; color:#34d399; background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.2); border-radius:8px; padding:4px 10px; }
+  .chip { font-size:10px; font-weight:900; letter-spacing:.04em; text-transform:uppercase; border-radius:6px; padding:2px 8px; border:1px solid #3f3f46; }
+  .chip.contas { color:#34d399; background:rgba(16,185,129,.1); border-color:rgba(16,185,129,.2); }
+  .chip.montante { color:#60a5fa; background:rgba(37,99,235,.1); border-color:rgba(37,99,235,.2); }
+  .prio { border-radius:999px; padding:2px 10px; font-size:10px; font-weight:900; letter-spacing:.04em; text-transform:uppercase; border:1px solid #3f3f46; background:#27272a; color:#a1a1aa; }
+  .prio.alta { color:#fcd34d; background:rgba(245,158,11,.2); border-color:rgba(245,158,11,.4); }
+  .prio.urgente { color:#f87171; background:rgba(239,68,68,.2); border-color:rgba(239,68,68,.4); }
+  .mid { display:flex; justify-content:space-between; gap:12px; }
+  .client { margin:0; font-size:16px; font-weight:700; }
+  .co { margin-top:2px; color:#71717a; font-size:11px; }
+  .money-k { display:block; color:#71717a; font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; text-align:right; }
+  .money { color:#34d399; font-size:18px; font-weight:900; }
+  .meta { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .status { border-radius:12px; padding:4px 10px; font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; border:1px solid #3f3f46; }
+  .status.wait { color:#fcd34d; background:rgba(245,158,11,.2); border-color:rgba(245,158,11,.4); }
+  .status.go { color:#34d399; background:rgba(16,185,129,.2); border-color:rgba(16,185,129,.4); }
+  .status.design { color:#d8b4fe; background:rgba(168,85,247,.2); border-color:rgba(168,85,247,.4); }
+  .status.done { color:#a1a1aa; background:#27272a; border-color:#3f3f46; }
+  .status.cancel { color:#f87171; background:rgba(239,68,68,.2); border-color:rgba(239,68,68,.4); }
+  .who { font-size:11px; border-radius:8px; padding:2px 8px; }
+  .who.me { color:#6ee7b7; background:rgba(6,78,59,.6); border:1px solid rgba(6,95,70,.5); }
+  .who.to { color:#d8b4fe; background:rgba(88,28,135,.45); border:1px solid rgba(107,33,168,.5); }
+  .who.free { color:#a1a1aa; background:rgba(39,39,42,.6); border:1px solid rgba(63,63,70,.5); }
+  .faixa { display:flex; width:100%; overflow:hidden; border-radius:12px; border:2px solid #10b981; background:#27272a; }
+  .faixa .q { background:#10b981; color:#000; padding:8px 12px; display:flex; flex-direction:column; justify-content:center; }
+  .faixa .q b { font-size:20px; line-height:1; }
+  .faixa .q span, .faixa .f span { font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+  .faixa .f { padding:8px 12px; min-width:0; }
+  .faixa .f span { color:#34d399; }
+  .faixa .f b { display:block; margin-top:4px; font-size:16px; }
+  .foot { border-top:1px solid rgba(39,39,42,.6); padding-top:12px; color:#71717a; font-size:10px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .right { display:flex; align-items:center; gap:8px; }
+  .mod { padding:2px 8px; border-radius:6px; border:1px solid #3f3f46; background:#18181b; color:#71717a; font-size:10px; font-weight:900; letter-spacing:.04em; text-transform:uppercase; }
+  .mod.contas.on { background:rgba(16,185,129,.2); border-color:#34d399; color:#6ee7b7; }
+  .mod.montante.on { background:rgba(59,130,246,.2); border-color:#60a5fa; color:#93c5fd; }
+  .check { width:28px; height:28px; border-radius:8px; border:1px solid #3f3f46; background:#18181b; display:grid; place-items:center; }
+  .check input { appearance:none; width:16px; height:16px; margin:0; background:transparent; border:0; display:grid; place-items:center; }
+  .check input:checked::after { content:""; width:8px; height:5px; border-left:2px solid #10b981; border-bottom:2px solid #10b981; transform:rotate(-45deg) translateY(-1px); }
+  .pend { color:#fcd34d; background:rgba(245,158,11,.2); border:1px solid rgba(245,158,11,.4); border-radius:6px; padding:2px 8px; font-size:10px; font-weight:900; animation:pulse 1.2s ease-in-out infinite; }
+  .card.pendencia { background:rgba(69,26,3,.2); border-color:rgba(245,158,11,.4); }
+  .co, .status { display:inline-flex; align-items:center; gap:4px; }
+  .co svg, .status svg { width:12px; height:12px; flex:none; }
+  .money-wrap { text-align:right; }
+  .from { display:block; color:#fbbf24; font-size:10px; font-weight:800; }
+  .desc { font-size:11px; color:#fcd34d; background:rgba(69,26,3,.6); border:1px solid rgba(146,64,14,.5); border-radius:8px; padding:2px 8px; }
+  .blogger { font-size:11px; border-radius:8px; padding:2px 8px; }
+  .blogger.contas { color:#6ee7b7; background:rgba(6,78,59,.6); border:1px solid rgba(6,95,70,.5); }
+  .blogger.montante { color:#93c5fd; background:rgba(23,37,84,.6); border:1px solid rgba(30,64,175,.5); }
+  .pix { font-size:11px; color:#fcd34d; background:rgba(69,26,3,.6); border:1px solid rgba(146,64,14,.5); border-radius:8px; padding:2px 8px; }
+  .notes { margin:0; font-size:12px; color:#a1a1aa; font-style:italic; background:rgba(9,9,11,.6); border:1px solid rgba(39,39,42,.5); border-radius:12px; padding:10px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .links { display:flex; flex-direction:column; gap:4px; }
+  .link { display:flex; align-items:center; gap:8px; }
+  .link a { color:#7dd3fc; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .icon, .abrir, .assumir { border:1px solid #3f3f46; background:#27272a; color:#d4d4d8; border-radius:12px; }
+  .icon { width:28px; height:28px; display:grid; place-items:center; padding:0; }
+  .icon svg, .abrir svg, .assumir svg, .copy svg { width:14px; height:14px; }
+  .icon.back:hover { background:rgba(245,158,11,.2); color:#fbbf24; }
+  .icon.stop:hover { background:rgba(239,68,68,.2); color:#f87171; }
+  .copy { width:28px; height:28px; display:grid; place-items:center; padding:0; flex:none; }
+  .abrir, .assumir { display:inline-flex; align-items:center; gap:4px; padding:6px 10px; font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+  .assumir { background:#10b981; color:#09090b; border-color:transparent; font-weight:900; }
+  .acts { display:flex; align-items:center; gap:6px; }
+  .cycle { padding:2px 8px; border-radius:6px; background:#27272a; color:#d4d4d8; border:1px solid #3f3f46; font-size:10px; font-family:ui-monospace, Consolas, monospace; font-weight:500; letter-spacing:0; }
+  .sheet { position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.9); padding:16px; }
+  .sheet[hidden] { display:none; }
+  .sheet-box { width:min(672px, 100%); max-height:90vh; overflow:auto; background:#09090b; border:1px solid #27272a; border-radius:24px; box-shadow:0 24px 60px rgba(0,0,0,.45); }
+  .sheet-head, .sheet-body, .sheet-form { padding:24px; }
+  .sheet-head { display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid #27272a; background:rgba(24,24,27,.4); }
+  .sheet-head h3 { margin:0; font-size:16px; }
+  .sheet-head p { margin:4px 0 0; color:#a1a1aa; font-size:12px; font-family:ui-monospace, Consolas, monospace; }
+  .sheet-body { display:flex; flex-direction:column; gap:16px; }
+  .k { color:#71717a; font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .pair b { display:block; margin-top:4px; font-size:14px; font-weight:600; }
+  .mods { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .mods button { border-radius:12px; padding:8px; font-size:12px; font-weight:900; letter-spacing:.04em; text-transform:uppercase; border:1px solid #27272a; background:transparent; color:#71717a; }
+  .mods button.on.contas { border-color:rgba(16,185,129,.4); background:rgba(16,185,129,.1); color:#34d399; }
+  .mods button.on.montante { border-color:rgba(59,130,246,.4); background:rgba(59,130,246,.1); color:#93c5fd; }
+  .block { border-radius:16px; border:1px solid rgba(6,78,59,.4); background:rgba(2,44,34,.2); padding:16px; }
+  .sheet-form { display:flex; flex-direction:column; gap:16px; }
+  .sheet-form h3 { margin:0; font-size:14px; letter-spacing:.04em; text-transform:uppercase; }
+  textarea.field { width:100%; min-height:88px; padding:12px; resize:none; }
+  .sheet-actions { display:flex; justify-content:flex-end; gap:8px; }
+  .back-btn, .go { border:0; border-radius:12px; padding:8px 16px; font-size:12px; font-weight:800; }
+  .back-btn { background:#27272a; color:#d4d4d8; }
+  .go.return { background:#f59e0b; color:#09090b; }
+  .go.cancel { background:#ef4444; color:#fff; }
+  .hist { border:1px solid rgba(39,39,42,.6); background:rgba(24,24,27,.6); border-radius:12px; padding:12px; margin-bottom:8px; }
+  .hist b { color:#34d399; font-size:11px; }
+  .hist span { float:right; color:#71717a; font-size:11px; font-family:ui-monospace, Consolas, monospace; }
+  .hist p { margin:6px 0 0; font-size:12px; color:#d4d4d8; }
+  .shot { max-height:176px; max-width:240px; width:auto; height:auto; object-fit:contain; border-radius:8px; border:1px solid #3f3f46; background:#09090b; display:block; cursor:zoom-in; }
+  .shots { display:flex; flex-wrap:wrap; gap:8px; }
+  .shots[hidden] { display:none; }
+  .zoom { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.9); display:flex; align-items:center; justify-content:center; padding:24px; }
+  .zoom[hidden] { display:none; }
+  .zoom img { max-width:100%; max-height:100%; object-fit:contain; }
+  .toast { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:90; background:#18181b; color:#fafafa; border:1px solid #3f3f46; border-radius:12px; padding:10px 14px; font-size:12px; font-weight:700; }
+  .toast[hidden] { display:none; }
+  .assumir.other { background:rgba(245,158,11,.15); color:#fde68a; border:1px solid rgba(245,158,11,.4); }
+  .fila-side {
+    width:42px; height:42px; border:0; border-radius:14px; cursor:pointer; flex:none;
+    background:linear-gradient(145deg, #34d399 0%, #10b981 48%, #059669 100%);
+    color:#052e16; box-shadow:0 8px 18px rgba(16,185,129,.28);
+    display:grid; place-items:center;
+  }
+  .fila-side svg { width:22px; height:22px; }
+  .fila-side.on { background:#27272a; color:#fafafa; box-shadow:none; }
+  .head-side { display:flex; align-items:center; gap:12px; flex:none; }
+  .who { display:flex; align-items:center; gap:8px; min-width:0; }
+  #account { color:#d4d4d8; font-size:12px; font-weight:700; white-space:nowrap; }
+  .ghost { background:#27272a; border:1px solid #3f3f46; border-radius:10px; padding:8px 12px; font-size:12px; font-weight:800; color:#e4e4e7; }
+  .corner-version { position:fixed; right:14px; bottom:8px; z-index:20; color:#71717a; font-size:11px; font-weight:700; letter-spacing:.04em; pointer-events:none; }
+  .sync { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:#71717a; font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+  .alert { position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.7); padding:16px; }
+  .alert[hidden] { display:none; }
+  .alert-box { width:min(1152px, 100%); max-height:90vh; overflow:auto; border-radius:16px; border:1px solid rgba(245,158,11,.4); background:#09090b; padding:24px; box-shadow:0 20px 50px rgba(245,158,11,.1); }
+  .alert-head { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  .bell { width:44px; height:44px; border-radius:999px; display:grid; place-items:center; background:rgba(245,158,11,.15); color:#fbbf24; animation:pulse 1.2s ease-in-out infinite; }
+  .bell svg { width:20px; height:20px; }
+  @keyframes pulse { 50% { opacity:.55; } }
+  .alert-kicker { margin:0; color:#fbbf24; font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }
+  .alert-title { margin:2px 0 0; font-size:18px; font-weight:700; }
+  .alert-cards { display:flex; flex-wrap:wrap; justify-content:center; align-items:stretch; gap:16px; }
+  .alert-card { width:min(100%, 360px); flex:1; border:1px solid #27272a; background:rgba(24,24,27,.8); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:8px; }
+  .alert-card h3 { margin:0; font-size:14px; }
+  .alert-card p { margin:0; font-size:14px; color:#a1a1aa; }
+  .blog.contas { color:#34d399; font-weight:700; }
+  .blog.montante { color:#60a5fa; font-weight:700; }
+  .alert-card .code { font-size:11px; color:#71717a; }
+  .alert-card .notes { font-size:12px; color:#a1a1aa; font-style:italic; }
+  .accept { margin-top:8px; width:100%; border:0; border-radius:12px; background:#10b981; color:#000; font-weight:900; letter-spacing:.06em; text-transform:uppercase; padding:12px; }
+  .accept:disabled { opacity:.6; }
+  .alert-foot { margin:12px 0 0; color:#71717a; font-size:12px; }
+  .alert-error { margin:8px 0 0; color:#f87171; font-size:12px; }
+  .spin { width:32px; height:32px; border:2px solid #10b981; border-top-color:transparent; border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @media (max-width: 980px) { .grid4, .cards { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="head">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      </div>
+      <div>
+        <h1>Fila de Pedidos — <span id="company">Minha Empresa</span> <span class="count" id="count">0 PEDIDOS</span> <span class="cycle" id="cycle" hidden></span></h1>
+        <p class="sub" id="sub">Acompanhe e assuma os pedidos em tempo real</p>
+      </div>
+    </div>
+    <div class="head-side">
+      <div class="who">
+        <span id="account">Conectado: —</span>
+        <button type="button" class="ghost" id="logout">Sair</button>
+      </div>
+      <button type="button" class="fila-side" id="open-fila" title="Fila operacional">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </button>
+    </div>
+  </header>
+  <span class="corner-version" id="app-version"></span>
+  <section class="filters">
+    <div class="row" id="periods"></div>
+    <div class="row" id="tabs"></div>
+    <div class="grid4">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+        <input class="field" id="search" placeholder="Buscar código, cliente, operador..." />
+      </div>
+      <div class="company" id="company-box"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h6v18"/><path d="M12 21V9h6a2 2 0 0 1 2 2v10"/><path d="M8 7h.01M8 11h.01M8 15h.01M16 13h.01M16 17h.01"/></svg><strong id="company-2">Minha Empresa</strong></div>
+      <div class="pick">
+        <button type="button" class="select" id="type" data-value="all"><span>Todos os Tipos</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="menu" hidden>
+          <button type="button" class="on" data-value="all">Todos os Tipos</button>
+          <button type="button" data-value="contas">Op. Contas</button>
+          <button type="button" data-value="montante">Op. Montantes</button>
+        </div>
+      </div>
+      <div class="pick">
+        <button type="button" class="select" id="priority" data-value="all"><span>Todas as Prioridades</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="menu" hidden>
+          <button type="button" class="on" data-value="all">Todas as Prioridades</button>
+          <button type="button" data-value="Normal">Normal</button>
+          <button type="button" data-value="Alta">Alta ⚡</button>
+          <button type="button" data-value="Urgente">Urgente 🔥</button>
+        </div>
+      </div>
+    </div>
+  </section>
+  <main class="list" id="list">
+    <div class="sync"><div class="spin"></div>Sincronizando Fila de Pedidos...</div>
+  </main>
+</div>
+<div class="alert" id="alert" hidden>
+  <div class="alert-box">
+    <div class="alert-head">
+      <div class="bell" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg></div>
+      <div>
+        <p class="alert-kicker" id="alert-kicker">Pedido designado</p>
+        <h2 class="alert-title" id="alert-title">Aceite para parar o alerta</h2>
+      </div>
+    </div>
+    <div class="alert-cards" id="alert-cards"></div>
+    <p class="alert-error" id="alert-error"></p>
+    <p class="alert-foot">A janela permanece até você aceitar todos os pedidos designados. Se você estiver na fila operacional do setor, ao aceitar a sua vez passa para o próximo.</p>
+  </div>
+</div>
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-box" id="sheet-box"></div>
+</div>
+<div id="toast" class="toast" hidden></div>
+<div class="zoom" id="zoom" hidden><img id="zoom-img" alt="Print do pedido"></div>
+<script>
+const periods = [
+  ['todos', 'Todos os Pedidos'],
+  ['hoje', 'Hoje'],
+  ['ontem', 'Ontem'],
+  ['semana', 'Esta Semana'],
+  ['semanaPassada', 'Semana Passada'],
+  ['mes', 'Este Mês'],
+  ['mesPassado', 'Mês Passado'],
+  ['tudo', 'Tudo'],
+];
+const tabs = [
+  ['todos', 'Todos'],
+  ['meus', 'Meus Pedidos'],
+  ['aguardando', 'Aguardando Operador'],
+  ['designados', 'Designados'],
+  ['assumidos', 'Assumidos / Em Andamento'],
+  ['finalizados', 'Finalizados'],
+  ['cancelados', 'Cancelados'],
+];
+const state = { period: 'todos', tab: 'todos', orders: [], me: {}, companyName: '', images: {}, imagesReady: false };
+const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
+}
+function day(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
+}
+function startOfWeek(date) {
+  const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  copy.setDate(copy.getDate() - copy.getDay());
+  return copy;
+}
+function inRange(iso, start, end) {
+  const key = localKey(iso);
+  if (!key) return false;
+  return key >= day(start) && key <= day(end);
+}
+function localKey(iso) {
+  const date = new Date(iso);
+  if (!iso || Number.isNaN(date.getTime())) return '';
+  return day(date);
+}
+function inPeriod(order) {
+  const today = new Date();
+  const key = localKey(order.createdAt);
+  if (state.period === 'hoje') return key === day(today);
+  if (state.period === 'ontem') {
+    const y = new Date(today); y.setDate(y.getDate() - 1);
+    return key === day(y);
+  }
+  if (state.period === 'semana') {
+    const start = startOfWeek(today);
+    const end = new Date(start); end.setDate(start.getDate() + 6);
+    return inRange(order.createdAt, start, end);
+  }
+  if (state.period === 'semanaPassada') {
+    const start = startOfWeek(today); start.setDate(start.getDate() - 7);
+    const end = new Date(start); end.setDate(start.getDate() + 6);
+    return inRange(order.createdAt, start, end);
+  }
+  if (state.period === 'mes') return key.slice(0, 7) === day(today).slice(0, 7);
+  if (state.period === 'mesPassado') {
+    const prev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    return key.slice(0, 7) === day(prev).slice(0, 7);
+  }
+  return true;
+}
+function scoped() {
+  const term = document.getElementById('search').value.trim().toLowerCase();
+  const type = document.getElementById('type').dataset.value || 'all';
+  const priority = document.getElementById('priority').dataset.value || 'all';
+  return state.orders.filter((order) => {
+    if (type !== 'all' && order.type !== type) return false;
+    if (priority !== 'all' && order.priority !== priority) return false;
+    if (!inPeriod(order)) return false;
+    if (!term) return true;
+    const bag = [order.orderCode, order.clientName, order.assignedOperatorName, order.responsibleOperatorName, order.notes, order.companyName];
+    if (manager()) bag.push(order.phone);
+    return bag.join(' ').toLowerCase().includes(term);
+  });
+}
+function tabOf(order, listName) {
+  const open = order.status !== 'Finalizado' && order.status !== 'Cancelado';
+  const mine = state.me.id && (order.assignedOperatorId === state.me.id || order.responsibleOperatorId === state.me.id);
+  if (listName === 'aguardando') return order.status === 'Aguardando operador' || order.status === 'Registrado' || order.status === 'Retornado para fila';
+  if (listName === 'designados') return order.status === 'Designado';
+  if (listName === 'meus') return mine && open;
+  if (listName === 'assumidos') return order.status === 'Assumido';
+  if (listName === 'finalizados') return order.status === 'Finalizado';
+  if (listName === 'cancelados') return order.status === 'Cancelado';
+  return true;
+}
+function statusClass(status) {
+  if (status === 'Assumido' || status === 'Em andamento') return 'go';
+  if (status === 'Designado') return 'design';
+  if (status === 'Finalizado') return 'done';
+  if (status === 'Cancelado') return 'cancel';
+  return 'wait';
+}
+function when(iso) {
+  const date = new Date(iso);
+  if (!iso || Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' }).replace(',', ' às');
+}
+function manager() {
+  return state.me.role === 'ADM_MASTER' || state.me.role === 'SOCIO';
+}
+function closed(order) {
+  return order.status === 'Finalizado' || order.status === 'Cancelado';
+}
+function mine(order) {
+  return state.me.id && order.responsibleOperatorId === state.me.id;
+}
+function moduleOn(order, module) {
+  const added = order.addedModules;
+  if (added && (added.contas !== undefined || added.montante !== undefined)) return !!added[module];
+  return order.type === module;
+}
+function hrefOf(link) {
+  const text = String(link || '').trim();
+  if (!text) return '';
+  return /^https?:\/\//i.test(text) ? text : 'https://' + text;
+}
+const eye = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const back = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
+const ban = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>';
+const clock = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v6l3 2"/></svg>';
+const copyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+const building = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V5a2 2 0 0 1 2-2h6v18"/><path d="M12 21V9h6a2 2 0 0 1 2 2v10"/></svg>';
+function card(order) {
+  const contas = order.type === 'contas';
+  const prio = order.priority === 'Urgente' ? 'urgente' : order.priority === 'Alta' ? 'alta' : '';
+  const today = new Date();
+  const createdToday = localKey(order.createdAt) === day(new Date());
+  const pending = !createdToday && !closed(order);
+  const who = order.responsibleOperatorName
+    ? '<span class="who me">Assumido por: <strong>' + esc(order.responsibleOperatorName) + '</strong></span>'
+    : order.assignedOperatorName
+      ? '<span class="who to">Designado para: <strong>' + esc(order.assignedOperatorName) + '</strong></span>'
+      : '<span class="who free">Livre na Fila</span>';
+  const faixa = contas && (order.faixa || order.qtd)
+    ? '<span class="faixa"><span class="q"><span>Qtd.</span><b>' + String(order.qtd || 0).padStart(2, '0') + '</b></span><span class="f"><span>Faixa de depósito</span><b>' + esc(order.faixa || '—') + '</b></span></span>'
+    : '';
+  const off = order.discountPercentage > 0
+    ? '<span class="desc">Desc: <strong>' + esc(order.discountPercentage) + '%</strong> (-' + money.format(order.discountAmount || 0) + ')</span>'
+    : '';
+  const from = order.discountPercentage > 0
+    ? '<span class="from">De: ' + money.format(order.originalAmount || 0) + ' (-' + esc(order.discountPercentage) + '%)</span>'
+    : '';
+  const blog = order.blogger
+    ? '<span class="blogger ' + (contas ? 'contas' : 'montante') + '">Blogueira ' + (contas ? 'Contas' : 'Montante') + ': <strong>' + money.format(order.blogger) + '</strong></span>'
+    : '';
+  const pix = order.pixReceivedBy ? '<span class="pix">Pix: <strong>' + esc(order.pixReceivedBy) + '</strong></span>' : '';
+  const phone = manager() && order.phone ? '<span class="co">' + esc(order.phone) + '</span>' : '';
+  const notes = order.notes ? '<p class="notes">"' + esc(order.notes) + '"</p>' : '';
+  const links = (order.links || []).length
+    ? '<div class="links">' + order.links.map((link) => '<div class="link"><a href="' + esc(hrefOf(link)) + '" target="_blank" rel="noreferrer">' + esc(link) + '</a><button type="button" class="icon copy" data-copy="' + esc(link) + '" title="Copiar link">' + copyIcon + '</button></div>').join('') + '</div>'
+    : '';
+  const showCheck = order.status !== 'Cancelado' && (manager() || ((order.status === 'Assumido' || order.status === 'Em andamento') && mine(order)) || (order.status === 'Finalizado' && mine(order)));
+  const check = showCheck
+    ? '<label class="check" title="' + (order.status === 'Finalizado' ? 'Finalizado' : 'Marcar como finalizado') + '"><input type="checkbox" data-finish="' + esc(order.id) + '"' + (order.status === 'Finalizado' ? ' checked' : '') + (order.status === 'Finalizado' && !manager() ? ' disabled' : '') + '></label>'
+    : '';
+  const shotRow = '<div class="shots" data-shots="' + esc(order.id) + '" hidden></div>';
+  const waiting = order.status === 'Aguardando operador' || order.status === 'Registrado' || order.status === 'Retornado para fila';
+  const claim = (waiting || order.assignedOperatorId === state.me.id) && !order.responsibleOperatorId && !closed(order);
+  const other = order.status === 'Designado' && !order.responsibleOperatorId && order.assignedOperatorId && order.assignedOperatorId !== state.me.id && (manager() || order.companyId === state.me.companyId);
+  const buttons = ['<button type="button" class="abrir" data-open="' + esc(order.id) + '" title="Abrir pedido completo">' + eye + 'Abrir</button>'];
+  if (claim) buttons.push('<button type="button" class="assumir" data-assumir="' + esc(order.id) + '" data-takeover="0">Assumir</button>');
+  if (other) buttons.push('<button type="button" class="assumir other" data-assumir="' + esc(order.id) + '" data-takeover="1" title="Assumir porque ' + esc(order.assignedOperatorName || 'o operador') + ' está cheio ou ocupado">Outro assumir</button>');
+  if ((mine(order) || manager()) && !closed(order)) buttons.push('<button type="button" class="icon back" data-act="return" data-id="' + esc(order.id) + '" title="Retornar à fila">' + back + '</button>');
+  if ((manager() || mine(order)) && !closed(order)) buttons.push('<button type="button" class="icon stop" data-act="cancel" data-id="' + esc(order.id) + '" title="Cancelar pedido">' + ban + '</button>');
+  buttons.push('<button type="button" class="icon" data-act="history" data-id="' + esc(order.id) + '" title="Histórico de movimentações">' + clock + '</button>');
+  return '<article class="card ' + prio + (pending ? ' pendencia' : '') + '">'
+    + '<div class="top"><div class="chips"><span class="code">' + esc(order.orderCode) + '</span>'
+    + '<span class="chip ' + (contas ? 'contas' : 'montante') + '">' + (contas ? 'Op. Contas' : 'Op. Montantes') + '</span>'
+    + '<button type="button" class="mod contas' + (moduleOn(order, 'contas') ? ' on' : '') + '" data-mod="contas" data-id="' + esc(order.id) + '" title="Marcar o que foi acrescentado">Contas</button>'
+    + '<button type="button" class="mod montante' + (moduleOn(order, 'montante') ? ' on' : '') + '" data-mod="montante" data-id="' + esc(order.id) + '" title="Marcar o que foi acrescentado">Montante</button>'
+    + (pending ? '<span class="pend">Pendência anterior</span>' : '')
+    + '</div><div class="right">' + check + '<span class="prio ' + prio + '">' + (order.priority === 'Urgente' ? '🔥 ' : order.priority === 'Alta' ? '⚡ ' : '') + esc(order.priority || 'Normal') + '</span></div></div>'
+    + '<div class="mid"><div><h3 class="client">' + esc(order.clientName) + '</h3>' + phone + '<div class="co">' + building + esc(order.companyName) + '</div></div>'
+    + '<div class="money-wrap"><span class="money-k">Valor Previsto</span><span class="money">' + money.format(order.totalValue || 0) + '</span>' + from + '</div></div>'
+    + '<div class="meta"><span class="status ' + statusClass(order.status) + '">' + clock + esc(order.status) + '</span>' + who + off + faixa + pix + blog + '</div>'
+    + notes + links + shotRow
+    + '<div class="foot"><span>Registrado em ' + esc(when(order.createdAt)) + ' por <strong>' + esc(order.registeredByName || '—') + '</strong></span><div class="acts">' + buttons.join('') + '</div></div></article>';
+}
+function fillShots(root) {
+  (root || document).querySelectorAll('[data-shots]').forEach((box) => {
+    const list = state.images[box.getAttribute('data-shots')] || [];
+    box.replaceChildren();
+    if (!list.length) { box.hidden = true; return; }
+    box.hidden = false;
+    list.forEach((src, index) => {
+      const img = document.createElement('img');
+      img.className = 'shot';
+      img.alt = 'Print ' + (index + 1);
+      img.src = src;
+      box.appendChild(img);
+    });
+  });
+}
+function openZoom(src) {
+  const zoom = document.getElementById('zoom');
+  const img = document.getElementById('zoom-img');
+  if (!zoom || !img || !src) return;
+  img.src = src;
+  zoom.hidden = false;
+}
+function paint() {
+  const rows = scoped();
+  const counts = {};
+  tabs.forEach(([id]) => { counts[id] = rows.filter((order) => tabOf(order, id)).length; });
+  document.getElementById('count').textContent = counts.todos + (counts.todos === 1 ? ' PEDIDO' : ' PEDIDOS');
+  const cycle = document.getElementById('cycle');
+  if (state.period === 'hoje') {
+    cycle.hidden = false;
+    cycle.textContent = 'Ciclo de Hoje • ' + new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
+  } else {
+    cycle.hidden = true;
+  }
+  document.getElementById('periods').innerHTML = '<span class="label">Período:</span>' + periods.map(([id, label]) => '<button type="button" class="pill' + (state.period === id ? ' on' : '') + '" data-period="' + id + '">' + label + '</button>').join('');
+  document.getElementById('tabs').innerHTML = tabs.map(([id, label]) => '<button type="button" class="tab' + (state.tab === id ? ' on' : '') + '" data-tab="' + id + '"><span>' + label + '</span><span class="badge">' + (counts[id] || 0) + '</span></button>').join('');
+  const shown = rows.filter((order) => tabOf(order, state.tab));
+  const list = document.getElementById('list');
+  if (!shown.length) {
+    const text = state.period === 'hoje'
+      ? 'A fila de hoje está limpa e pronta para novos registros operacionais.'
+      : 'Não há pedidos no período ou filtros selecionados.';
+    list.innerHTML = '<div class="empty"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></div><h4>Nenhum pedido encontrado</h4><p>' + text + '</p></div>';
+    return;
+  }
+  list.innerHTML = '<div class="cards">' + shown.map(card).join('') + '</div>';
+  fillShots(list);
+  loadImages();
+}
+document.getElementById('open-fila').addEventListener('click', () => {
+  const button = document.getElementById('open-fila');
+  button.classList.toggle('on');
+  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('fila-toggle');
+});
+function toast(message) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.hidden = false;
+  el.textContent = message;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => { el.hidden = true; }, 3200);
+}
+function orderById(id) {
+  return state.orders.find((order) => order.id === id);
+}
+async function postJson(url, body) {
+  const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await response.json();
+  if (!data || !data.ok) throw new Error((data && data.message) || 'Não foi possível atualizar o pedido.');
+  return data;
+}
+function closeSheet() {
+  document.getElementById('sheet').hidden = true;
+  document.getElementById('sheet-box').innerHTML = '';
+}
+function field(label, value) {
+  return '<div><span class="k">' + label + '</span><b>' + esc(value || '—') + '</b></div>';
+}
+function openOrder(order) {
+  const contas = order.type === 'contas';
+  const detail = contas
+    ? '<div class="block pair">' + field('Faixa de depósito', order.faixa) + field('Grupo', order.grupo) + field('Qtd. contas', order.qtd) + field('Valor por conta', money.format(order.valorPorConta || 0)) + '</div>'
+    : '<div class="block pair">' + field('Montante', money.format(order.valorMontante || order.totalValue || 0)) + field('Quantidade', order.quantidade) + field('Taxa', order.rollover) + '</div>';
+  const links = (order.links || []).map((link) => '<div class="link"><a href="' + esc(hrefOf(link)) + '" target="_blank" rel="noreferrer">' + esc(link) + '</a><button type="button" class="icon copy" data-copy="' + esc(link) + '" title="Copiar link">' + copyIcon + '</button></div>').join('');
+  document.getElementById('sheet-box').innerHTML = '<div class="sheet-head"><div><h3>Pedido completo</h3><p>' + esc(order.orderCode) + '</p></div><button type="button" class="back-btn" data-close>Fechar</button></div><div class="sheet-body"><div><span class="k">Marcar o que foi acrescentado</span><div class="mods"><button type="button" class="contas' + (moduleOn(order, 'contas') ? ' on' : '') + '" data-mod="contas" data-id="' + esc(order.id) + '">Op. Contas</button><button type="button" class="montante' + (moduleOn(order, 'montante') ? ' on' : '') + '" data-mod="montante" data-id="' + esc(order.id) + '">Op. Montantes</button></div></div><div class="pair">' + field('Cliente', order.clientName) + field('WhatsApp / Telefone', order.phone) + field('Empresa', order.companyName) + field('Prioridade', order.priority) + '</div>' + detail + '<div class="pair">' + field('Blogueira', money.format(order.blogger || 0)) + field('Operador', order.responsibleOperatorName || order.assignedOperatorName || 'Livre na fila') + field('Pix recebido por', order.pixReceivedBy) + field('Status', order.status) + '</div>' + (links ? '<div><span class="k">Links</span><div class="links">' + links + '</div></div>' : '') + (order.notes ? '<p class="notes">"' + esc(order.notes) + '"</p>' : '') + '</div>';
+  document.getElementById('sheet').hidden = false;
+  fetch('/pedidos/imagens?id=' + encodeURIComponent(order.id), { cache: 'no-store' }).then((res) => res.json()).then((payload) => {
+    const images = (payload && payload.images) || [];
+    const body = document.querySelector('#sheet-box .sheet-body');
+    if (!body || !images.length || document.getElementById('sheet').hidden) return;
+    const row = document.createElement('div');
+    row.className = 'shots';
+    images.forEach((src) => {
+      const img = document.createElement('img');
+      img.className = 'shot';
+      img.alt = '';
+      img.src = src;
+      row.appendChild(img);
+    });
+    body.appendChild(row);
+  }).catch(() => {});
+}
+function openReason(order, action) {
+  const title = action === 'return' ? 'Retornar Pedido à Fila' : 'Cancelar Pedido';
+  const label = action === 'return' ? 'Motivo do Retorno' : 'Motivo do Cancelamento';
+  document.getElementById('sheet-box').innerHTML = '<form class="sheet-form" data-reason="' + action + '" data-id="' + esc(order.id) + '"><div class="sheet-head" style="padding:0;border:0;background:none"><h3>' + title + '</h3><button type="button" class="icon" data-close title="Fechar">×</button></div><div><span class="k">' + label + '</span><textarea class="field" name="reason" placeholder="Descreva detalhadamente o motivo..."></textarea></div><p class="err" data-reason-error></p><div class="sheet-actions"><button type="button" class="back-btn" data-close>Voltar</button><button type="submit" class="go ' + action + '">Confirmar</button></div></form>';
+  document.getElementById('sheet').hidden = false;
+}
+async function openHistory(order) {
+  document.getElementById('sheet-box').innerHTML = '<div class="sheet-head"><h3>Histórico - ' + esc(order.orderCode) + '</h3><button type="button" class="back-btn" data-close>Fechar</button></div><div class="sheet-body" id="history">Carregando histórico...</div>';
+  document.getElementById('sheet').hidden = false;
+  try {
+    const response = await fetch('/pedidos/historico?id=' + encodeURIComponent(order.id), { cache: 'no-store' });
+    const data = await response.json();
+    const events = (data && data.events) || [];
+    const box = document.getElementById('history');
+    if (!box) return;
+    if (!data || !data.ok) { box.textContent = (data && data.message) || 'Não li o histórico.'; return; }
+    box.innerHTML = events.length ? events.map((event) => '<div class="hist"><b>' + esc(event.action) + '</b><span>' + esc(when(event.timestamp)) + '</span><p>' + esc(event.notes) + '</p><span class="co">Por: ' + esc(event.userName) + ' (' + esc(event.userRole) + ')</span></div>').join('') : '<p class="co">Nenhum evento registrado.</p>';
+  } catch (err) {
+    const box = document.getElementById('history');
+    if (box) box.textContent = 'Não li o histórico.';
+  }
+}
+document.body.addEventListener('click', async (event) => {
+  const pickItem = event.target.closest('.menu button');
+  if (pickItem) {
+    const pick = pickItem.closest('.pick');
+    const button = pick.querySelector('.select');
+    button.dataset.value = pickItem.dataset.value;
+    button.querySelector('span').textContent = pickItem.textContent;
+    pick.querySelectorAll('.menu button').forEach((item) => item.classList.toggle('on', item === pickItem));
+    pick.querySelector('.menu').hidden = true;
+    pick.classList.remove('open');
+    paint();
+    return;
+  }
+  const pickButton = event.target.closest('.pick .select');
+  if (pickButton) {
+    const pick = pickButton.closest('.pick');
+    const menu = pick.querySelector('.menu');
+    const willOpen = menu.hidden;
+    document.querySelectorAll('.pick').forEach((other) => {
+      other.classList.remove('open');
+      other.querySelector('.menu').hidden = true;
+    });
+    if (willOpen) { menu.hidden = false; pick.classList.add('open'); }
+    return;
+  }
+  document.querySelectorAll('.pick.open').forEach((pick) => {
+    pick.classList.remove('open');
+    pick.querySelector('.menu').hidden = true;
+  });
+  const shot = event.target.closest && event.target.closest('.shot');
+  if (shot && shot.src) { openZoom(shot.src); return; }
+  if (event.target.id === 'zoom' || event.target.id === 'zoom-img') {
+    document.getElementById('zoom').hidden = true;
+    return;
+  }
+  const period = event.target.closest('[data-period]');
+  const tab = event.target.closest('[data-tab]');
+  if (period) { state.period = period.getAttribute('data-period'); paint(); }
+  if (tab) { state.tab = tab.getAttribute('data-tab'); paint(); }
+  const anchor = event.target.closest('a');
+  if (anchor) event.preventDefault();
+  if (event.target.closest('[data-close]') || event.target.id === 'sheet') { closeSheet(); return; }
+  const copy = event.target.closest('[data-copy]');
+  if (copy) {
+  if (copy) {
+    const text = copy.getAttribute('data-copy') || '';
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.postMessage('copy:' + text);
+      toast('Link copiado.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Link copiado.');
+    } catch (err) {
+      const area = document.createElement('textarea');
+      area.value = text;
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand('copy');
+      area.remove();
+      toast(ok ? 'Link copiado.' : 'Não foi possível copiar o link.');
+    }
+    return;
+  }
+    return;
+  }
+  const mod = event.target.closest('[data-mod]');
+  if (mod) {
+    const id = mod.getAttribute('data-id');
+    const order = orderById(id);
+    if (!order) return;
+    try {
+      const data = await postJson('/pedidos/modulo', { id, module: mod.getAttribute('data-mod') });
+      order.addedModules = data.addedModules;
+      paint();
+      if (!document.getElementById('sheet').hidden) openOrder(order);
+    } catch (err) { toast(err.message || 'Não foi possível marcar o módulo.'); }
+    return;
+  }
+  const open = event.target.closest('[data-open]');
+  if (open) { const order = orderById(open.getAttribute('data-open')); if (order) openOrder(order); return; }
+  const claim = event.target.closest('[data-assumir]');
+  if (claim) {
+    try {
+      const data = await postJson('/pedidos/aceitar', {
+        id: claim.getAttribute('data-assumir'),
+        claim: true,
+        takeOver: claim.getAttribute('data-takeover') === '1',
+      });
+      toast(data.message || 'Pedido assumido.');
+      await load();
+    } catch (err) { toast(err.message || 'Não foi possível assumir o pedido.'); }
+    return;
+  }
+  const act = event.target.closest('[data-act]');
+  if (!act) return;
+  const order = orderById(act.getAttribute('data-id'));
+  if (!order) return;
+  const action = act.getAttribute('data-act');
+  if (action === 'history') openHistory(order);
+  else openReason(order, action);
+});
+document.getElementById('list').addEventListener('change', async (event) => {
+  const box = event.target.closest('[data-finish]');
+  if (!box) return;
+  const id = box.getAttribute('data-finish');
+  const order = orderById(id);
+  try {
+    const data = await postJson('/pedidos/finalizar', { id, done: box.checked });
+    if (order && data.status) order.status = data.status;
+    paint();
+  } catch (err) {
+    box.checked = !box.checked;
+    toast(err.message || 'Não foi possível atualizar o pedido.');
+  }
+});
+document.getElementById('sheet').addEventListener('submit', async (event) => {
+  const form = event.target.closest('[data-reason]');
+  if (!form) return;
+  event.preventDefault();
+  const reason = new FormData(form).get('reason');
+  try {
+    const data = await postJson('/pedidos/acao', { id: form.getAttribute('data-id'), action: form.getAttribute('data-reason'), reason });
+    const order = orderById(form.getAttribute('data-id'));
+    if (order && data.status) {
+      order.status = data.status;
+      if (data.status === 'Retornado para fila') {
+        order.responsibleOperatorId = '';
+        order.responsibleOperatorName = '';
+        order.assignedOperatorId = '';
+        order.assignedOperatorName = '';
+      }
+    }
+    closeSheet();
+    paint();
+  } catch (err) {
+    const error = form.querySelector('[data-reason-error]');
+    if (error) error.textContent = err.message || 'Não foi possível atualizar o pedido.';
+  }
+});
+document.getElementById('search').addEventListener('input', paint);
+async function load() {
+  const response = await fetch('/pedidos', { cache: 'no-store' });
+  const data = await response.json();
+  if (!data || !data.ok) {
+    document.getElementById('list').innerHTML = '<div class="empty"><h4>Entre na empresa</h4><p>' + esc((data && data.message) || 'A sessão da calculadora não está neste PC.') + '</p></div>';
+    return;
+  }
+  state.orders = data.orders || [];
+  state.me = data.me || {};
+  state.companyName = data.companyName || state.me.companyName || 'Minha Empresa';
+  document.getElementById('company').textContent = state.companyName;
+  document.getElementById('company-2').textContent = state.companyName;
+  const account = document.getElementById('account');
+  if (account) account.textContent = state.me.name ? ('Conectado: ' + state.me.name) : 'Sem conta';
+  document.getElementById('sub').textContent = 'Acompanhe e assuma os pedidos em tempo real para ' + state.companyName;
+  if (!state.ready && state.me.role === 'OPERADOR') state.tab = 'meus';
+  state.ready = true;
+  paint();
+  syncAlert();
+  loadImages();
+}
+loadVersion();
+if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('ready');
+function loadImages() {
+  const ids = [];
+  document.querySelectorAll('[data-shots]').forEach((box) => {
+    const id = box.getAttribute('data-shots');
+    if (!id || state.images[id] || ids.length >= 6) return;
+    ids.push(id);
+  });
+  if (!ids.length || state.imagesLoading) return;
+  state.imagesLoading = true;
+  fetch('/pedidos/imagens?ids=' + encodeURIComponent(ids.join(',')), { cache: 'no-store' }).then((res) => res.json()).then((payload) => {
+    const images = (payload && payload.images) || {};
+    ids.forEach((id) => { state.images[id] = images[id] || []; });
+    state.imagesLoading = false;
+    fillShots();
+    setTimeout(loadImages, 500);
+  }).catch(() => { state.imagesLoading = false; });
+}
+function loadVersion() {
+  fetch('/pedidos/versao', { cache: 'no-store' }).then((res) => res.json()).then((data) => {
+    const el = document.getElementById('app-version');
+    if (el && data && data.version) el.textContent = 'Versão ' + data.version;
+  }).catch(() => {});
+}
+document.getElementById('logout').addEventListener('click', async (event) => {
+  event.stopPropagation();
+  try { await fetch('/pedidos/sair', { method: 'POST' }); } catch (err) {}
+  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('sair');
+});
+let acceptingId = '';
+let beepTimer = 0;
+let beepKey = '';
+function designated() {
+  const me = state.me && state.me.id;
+  if (!me) return [];
+  return state.orders.filter((order) => order.assignedOperatorId === me && order.status === 'Designado' && order.assignmentAccepted !== true)
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+}
+function playBeep() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!playBeep.ctx) playBeep.ctx = new Ctx();
+    const ctx = playBeep.ctx;
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  } catch (err) {}
+}
+function stopBeep() {
+  if (beepTimer) clearInterval(beepTimer);
+  beepTimer = 0;
+  beepKey = '';
+}
+function syncAlert() {
+  const pending = designated();
+  const box = document.getElementById('alert');
+  if (!pending.length) {
+    box.hidden = true;
+    stopBeep();
+    return;
+  }
+  const many = pending.length > 1;
+  document.getElementById('alert-kicker').textContent = many ? 'Pedidos designados' : 'Pedido designado';
+  document.getElementById('alert-title').textContent = many ? 'Aceite todos para parar o alerta' : 'Aceite para parar o alerta';
+  document.getElementById('alert-cards').innerHTML = pending.map((order) => {
+    const montante = order.type === 'montante';
+    const notes = order.notes ? '<p class="notes">"' + esc(order.notes) + '"</p>' : '';
+    return '<article class="alert-card"><h3>' + esc(order.clientName) + '</h3><p>' + (montante ? 'Op. Montante' : 'Op. Contas') + ' · ' + esc(order.companyName || 'Empresa') + '</p><p class="blog ' + (montante ? 'montante' : 'contas') + '">Blogueira ' + (montante ? 'Montante' : 'Contas') + ': ' + money.format(order.blogger || order.totalValue || 0) + '</p><p class="code">' + esc(order.orderCode) + '</p>' + notes + '<button type="button" class="accept" data-accept="' + esc(order.id) + '"' + (acceptingId ? ' disabled' : '') + '>' + (acceptingId === order.id ? 'Aceitando...' : 'Aceitar pedido') + '</button></article>';
+  }).join('');
+  box.hidden = false;
+  const key = pending.map((order) => order.id).join('|');
+  if (beepKey !== key) {
+    beepKey = key;
+    playBeep();
+    if (beepTimer) clearInterval(beepTimer);
+    beepTimer = setInterval(playBeep, 1400);
+  }
+}
+document.getElementById('alert').addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-accept]');
+  if (!button || acceptingId) return;
+  acceptingId = button.getAttribute('data-accept');
+  document.getElementById('alert-error').textContent = '';
+  syncAlert();
+  try {
+    const response = await fetch('/pedidos/aceitar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: acceptingId }),
+    });
+    const data = await response.json();
+    if (!data || !data.ok) throw new Error((data && data.message) || 'Não foi possível aceitar o pedido.');
+    const order = state.orders.find((item) => item.id === button.getAttribute('data-accept'));
+    if (order) {
+      order.assignmentAccepted = true;
+      order.status = 'Assumido';
+      order.responsibleOperatorName = state.me.name || order.responsibleOperatorName;
+    }
+    acceptingId = '';
+    paint();
+    syncAlert();
+  } catch (err) {
+    acceptingId = '';
+    document.getElementById('alert-error').textContent = err.message || 'Não foi possível aceitar o pedido.';
+    syncAlert();
+  }
+});
+load().catch(() => {
+  document.getElementById('list').innerHTML = '<div class="empty"><h4>Não carregou a fila</h4><p>O programa não conseguiu ler os pedidos.</p></div>';
+});
+setInterval(() => { load().catch(() => {}); }, 8000);
+</script>
+</body>
+</html>
