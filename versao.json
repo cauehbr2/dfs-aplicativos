@@ -43,7 +43,7 @@
                                 ]
                   },
     "pedidos":  {
-                    "version":  "1.0.2",
+                    "version":  "1.0.3",
                     "remover":  false,
                     "files":  [
                                   "app-versao.txt",
@@ -52,7 +52,8 @@
                                   "FilaPedidos.deps.json",
                                   "FilaPedidos.runtimeconfig.json",
                                   "pedidos-app.mjs",
-                                  "pedidos.ui"
+                                  "pedidos.ui",
+                                  "fila-pedidos.ico"
                               ]
                 }
 }
