@@ -87,6 +87,15 @@
   .status.ok { color:#34d399; background:rgba(16,185,129,.18); border-color:rgba(52,211,153,.5); }
   .done-note { display:flex; align-items:center; gap:8px; margin-top:10px; padding:10px 12px; border-radius:12px; border:1px solid rgba(16,185,129,.4); background:rgba(6,78,59,.45); color:#d1fae5; font-size:13px; font-weight:700; line-height:1.35; }
   .done-note b { color:#34d399; }
+  .saque-box { margin-top:10px; padding:10px; border-radius:12px; border:1px solid rgba(16,185,129,.35); background:rgba(9,9,11,.55); }
+  .saque-box h4 { margin:0 0 8px; font-size:11px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; color:#a7f3d0; }
+  .saque-row { display:flex; gap:8px; margin-bottom:8px; }
+  .saque-row input { flex:1; min-width:0; border-radius:10px; border:1px solid #3f3f46; background:#18181b; color:#fff; padding:8px 10px; font-size:14px; }
+  .saque-row button { width:36px; border-radius:10px; border:1px solid #3f3f46; background:transparent; color:#a1a1aa; cursor:pointer; }
+  .saque-actions { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .saque-add { border:0; background:transparent; color:#34d399; font-weight:800; font-size:12px; cursor:pointer; padding:0; }
+  .saque-total { color:#d4d4d8; font-size:12px; font-weight:700; }
+  .saque-ok { border:0; background:#10b981; color:#09090b; border-radius:10px; padding:8px 14px; font-weight:900; cursor:pointer; }
   .status.cancel { color:#f87171; background:rgba(239,68,68,.2); border-color:rgba(239,68,68,.4); }
   .who { font-size:11px; border-radius:8px; padding:2px 8px; }
   .who.me { color:#6ee7b7; background:rgba(6,78,59,.6); border:1px solid rgba(6,95,70,.5); }
@@ -308,6 +317,9 @@ const tabs = [
   ['cancelados', 'Cancelados'],
 ];
 const state = { period: 'todos', tab: 'todos', orders: [], me: {}, companyName: '', images: {}, imageFresh: {}, imagesReady: false };
+const saqueDraft = {};
+let focusSaque = null;
+let skipSaqueSnapshot = false;
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]));
@@ -459,7 +471,7 @@ function card(order) {
   const doneNote = order.status === 'Finalizado'
     ? '<div class="done-note"><b>Pedido finalizado.</b> Completo. Aguardando o valor do saque.</div>'
     : order.status === 'Concluído'
-      ? '<div class="done-note"><b>Pedido concluído.</b> Finalizado e com o saque lançado.</div>'
+      ? '<div class="done-note"><b>Pedido concluído.</b>' + (Number(order.withdrawal) > 0 ? ' Saque ' + money.format(order.withdrawal) + '.' : ' Finalizado.') + '</div>'
       : '';
   const shotRow = '<div class="shots" data-shots="' + esc(order.id) + '" hidden></div>';
   const waiting = order.status === 'Aguardando operador' || order.status === 'Registrado' || order.status === 'Retornado para fila';
@@ -482,7 +494,7 @@ function card(order) {
     + '<div class="mid"><div><h3 class="client">' + esc(order.clientName) + '</h3>' + phone + '<div class="co">' + building + esc(order.companyName) + '</div></div>'
     + '<div class="money-wrap"><span class="money-k">Valor Previsto</span><span class="money">' + money.format(order.totalValue || 0) + '</span>' + from + '</div></div>'
     + '<div class="meta"><span class="status ' + statusClass(order.status) + '">' + clock + esc(order.status === 'Finalizado' ? 'Finalizado' : order.status) + '</span>' + who + off + faixa + pix + blog + '</div>'
-    + doneNote + notes + links + shotRow
+    + doneNote + saqueBox(order) + notes + links + shotRow
     + '<div class="foot"><span>Registrado em ' + esc(when(order.createdAt)) + ' por <strong>' + esc(order.registeredByName || '—') + '</strong></span><div class="acts">' + buttons.join('') + '</div></div></article>';
 }
 function fillShots(root) {
@@ -507,7 +519,46 @@ function openZoom(src) {
   img.src = src;
   zoom.hidden = false;
 }
+function moneyInput(value) {
+  const text = String(value ?? '').trim().replace(/\s/g, '').replace(/R\$/g, '');
+  if (!text) return 0;
+  const normal = text.includes(',') ? text.replace(/\./g, '').replace(',', '.') : text;
+  const n = parseFloat(normal);
+  return Number.isFinite(n) ? n : 0;
+}
+function saqueValues(order) {
+  const draft = saqueDraft[order.id];
+  if (Array.isArray(draft) && draft.length) return draft;
+  if (Array.isArray(order.saques) && order.saques.length) return order.saques.map((item) => String(item));
+  if (Number(order.withdrawal) > 0) return [String(order.withdrawal).replace('.', ',')];
+  return [''];
+}
+function saqueBox(order) {
+  if (order.status !== 'Finalizado' || !(mine(order) || manager())) return '';
+  const values = saqueValues(order);
+  const total = values.reduce((sum, item) => sum + moneyInput(item), 0);
+  const rows = values.map((value, index) => '<div class="saque-row"><input data-saque="' + index + '" inputmode="decimal" placeholder="0,00" value="' + esc(value) + '">' + (values.length > 1 ? '<button type="button" data-remove-saque="' + index + '" title="Remover">×</button>' : '') + '</div>').join('');
+  return '<div class="saque-box" data-saque-box="' + esc(order.id) + '"><h4>Calculadora de saque</h4>' + rows
+    + '<div class="saque-actions"><button type="button" class="saque-add" data-add-saque="' + esc(order.id) + '">+ Adicionar valor</button><span class="saque-total">Total <b data-saque-total>' + money.format(total) + '</b></span><button type="button" class="saque-ok" data-ok-saque="' + esc(order.id) + '">OK</button></div></div>';
+}
+function snapshotSaques() {
+  document.querySelectorAll('[data-saque-box]').forEach((box) => {
+    saqueDraft[box.getAttribute('data-saque-box')] = [...box.querySelectorAll('[data-saque]')].map((input) => input.value);
+  });
+}
+function saqueList(id) {
+  const box = document.querySelector('[data-saque-box="' + id + '"]');
+  if (box) return [...box.querySelectorAll('[data-saque]')].map((input) => input.value);
+  return Array.isArray(saqueDraft[id]) ? saqueDraft[id].slice() : [];
+}
 function paint() {
+  const active = document.activeElement;
+  if (!focusSaque && active && active.hasAttribute && active.hasAttribute('data-saque')) {
+    const box = active.closest('[data-saque-box]');
+    if (box) focusSaque = { id: box.getAttribute('data-saque-box'), index: active.getAttribute('data-saque') };
+  }
+  if (!skipSaqueSnapshot) snapshotSaques();
+  skipSaqueSnapshot = false;
   const rows = scoped();
   const counts = {};
   tabs.forEach(([id]) => { counts[id] = rows.filter((order) => tabOf(order, id)).length; });
@@ -528,12 +579,51 @@ function paint() {
       ? 'A fila de hoje está limpa e pronta para novos registros operacionais.'
       : 'Não há pedidos no período ou filtros selecionados.';
     list.innerHTML = '<div class="empty"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></div><h4>Nenhum pedido encontrado</h4><p>' + text + '</p></div>';
+    restoreSaqueFocus();
     return;
   }
   list.innerHTML = '<div class="cards">' + shown.map(card).join('') + '</div>';
   fillShots(list);
   loadImages();
+  restoreSaqueFocus();
 }
+function restoreSaqueFocus() {
+  if (!focusSaque) return;
+  const box = document.querySelector('[data-saque-box="' + focusSaque.id + '"]');
+  const input = box && box.querySelector('[data-saque="' + focusSaque.index + '"]');
+  focusSaque = null;
+  if (!input) return;
+  input.focus();
+  const length = input.value.length;
+  try { input.setSelectionRange(length, length); } catch (err) {}
+}
+document.body.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  const input = event.target.closest && event.target.closest('[data-saque]');
+  if (!input) return;
+  event.preventDefault();
+  const box = input.closest('[data-saque-box]');
+  const id = box.getAttribute('data-saque-box');
+  const values = saqueList(id);
+  const index = Number(input.getAttribute('data-saque'));
+  values[index] = input.value;
+  const last = index >= values.length - 1;
+  if (last && String(input.value || '').trim() !== '') values.push('');
+  saqueDraft[id] = values;
+  focusSaque = { id, index: String(last ? values.length - 1 : index + 1) };
+  skipSaqueSnapshot = true;
+  paint();
+});
+document.body.addEventListener('input', (event) => {
+  const input = event.target.closest && event.target.closest('[data-saque]');
+  if (!input) return;
+  const box = input.closest('[data-saque-box]');
+  const id = box.getAttribute('data-saque-box');
+  const values = saqueList(id);
+  saqueDraft[id] = values;
+  const total = box.querySelector('[data-saque-total]');
+  if (total) total.textContent = money.format(values.reduce((sum, item) => sum + moneyInput(item), 0));
+});
 document.getElementById('open-fila').addEventListener('click', () => {
   const button = document.getElementById('open-fila');
   button.classList.toggle('on');
@@ -695,14 +785,60 @@ document.body.addEventListener('click', async (event) => {
     const order = orderById(id);
     conclude.disabled = true;
     try {
-      const data = await postJson('/pedidos/concluir', { id });
-      if (order && data.status) order.status = data.status;
+      const data = await postJson('/pedidos/concluir', { id, values: saqueList(id) });
+      if (order && data.status) {
+        order.status = data.status;
+        if (data.withdrawal != null) order.withdrawal = data.withdrawal;
+      }
       toast('Pedido concluído.');
       paint();
     } catch (err) {
       conclude.disabled = false;
       toast(err.message || 'Não foi possível concluir o pedido.');
     }
+    return;
+  }
+  const okSaque = event.target.closest('[data-ok-saque]');
+  if (okSaque) {
+    const id = okSaque.getAttribute('data-ok-saque');
+    const order = orderById(id);
+    const values = saqueList(id);
+    okSaque.disabled = true;
+    try {
+      const data = await postJson('/pedidos/saque', { id, values });
+      if (order) {
+        order.withdrawal = data.withdrawal;
+        order.saques = values;
+      }
+      saqueDraft[id] = values;
+      toast(Number(data.withdrawal) > 0 ? 'Saque lançado.' : 'Saque zerado salvo.');
+      paint();
+    } catch (err) {
+      okSaque.disabled = false;
+      toast(err.message || 'Não foi possível lançar o saque.');
+    }
+    return;
+  }
+  const addSaque = event.target.closest('[data-add-saque]');
+  if (addSaque) {
+    const id = addSaque.getAttribute('data-add-saque');
+    const values = saqueList(id);
+    values.push('');
+    saqueDraft[id] = values;
+    focusSaque = { id, index: String(values.length - 1) };
+    skipSaqueSnapshot = true;
+    paint();
+    return;
+  }
+  const removeSaque = event.target.closest('[data-remove-saque]');
+  if (removeSaque) {
+    const box = removeSaque.closest('[data-saque-box]');
+    const id = box.getAttribute('data-saque-box');
+    const values = saqueList(id);
+    values.splice(Number(removeSaque.getAttribute('data-remove-saque')), 1);
+    saqueDraft[id] = values.length ? values : [''];
+    skipSaqueSnapshot = true;
+    paint();
     return;
   }
   const open = event.target.closest('[data-open]');

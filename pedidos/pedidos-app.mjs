@@ -408,6 +408,8 @@ function publicOrder(order) {
     addedModules: order.addedModules && typeof order.addedModules === 'object' ? order.addedModules : null,
     version: Number(order.version || 1),
     operationId: order.operationId || '',
+    withdrawal: moneyOf(order.withdrawal),
+    saques: Array.isArray(order.saques) ? order.saques.map((item) => String(item)) : [],
   };
 }
 function isManager(session) {
@@ -480,7 +482,11 @@ async function finishOrder(session, id, done) {
   return { ok: true, status };
 }
 function moneyOf(value) {
-  const n = typeof value === 'number' ? value : parseFloat(String(value || '').replace(/\./g, '').replace(',', '.'));
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const text = String(value || '').trim().replace(/\s/g, '').replace(/R\$/g, '');
+  if (!text) return 0;
+  const normal = text.includes(',') ? text.replace(/\./g, '').replace(',', '.') : text;
+  const n = parseFloat(normal);
   return Number.isFinite(n) ? n : 0;
 }
 function withdrawalOf(op) {
@@ -490,7 +496,13 @@ function withdrawalOf(op) {
   if (!Array.isArray(list)) return 0;
   return list.reduce((sum, item) => sum + moneyOf(item && typeof item === 'object' ? (item.value ?? item.amount ?? item.valor) : item), 0);
 }
-function markLocalConcluded(operationId, orderId, withdrawal) {
+function typedWithdrawal(values) {
+  if (!Array.isArray(values)) return null;
+  const filled = values.map((item) => String(item || '').trim()).filter(Boolean);
+  if (!filled.length) return null;
+  return Math.round(filled.reduce((sum, item) => sum + moneyOf(item), 0) * 100) / 100;
+}
+function localOpFiles() {
   const files = [];
   const root = path.join(dataDir, 'operacoes.json');
   if (fs.existsSync(root)) files.push(root);
@@ -501,7 +513,10 @@ function markLocalConcluded(operationId, orderId, withdrawal) {
       if (fs.existsSync(file)) files.push(file);
     });
   }
-  files.forEach((file) => {
+  return files;
+}
+function patchLocalOp(operationId, orderId, patch) {
+  localOpFiles().forEach((file) => {
     try {
       const data = JSON.parse(fs.readFileSync(file, 'utf8'));
       const ops = Array.isArray(data.ops) ? data.ops : null;
@@ -510,31 +525,49 @@ function markLocalConcluded(operationId, orderId, withdrawal) {
       ops.forEach((op) => {
         const same = String(op.panelId || '') === String(operationId) || String(op.orderId || '') === String(orderId);
         if (!same) return;
-        op.verificado = true;
-        if (!(moneyOf(op.withdrawal) > 0) && withdrawal > 0) op.withdrawal = withdrawal;
+        if (patch.withdrawal != null) op.withdrawal = patch.withdrawal;
+        if (Array.isArray(patch.saques)) op.saques = patch.saques.map((item) => String(item));
+        if (patch.verificado === true) op.verificado = true;
         changed = true;
       });
       if (changed) fs.writeFileSync(file, JSON.stringify(data));
     } catch (err) { /* o histórico local continua no painel */ }
   });
 }
-async function concludeOrder(session, id) {
-  const order = await readOrder(session, id);
-  if (!order) throw new Error('Pedido não encontrado.');
-  if (order.status === 'Concluído') return { ok: true, status: 'Concluído' };
-  if (order.status !== 'Finalizado') throw new Error('Finalize o pedido antes de concluir.');
-  const admin = isManager(session);
-  const mine = order.responsibleOperatorId === session.userId;
-  if (!admin && !mine) throw new Error('Só quem finalizou o pedido conclui.');
-  if (!order.operationId) throw new Error('Este pedido não tem operação no histórico.');
+function rememberReady(map, key, info) {
+  if (!key) return;
+  const current = map.get(String(key));
+  if (!current) { map.set(String(key), info); return; }
+  map.set(String(key), {
+    verificado: current.verificado || info.verificado,
+    withdrawal: Math.max(current.withdrawal, info.withdrawal),
+  });
+}
+function readyFromOp(op) {
+  const withdrawal = withdrawalOf(op);
+  const checked = op && op.verificado === true;
+  if (!checked && !(withdrawal > 0)) return null;
+  return { verificado: checked, withdrawal };
+}
+async function saveOrderSaque(session, order, values, markChecked) {
+  if (!order.operationId) {
+    const typed = typedWithdrawal(values);
+    const withdrawal = typed == null ? moneyOf(order.withdrawal) : typed;
+    const saques = Array.isArray(values) ? values.map((item) => String(item || '').trim()).filter(Boolean) : [];
+    await writeOrder(session, order, { withdrawal, saques });
+    return { withdrawal, saques };
+  }
   const read = await panelRequest('read', { collection: 'operations', id: order.operationId, dfs_token: session.token });
   const json = (read && read.json) || {};
   const op = json.data && typeof json.data === 'object' ? json.data : (json.doc && json.doc.data) || null;
   if (!op) throw new Error('A operação deste pedido não está no histórico.');
-  const withdrawal = withdrawalOf(op);
-  if (!(withdrawal > 0)) throw new Error('Lance o saque nas Operações antes de concluir o pedido.');
-  const patch = { verificado: true, updatedAt: new Date().toISOString() };
-  if (!(moneyOf(op.withdrawal) > 0)) patch.withdrawal = withdrawal;
+  const typed = typedWithdrawal(values);
+  const withdrawal = typed == null ? withdrawalOf(op) : typed;
+  const saques = typed == null
+    ? (Array.isArray(op.saques) ? op.saques : (withdrawal > 0 ? [String(withdrawal)] : []))
+    : values.map((item) => String(item || '').trim()).filter(Boolean);
+  const patch = { withdrawal, saques, updatedAt: new Date().toISOString() };
+  if (markChecked) patch.verificado = true;
   const saved = await panelRequest('write', {
     op: 'update',
     collection: 'operations',
@@ -544,11 +577,80 @@ async function concludeOrder(session, id) {
     dfs_token: session.token,
   });
   const savedJson = (saved && saved.json) || {};
-  if (saved.status >= 400 || savedJson.ok === false) throw new Error(savedJson.message || 'Não marquei a operação no histórico.');
-  markLocalConcluded(order.operationId, order.id, withdrawal);
-  await writeOrder(session, order, { status: 'Concluído', concludedAt: new Date().toISOString() });
-  await addHistory(session, order, 'Pedido concluído', 'Saque de R$ ' + withdrawal.toFixed(2).replace('.', ',') + ' confirmado. Operação marcada no histórico.');
-  return { ok: true, status: 'Concluído', withdrawal };
+  if (saved.status >= 400 || savedJson.ok === false) throw new Error(savedJson.message || 'Não gravei o saque na operação.');
+  patchLocalOp(order.operationId, order.id, { withdrawal, saques, verificado: markChecked === true });
+  await writeOrder(session, order, { withdrawal, saques });
+  return { withdrawal, saques };
+}
+async function storeSaque(session, id, values) {
+  const order = await readOrder(session, id);
+  if (!order) throw new Error('Pedido não encontrado.');
+  if (order.status !== 'Finalizado') throw new Error('O saque entra no pedido finalizado.');
+  const admin = isManager(session);
+  const mine = order.responsibleOperatorId === session.userId;
+  if (!admin && !mine) throw new Error('Só quem finalizou o pedido lança o saque.');
+  const saved = await saveOrderSaque(session, order, values, false);
+  return { ok: true, withdrawal: saved.withdrawal };
+}
+async function concludeOrder(session, id, values) {
+  const order = await readOrder(session, id);
+  if (!order) throw new Error('Pedido não encontrado.');
+  if (order.status === 'Concluído') return { ok: true, status: 'Concluído', withdrawal: moneyOf(order.withdrawal) };
+  if (order.status !== 'Finalizado') throw new Error('Finalize o pedido antes de concluir.');
+  const admin = isManager(session);
+  const mine = order.responsibleOperatorId === session.userId;
+  if (!admin && !mine) throw new Error('Só quem finalizou o pedido conclui.');
+  const saved = await saveOrderSaque(session, order, values, true);
+  await writeOrder(session, order, { status: 'Concluído', concludedAt: new Date().toISOString(), withdrawal: saved.withdrawal, saques: saved.saques });
+  const note = saved.withdrawal > 0
+    ? 'Saque de R$ ' + saved.withdrawal.toFixed(2).replace('.', ',') + ' confirmado. Operação marcada no histórico.'
+    : 'Pedido concluído com saque zerado. Operação marcada no histórico.';
+  await addHistory(session, order, 'Pedido concluído', note);
+  return { ok: true, status: 'Concluído', withdrawal: saved.withdrawal };
+}
+let promoteStarted = false;
+async function promoteExisting(session, orders) {
+  const byPanel = new Map();
+  const byOrder = new Map();
+  localOpFiles().forEach((file) => {
+    try {
+      const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+      (Array.isArray(data.ops) ? data.ops : []).forEach((op) => {
+        const info = readyFromOp(op);
+        if (!info) return;
+        rememberReady(byPanel, op.panelId, info);
+        rememberReady(byOrder, op.orderId, info);
+      });
+    } catch (err) { /* arquivo local ilegível não trava a fila */ }
+  });
+  try {
+    const result = await panelRequest('query', { collection: 'operations', limit: 0, dfs_token: session.token });
+    rowsOf(result).forEach((op) => {
+      const info = readyFromOp(op);
+      if (!info) return;
+      rememberReady(byPanel, op.id, info);
+      rememberReady(byOrder, op.orderId, info);
+    });
+  } catch (err) { /* o histórico local ainda promove o que já está no computador */ }
+  for (const order of orders) {
+    const info = byPanel.get(String(order.operationId || '')) || byOrder.get(String(order.id || ''));
+    if (!info) continue;
+    try {
+      if (order.operationId && !info.verificado) {
+        const saved = await panelRequest('write', {
+          op: 'update',
+          collection: 'operations',
+          id: order.operationId,
+          merge: true,
+          data: { verificado: true, updatedAt: new Date().toISOString() },
+          dfs_token: session.token,
+        });
+        if (saved.status >= 400) continue;
+        patchLocalOp(order.operationId, order.id, { verificado: true });
+      }
+      await writeOrder(session, order, { status: 'Concluído', concludedAt: new Date().toISOString() });
+    } catch (err) { /* tenta o próximo pedido */ }
+  }
 }
 async function actOnOrder(session, id, action, reason) {
   const order = await readOrder(session, id);
@@ -618,6 +720,11 @@ const server = http.createServer((req, res) => {
           orders = orders.filter((order) => allowed.has(String(order.companyId || '')));
         }
         orders.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+        if (!promoteStarted) {
+          promoteStarted = true;
+          const pending = orders.filter((order) => order.status === 'Finalizado');
+          promoteExisting(session, pending).catch(() => {});
+        }
         sendJson(res, 200, {
           ok: true,
           companyName: session.companyName || '',
@@ -657,10 +764,18 @@ const server = http.createServer((req, res) => {
       .catch((err) => sendJson(res, 200, { ok: false, message: err.message || 'Não foi possível marcar o módulo.' }));
     return;
   }
+  if (url === '/pedidos/saque' && req.method === 'POST') {
+    const session = readSession();
+    if (!session) { sendJson(res, 200, { ok: false, message: 'Entre na empresa para lançar o saque.' }); return; }
+    readBody(req).then((body) => storeSaque(session, String(body.id || ''), body.values))
+      .then((result) => sendJson(res, 200, result))
+      .catch((err) => sendJson(res, 200, { ok: false, message: err.message || 'Não foi possível lançar o saque.' }));
+    return;
+  }
   if (url === '/pedidos/concluir' && req.method === 'POST') {
     const session = readSession();
     if (!session) { sendJson(res, 200, { ok: false, message: 'Entre na empresa para concluir o pedido.' }); return; }
-    readBody(req).then((body) => concludeOrder(session, String(body.id || '')))
+    readBody(req).then((body) => concludeOrder(session, String(body.id || ''), body.values))
       .then((result) => sendJson(res, 200, result))
       .catch((err) => sendJson(res, 200, { ok: false, message: err.message || 'Não foi possível concluir o pedido.' }));
     return;
