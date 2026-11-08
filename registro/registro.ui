@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Registro Central de Pedido</title>
+<style>
+  :root { color-scheme: dark; --bg:#09090b; --card:#18181b; --line:#27272a; --text:#fafafa; --muted:#a1a1aa; --green:#10b981; --amber:#f59e0b; --pink:#f472b6; --blue:#3b82f6; }
+  * { box-sizing: border-box; }
+  html, body { height:100%; margin:0; overflow:hidden; }
+  body { font-family: Inter, Segoe UI, system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  .shell { height:100%; display:flex; flex-direction:column; overflow:hidden; }
+  .bar { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); background:#0c0c0e; flex-shrink:0; }
+  .brand { display:flex; align-items:center; gap:10px; min-width:0; }
+  .mark { width:36px; height:36px; border-radius:12px; display:grid; place-items:center; background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.25); color:var(--green); flex-shrink:0; }
+  .brand h1 { margin:0; font-size:14px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .brand p { margin:2px 0 0; font-size:11px; color:var(--muted); }
+  .actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  button { font-family:inherit; }
+  .ghost, .fab, .go, .soft, .pend { border:0; cursor:pointer; border-radius:12px; font-weight:800; }
+  .ghost { background:#18181b; color:#e4e4e7; border:1px solid var(--line); padding:9px 12px; font-size:11px; }
+  .fab { width:38px; height:38px; display:grid; place-items:center; background:linear-gradient(180deg,#34d399,#059669); color:#052e16; box-shadow:0 8px 18px rgba(16,185,129,.25); }
+  .fab.on { background:#27272a; color:#fafafa; box-shadow:none; }
+  .fab svg { width:18px; height:18px; }
+  main { flex:1; min-height:0; overflow:hidden; padding:12px 14px; display:flex; }
+  .panel { width:100%; max-width:672px; margin:0 auto; background:#09090b; border:1px solid var(--line); border-radius:24px; overflow:hidden; display:flex; flex-direction:column; min-height:0; flex:1; box-shadow:0 25px 50px rgba(0,0,0,.35); }
+  .head { display:flex; justify-content:space-between; gap:12px; padding:18px 20px; border-bottom:1px solid rgba(39,39,42,.8); background:rgba(24,24,27,.45); align-items:flex-start; flex-shrink:0; }
+  .head h2 { margin:0; font-size:15px; font-weight:800; letter-spacing:.02em; }
+  .head .sub { margin:3px 0 0; font-size:12px; color:var(--muted); }
+  .who { font-size:11px; color:var(--muted); text-align:right; margin-top:6px; }
+  .pending-box { text-align:right; min-width:150px; max-width:240px; }
+  .pending-box > span { display:block; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#fbbf24; margin-bottom:6px; }
+  .pending-empty { font-size:11px; color:#71717a; }
+  .pending-list { display:flex; flex-direction:column; gap:4px; }
+  .pending-item { display:flex; align-items:center; gap:6px; border:1px solid #27272a; background:#09090b; color:#d4d4d8; border-radius:12px; padding:6px 8px; cursor:pointer; text-align:left; width:100%; font-size:11px; font-weight:800; }
+  .pending-item.on { border-color:rgba(245,158,11,.5); background:rgba(245,158,11,.15); color:#fde68a; }
+  .pending-item .x { margin-left:auto; color:#71717a; padding:2px 4px; border-radius:6px; }
+  .pending-item .x:hover { color:#f87171; background:rgba(239,68,68,.1); }
+  form { padding:20px; display:flex; flex-direction:column; gap:18px; overflow-y:auto; flex:1; min-height:0; }
+  form::-webkit-scrollbar { width:8px; }
+  form::-webkit-scrollbar-thumb { background:#3f3f46; border-radius:8px; }
+  label.cap { display:block; font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#a1a1aa; margin-bottom:6px; }
+  label.cap .req { color:var(--green); }
+  label.cap .hint { text-transform:none; letter-spacing:0; font-weight:600; color:#71717a; font-size:9px; margin-left:6px; }
+  .seg { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:4px; background:#18181b; border:1px solid var(--line); border-radius:16px; }
+  .seg.two { grid-template-columns:1fr 1fr; max-width:280px; height:42px; align-items:center; }
+  .seg button { border:0; border-radius:12px; padding:10px 8px; background:transparent; color:#a1a1aa; font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .seg button.on { background:var(--green); color:#052e16; box-shadow:0 4px 12px rgba(16,185,129,.25); }
+  .seg.blue button.on { background:var(--blue); color:#eff6ff; box-shadow:0 4px 12px rgba(59,130,246,.25); }
+  .seg.amber button.on { background:var(--amber); color:#1c1917; box-shadow:0 4px 12px rgba(245,158,11,.25); }
+  .seg.two button.on.hoje { background:var(--green); color:#052e16; }
+  .seg.two button.on.ontem { background:var(--amber); color:#1c1917; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  input, select, textarea { width:100%; background:#18181b; border:1px solid #27272a; border-radius:12px; color:#fff; padding:10px 12px; font-size:13px; outline:none; }
+  input:focus, select:focus, textarea:focus { border-color:#10b981; }
+  textarea { min-height:64px; resize:vertical; }
+  .groups { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+  .groups button { flex:1; min-width:84px; border:1px solid #27272a; border-radius:10px; padding:8px; background:#09090b; color:#71717a; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
+  .groups button.on { background:rgba(16,185,129,.85); color:#fff; border-color:transparent; }
+  .mont-box { padding:14px; background:rgba(59,130,246,.05); border:1px solid rgba(59,130,246,.2); border-radius:16px; display:grid; gap:12px; }
+  .mont-box .title { font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#60a5fa; }
+  .opbox .row { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+  .opbox .row label { display:inline-flex; align-items:center; gap:6px; font-size:11px; color:#a1a1aa; cursor:pointer; text-transform:none; letter-spacing:0; font-weight:700; margin:0; }
+  .opbox .row input[type=checkbox] { width:14px; height:14px; accent-color:#10b981; }
+  .qcount { font-size:10px; font-weight:800; color:#71717a; font-variant-numeric:tabular-nums; }
+  .link-row { display:flex; gap:6px; align-items:center; }
+  .plus { width:44px; height:44px; flex-shrink:0; border:1px solid #3f3f46; border-radius:12px; background:#18181b; color:#d4d4d8; font-size:20px; font-weight:700; cursor:pointer; }
+  .plus:hover { color:#34d399; border-color:rgba(16,185,129,.4); }
+  .extra-links { margin-top:8px; border:1px solid #27272a; background:rgba(24,24,27,.4); border-radius:12px; padding:10px; display:grid; gap:8px; }
+  .extra-links p { margin:0; font-size:10px; font-weight:800; color:#71717a; letter-spacing:.08em; text-transform:uppercase; }
+  .extra-line { display:flex; gap:6px; align-items:center; }
+  .extra-line span { width:16px; font-size:10px; color:#52525b; font-weight:800; }
+  .mini { height:36px; width:32px; border:0; background:transparent; color:#71717a; cursor:pointer; border-radius:8px; }
+  .mini:hover { color:#34d399; }
+  .mini.danger:hover { color:#f87171; }
+  .link-actions { display:flex; gap:8px; }
+  .link-actions button, .link-actions a { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#71717a; text-decoration:none; background:none; border:0; cursor:pointer; padding:0; }
+  .link-actions button:hover, .link-actions a:hover { color:#34d399; }
+  .notes-wrap { display:grid; gap:8px; }
+  .imgs { display:flex; gap:8px; flex-wrap:wrap; }
+  .imgs .shot { position:relative; width:72px; height:72px; border-radius:10px; overflow:hidden; border:1px solid #27272a; background:#18181b; }
+  .imgs img { width:100%; height:100%; object-fit:cover; display:block; }
+  .imgs .shot button { position:absolute; top:2px; right:2px; width:20px; height:20px; border:0; border-radius:6px; background:rgba(0,0,0,.7); color:#fff; cursor:pointer; font-size:12px; }
+  .hint { font-size:10px; color:#71717a; margin-top:4px; }
+  .summary { background:rgba(24,24,27,.9); border:1px solid var(--line); border-radius:16px; padding:14px; display:grid; gap:12px; }
+  .summary .top { display:flex; justify-content:space-between; gap:8px; align-items:center; }
+  .summary .top span { font-size:11px; color:#a1a1aa; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+  .summary .top em { font-style:normal; font-size:10px; color:#71717a; }
+  .sum-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .sum-card { background:rgba(9,9,11,.6); border:1px solid rgba(39,39,42,.6); border-radius:12px; padding:10px; }
+  .sum-card.total { background:rgba(6,78,59,.3); border-color:rgba(6,95,70,.4); }
+  .sum-card span { display:block; font-size:10px; color:#71717a; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin-bottom:2px; }
+  .sum-card.total span { color:rgba(52,211,153,.9); }
+  .sum-card strong { display:block; font-size:13px; }
+  .sum-card .amber { color:#fbbf24; }
+  .sum-card .red { color:#f87171; }
+  .sum-card .green { color:#34d399; font-weight:900; }
+  .blog-line { display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(39,39,42,.8); padding-top:10px; font-size:12px; }
+  .blog-line span { color:#a1a1aa; font-weight:600; }
+  .blog-line strong { color:var(--pink); font-weight:800; }
+  .blog-input { width:140px; background:#09090b; border:1px solid #27272a; border-radius:10px; color:#34d399; font-weight:800; padding:8px 10px; font-size:13px; }
+  .foot { display:flex; justify-content:flex-end; gap:10px; padding-top:12px; border-top:1px solid rgba(39,39,42,.8); flex-wrap:wrap; }
+  .soft { background:#18181b; color:#d4d4d8; padding:11px 16px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  .pend { background:rgba(245,158,11,.15); color:#fcd34d; border:1px solid rgba(245,158,11,.4); padding:11px 16px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  .go { background:var(--green); color:#052e16; padding:11px 18px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; box-shadow:0 8px 18px rgba(16,185,129,.2); }
+  .go:disabled { opacity:.5; cursor:wait; }
+  .toast { position:fixed; right:18px; bottom:18px; background:#14532d; color:#bbf7d0; border:1px solid #166534; padding:12px 14px; border-radius:12px; font-size:13px; font-weight:700; display:none; z-index:50; max-width:360px; }
+  .toast.err { background:#450a0a; color:#fecaca; border-color:#7f1d1d; }
+  .empty { padding:40px 20px; text-align:center; color:var(--muted); }
+  .suggest { position:absolute; left:0; right:0; top:100%; margin-top:4px; background:#18181b; border:1px solid #3f3f46; border-radius:14px; max-height:220px; overflow:auto; z-index:30; display:none; }
+  .suggest .cap-list { padding:6px 12px; font-size:10px; font-weight:800; color:#71717a; text-transform:uppercase; background:#09090b; }
+  .suggest button { display:block; width:100%; text-align:left; border:0; background:transparent; color:#fff; padding:10px 12px; cursor:pointer; border-bottom:1px solid #27272a; font-size:13px; }
+  .suggest button:hover { background:rgba(16,185,129,.1); }
+  .rel { position:relative; }
+  .badge { font-size:10px; color:#34d399; font-weight:800; background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.2); padding:2px 8px; border-radius:6px; }
+  .paste-hint { font-size:10px; color:#71717a; background:#18181b; border:1px dashed #3f3f46; border-radius:10px; padding:8px 10px; }
+  @media (max-width:720px) {
+    .grid2, .grid3, .grid4, .sum-grid { grid-template-columns:1fr 1fr; }
+    .panel { border-radius:16px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="bar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      </div>
+      <div>
+        <h1>Registro Central — <span id="company">Minha Empresa</span></h1>
+        <p>Cadastre o pedido com bases sincronizadas para a fila operacional</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" class="ghost" id="goto-fila">Fila de Pedidos</button>
+      <button type="button" class="ghost" id="logout">Sair</button>
+      <button type="button" class="fab" id="open-calc" title="Orçamento">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M16 12h2M8 16h2M12 16h2M16 16h2"/></svg>
+      </button>
+    </div>
+  </header>
+  <main>
+    <div class="panel" id="app">
+      <div class="empty" id="boot">Carregando registro…</div>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const PENDING_KEY = 'dfs_order_pending_drafts_v1';
+const state = {
+  type: 'contas',
+  day: 'hoje',
+  grupo: 'Grupo 01',
+  montanteGrupo: 'Grupo 01',
+  dados: null,
+  clientId: '',
+  onlyQueue: localStorage.getItem('dfs_assign_only_queue') === '1',
+  houseLinks: [''],
+  noteImages: [],
+  pendingId: null,
+  pendingDrafts: [],
+  customRange: false,
+  promocao: false,
+  blogueiraOverride: null,
+  semDesconto: false,
+  descontoManual: { contas: false, montante: false },
+  formSnap: null,
+  skipSnap: false,
+  submitting: false,
+};
+function emptyFormSnap() {
+  return {
+    cliente: '', phone: '', notes: '', assign: '',
+    qtd: '1', valor: '', montante: '0', qtdm: '0',
+    desconto: '', descontoM: '', faixa: '', taxa: '', customFaixa: '',
+  };
+}
+/** Igual ao site após registrar: zera tudo para o próximo (sem reaproveitar o DOM antigo). */
+function resetFormAfterRegister() {
+  state.clientId = '';
+  state.pendingId = null;
+  state.houseLinks = [''];
+  state.noteImages = [];
+  state.customRange = false;
+  state.promocao = false;
+  state.blogueiraOverride = null;
+  state.semDesconto = false;
+  state.descontoManual = { contas: false, montante: false };
+  state.day = 'hoje';
+  state.formSnap = emptyFormSnap();
+  state.skipSnap = true;
+}
+function money(n) {
+  return Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+function normalizeText(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+function digitsOnly(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+function toast(msg, err) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast' + (err ? ' err' : '');
+  el.style.display = 'block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.style.display = 'none'; }, 3200);
+}
+function postHost(msg) {
+  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage(msg);
+}
+async function postJson(url, body) {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; }
+  catch (e) { throw new Error('Resposta inválida do servidor ao registrar.'); }
+  if (!data || typeof data !== 'object') throw new Error('Resposta vazia do servidor.');
+  return data;
+}
+function assertCreated(data, label) {
+  if (!data || data.ok !== true) throw new Error((data && data.message) || ('Não registrei' + (label ? (' ' + label) : ' o pedido') + '.'));
+  if (!data.id && !(data.order && data.order.id)) throw new Error('O servidor não confirmou o ID do pedido. Nada foi limpo — tente de novo.');
+  if (!data.orderCode) throw new Error('O servidor não devolveu o código do pedido. Confira na fila antes de enviar de novo.');
+  return data;
+}
+function loadPending() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+    state.pendingDrafts = Array.isArray(raw) ? raw.filter((d) => d && d.id) : [];
+  } catch (e) { state.pendingDrafts = []; }
+}
+function savePendingList(list) {
+  state.pendingDrafts = (list || []).slice(0, 30);
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(state.pendingDrafts)); } catch (e) {}
+}
+function pendingLabel(type) {
+  if (type === 'montante') return 'Montante';
+  if (type === 'multi') return 'Mult';
+  return 'Contas';
+}
+function hrefLink(link) {
+  const t = String(link || '').trim();
+  if (!t) return '';
+  return /^https?:\/\//i.test(t) ? t : ('https://' + t);
+}
+function compactLinks(list) {
+  return (list || []).map((x) => String(x || '').trim()).filter(Boolean);
+}
+function rangesOfGrupo() {
+  const all = (state.dados && state.dados.ranges) || [];
+  return all.filter((item) => String(item.grupo || 'Grupo 01') === state.grupo);
+}
+function ratesOfGrupo() {
+  const all = (state.dados && state.dados.rates) || [];
+  const g = state.montanteGrupo;
+  const hit = all.filter((item) => String(item.grupo || 'Grupo 01') === g);
+  return hit.length ? hit : all.filter((item) => String(item.grupo || '') === 'Grupo 01' || !item.grupo);
+}
+/** Espelho de src/utils/campaignDiscount.ts + useActiveCampaign (site 1.4.24). */
+function normalizeCategoryLabel(raw) {
+  const text = String(raw || '').replace(/\s+/g, ' ').trim();
+  const tagged = text.match(/^(lista|grupo)\s*0*(\d+)$/i);
+  if (tagged) {
+    const kind = tagged[1].toLowerCase() === 'grupo' ? 'Grupo' : 'Lista';
+    return kind + ' ' + tagged[2].padStart(2, '0');
+  }
+  return text;
+}
+function sameDepositGroup(a, b) {
+  const left = normalizeCategoryLabel(a || '').toLowerCase();
+  const right = normalizeCategoryLabel(b || '').toLowerCase();
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const numA = left.match(/^(?:grupo|lista)\s+(\d+)$/)?.[1];
+  const numB = right.match(/^(?:grupo|lista)\s+(\d+)$/)?.[1];
+  return !!(numA && numB && numA === numB);
+}
+function isAllGroupsLabel(group) {
+  const raw = String(group || '').trim().toLowerCase();
+  return !raw || raw === 'todos' || raw === 'todos os grupos' || raw === 'all';
+}
+function ruleIsModule(rule, moduleKey) {
+  const raw = String((rule && (rule.module || rule.tipo)) || '').trim().toLowerCase();
+  if (moduleKey === 'Contas') return raw === 'contas';
+  return raw === 'montantes' || raw === 'montante';
+}
+function hasMontanteThreshold(montante) {
+  const n = Number(montante);
+  return Number.isFinite(n) && n > 0;
+}
+function normalizeMontanteCompare(raw) {
+  return raw === 'abaixo' ? 'abaixo' : 'acima';
+}
+function ruleMatchesMontanteValue(rule, value) {
+  if (!hasMontanteThreshold(rule.montante)) return true;
+  const x = Number(rule.montante) || 0;
+  return normalizeMontanteCompare(rule.montanteCompare) === 'abaixo' ? value <= x + 1e-9 : value + 1e-9 >= x;
+}
+function campaignHasModuleDiscounts(campaign, module) {
+  if (!campaign) return false;
+  const moduleKey = module === 'contas' ? 'Contas' : 'Montantes';
+  if ((campaign.groupDiscounts || []).some((r) => ruleIsModule(r, moduleKey))) return true;
+  return module === 'contas'
+    ? (Number(campaign.discountContas) || 0) > 0
+    : (Number(campaign.discountMontantes) || 0) > 0;
+}
+function campaignAppliesToModule(campaign, module) {
+  if (campaignHasModuleDiscounts(campaign, module)) return true;
+  if (campaign.category === 'Contas') return module === 'contas';
+  if (campaign.category === 'Montantes' || campaign.category === 'Montante') return module === 'montante';
+  return true;
+}
+function isCampaignLive(item) {
+  if (!item) return false;
+  const st = String(item.status || '').toLowerCase();
+  if (st === 'inactive' || st === 'inativa' || st === 'encerrada' || st === 'pausada') return false;
+  if (st && st !== 'ativa' && st !== 'active' && st !== 'ativo') {
+    if (st !== 'agendada' && st !== 'programada') return false;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  if (item.startDate && today < String(item.startDate).slice(0, 10)) return false;
+  if (item.endDate && today > String(item.endDate).slice(0, 10)) return false;
+  return true;
+}
+function activeCampaignFor(module) {
+  const list = ((state.dados && state.dados.campaigns) || []).filter(isCampaignLive);
+  if (!list.length) return null;
+  return list.find((c) => campaignAppliesToModule(c, module)) || null;
+}
+function rulesForGroup(rules, groupLabel) {
+  const group = normalizeCategoryLabel(groupLabel || '');
+  if (group) {
+    const exact = rules.filter((r) => !isAllGroupsLabel(r.group || r.grupo) && sameDepositGroup(r.group || r.grupo, group));
+    if (exact.length) return exact;
+  }
+  const all = rules.filter((r) => isAllGroupsLabel(r.group || r.grupo));
+  if (all.length) return all;
+  if (!group) return rules;
+  return [];
+}
+function pickPercentByThreshold(scoped, value) {
+  const withThreshold = scoped.filter((r) => hasMontanteThreshold(r.montante));
+  const withoutThreshold = scoped.filter((r) => !hasMontanteThreshold(r.montante));
+  const n = Number(value);
+  if (Number.isFinite(n) && n > 0 && withThreshold.length) {
+    const matched = withThreshold.filter((r) => ruleMatchesMontanteValue(r, n));
+    if (matched.length) {
+      matched.sort((a, b) => {
+        const da = Math.abs((Number(a.montante) || 0) - n);
+        const db = Math.abs((Number(b.montante) || 0) - n);
+        if (da !== db) return da - db;
+        return (Number(b.percent) || 0) - (Number(a.percent) || 0);
+      });
+      return Number(matched[0].percent) || 0;
+    }
+  }
+  if (withoutThreshold.length) return Number(withoutThreshold[0].percent) || 0;
+  if (withThreshold.length) return Math.max(0, ...withThreshold.map((r) => Number(r.percent) || 0));
+  return Number(scoped[0] && scoped[0].percent) || 0;
+}
+function resolveCampaignDiscountPercent(campaign, module, groupLabel, montanteValue, quantidade) {
+  if (!campaign) return 0;
+  const moduleKey = module === 'contas' ? 'Contas' : 'Montantes';
+  const rules = (campaign.groupDiscounts || []).filter((r) => ruleIsModule(r, moduleKey));
+  if (!rules.length) {
+    return module === 'contas'
+      ? Number(campaign.discountContas) || 0
+      : Number(campaign.discountMontantes) || 0;
+  }
+  const scoped = rulesForGroup(rules, groupLabel);
+  if (!scoped.length) return 0;
+  if (module === 'contas') return pickPercentByThreshold(scoped, quantidade);
+  return pickPercentByThreshold(scoped, montanteValue);
+}
+/** % da campanha ativa do módulo/grupo — null se não há campanha. */
+function campaignPct(module, grupo, montanteValue, qtd) {
+  const active = activeCampaignFor(module);
+  if (!active) return null;
+  return resolveCampaignDiscountPercent(active, module, grupo, montanteValue, qtd);
+}
+function snapForm() {
+  if (state.skipSnap) {
+    state.skipSnap = false;
+    if (!state.formSnap) state.formSnap = emptyFormSnap();
+    return;
+  }
+  if (!document.getElementById('form')) return;
+  state.formSnap = {
+    cliente: document.getElementById('cliente')?.value || '',
+    phone: document.getElementById('phone')?.value || '',
+    notes: document.getElementById('notes')?.value || '',
+    assign: document.getElementById('assign')?.value || '',
+    qtd: document.getElementById('qtd')?.value || '1',
+    valor: document.getElementById('valor')?.value || '0',
+    montante: document.getElementById('montante')?.value || '0',
+    qtdm: document.getElementById('qtdm')?.value || '0',
+    desconto: document.getElementById('desconto')?.value || '0',
+    descontoM: document.getElementById('desconto-m')?.value || '0',
+    faixa: document.getElementById('faixa')?.value || '',
+    taxa: document.getElementById('taxa')?.value || '',
+    customFaixa: document.getElementById('custom-faixa')?.value || '',
+  };
+}
+function discountFieldValue(module, camp) {
+  if (state.semDesconto) return '0';
+  const snap = state.formSnap || {};
+  if (module === 'contas') {
+    if (state.descontoManual.contas) return snap.desconto != null ? snap.desconto : '0';
+    return camp != null ? String(camp) : (snap.desconto || '0');
+  }
+  if (state.descontoManual.montante) return snap.descontoM != null ? snap.descontoM : (snap.desconto || '0');
+  return camp != null ? String(camp) : (snap.descontoM || snap.desconto || '0');
+}
+function queueSectorsForType() {
+  const queue = (state.dados && state.dados.queue) || { contas: [], montante: [] };
+  if (state.type === 'montante') return [queue.montante || []];
+  if (state.type === 'multi') return [queue.contas || [], queue.montante || []];
+  return [queue.contas || []];
+}
+/** Igual ao site: só ativo com position > 0 (pausado/inativo fica de fora). */
+function queueOperatorPosMap() {
+  const posMap = new Map();
+  queueSectorsForType().forEach((ops) => {
+    (ops || []).forEach((op) => {
+      if (!op || !op.userId) return;
+      if (op.active === false) return;
+      const pos = Number(op.position);
+      if (!(pos > 0)) return;
+      const uid = String(op.userId);
+      const prev = posMap.get(uid);
+      if (prev == null || pos < prev) posMap.set(uid, pos);
+    });
+  });
+  return posMap;
+}
+function allEligibleOperators() {
+  const ops = (state.dados && state.dados.operators) || [];
+  return ops.filter((op) => {
+    const perms = op.permissions || [];
+    if (state.type === 'montante') return perms.includes('montante') || perms.includes('dashboard') || op.role === 'ATENDENTE';
+    if (state.type === 'multi') return perms.includes('contas') || perms.includes('montante') || perms.includes('dashboard') || op.role === 'ATENDENTE';
+    return perms.includes('contas') || perms.includes('dashboard') || op.role === 'ATENDENTE';
+  });
+}
+function operatorsForType() {
+  const list = allEligibleOperators().slice();
+  if (!state.onlyQueue) return list;
+  const posMap = queueOperatorPosMap();
+  return list
+    .filter((op) => posMap.has(String(op.id)))
+    .sort((a, b) => {
+      const pa = posMap.get(String(a.id)) ?? 9999;
+      const pb = posMap.get(String(b.id)) ?? 9999;
+      if (pa !== pb) return pa - pb;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'pt-BR', { sensitivity: 'base' });
+    });
+}
+function queueLabel() {
+  const sectorName = state.type === 'montante' ? 'Montante' : state.type === 'multi' ? 'Contas+Montante' : 'Contas';
+  const all = allEligibleOperators().length;
+  const posMap = queueOperatorPosMap();
+  const inQueue = allEligibleOperators().filter((op) => posMap.has(String(op.id))).length;
+  if (state.onlyQueue) return operatorsForType().length + ' na fila ' + sectorName;
+  return all + ' no painel · ' + inQueue + ' na fila ' + sectorName;
+}
+function clientMatches(client, term) {
+  if (!client || client.active === false) return false;
+  const q = normalizeText(term);
+  if (!q) return false;
+  const name = normalizeText(client.name || '');
+  const phoneDigits = digitsOnly(client.normalizedPhone || client.phone || '');
+  const phoneRaw = String(client.phone || '').toLowerCase();
+  const qDigits = digitsOnly(term);
+  if (name.includes(q)) return true;
+  if (qDigits && phoneDigits.includes(qDigits)) return true;
+  if (phoneRaw.includes(q)) return true;
+  return false;
+}
+function parseDiscountInput(raw) {
+  const clean = String(raw || '0').trim().replace(',', '.');
+  if (clean === '') return { num: 0, error: null };
+  const num = parseFloat(clean);
+  if (isNaN(num)) return { num: 0, error: 'Informe um percentual numérico válido.' };
+  if (num < 0) return { num: 0, error: 'O desconto não pode ser negativo.' };
+  if (num > 100) return { num, error: 'O desconto não pode ser superior a 100%.' };
+  return { num, error: null };
+}
+function contasSummaryOf() {
+  const qtd = Number(document.getElementById('qtd')?.value) || 1;
+  const valor = Number(document.getElementById('valor')?.value) || 0;
+  const discountObj = parseDiscountInput(document.getElementById('desconto')?.value);
+  const percent = discountObj.error ? 0 : discountObj.num;
+  const subtotal = Math.round(qtd * valor * 100) / 100;
+  const discountAmount = Math.round(((subtotal * percent) / 100) * 100) / 100;
+  const finalAmount = Math.max(0, Math.round((subtotal - discountAmount) * 100) / 100);
+  return { subtotal, discountPercent: percent, discountAmount, finalAmount, qtd, valor, discountError: discountObj.error };
+}
+function montanteSummaryOf() {
+  const montante = Number(document.getElementById('montante')?.value) || 0;
+  const taxa = Number(document.getElementById('taxa')?.selectedOptions?.[0]?.dataset?.taxa || document.getElementById('taxa')?.value) || 0;
+  const descEl = document.getElementById('desconto-m') || document.getElementById('desconto');
+  const discountObj = parseDiscountInput(descEl?.value);
+  const percent = discountObj.error ? 0 : discountObj.num;
+  const subtotal = Math.round(montante * (taxa / 100) * 100) / 100;
+  const discountAmount = Math.round(((subtotal * percent) / 100) * 100) / 100;
+  const finalAmount = Math.max(0, Math.round((subtotal - discountAmount) * 100) / 100);
+  const qtdm = Math.max(0, Math.round(Number(document.getElementById('qtdm')?.value) || 0));
+  return { subtotal, discountPercent: percent, discountAmount, finalAmount, montante, taxa, qtdm, discountError: discountObj.error };
+}
+function summary() {
+  const contas = contasSummaryOf();
+  const montante = montanteSummaryOf();
+  if (state.type === 'montante') return { ...montante, qtd: montante.qtdm, valor: 0 };
+  if (state.type === 'multi') {
+    return {
+      subtotal: Math.round((contas.subtotal + montante.subtotal) * 100) / 100,
+      discountPercent: contas.discountPercent,
+      discountAmount: Math.round((contas.discountAmount + montante.discountAmount) * 100) / 100,
+      finalAmount: Math.round((contas.finalAmount + montante.finalAmount) * 100) / 100,
+      qtd: contas.qtd,
+      valor: contas.valor,
+      montante: montante.montante,
+      taxa: montante.taxa,
+      discountError: contas.discountError || montante.discountError,
+    };
+  }
+  return { ...contas, montante: 0, taxa: 0 };
+}
+function parseMoneyLoose(text) {
+  const raw = String(text || '').replace(/[^\d,.-]/g, '').trim();
+  if (!raw) return 0;
+  if (raw.includes(',') && raw.includes('.')) return Number(raw.replace(/\./g, '').replace(',', '.')) || 0;
+  if (raw.includes(',')) return Number(raw.replace(',', '.')) || 0;
+  return Number(raw) || 0;
+}
+function applyBudgetText(text) {
+  const raw = String(text || '');
+  if (!/OR[CÇ]AMENTO|Faixa:|Montante:|Quantidade de contas|Desconto aplicado|Valor final/i.test(raw)) return false;
+  const isMontante = /OR[CÇ]AMENTO\s*\(?\s*MONTANTE|^\s*Montante:/im.test(raw);
+  const isContas = /OR[CÇ]AMENTO\s*\(?\s*CONTAS|Faixa:/i.test(raw);
+  if (isMontante && !isContas) state.type = 'montante';
+  else if (isContas) state.type = 'contas';
+
+  const faixaMatch = raw.match(/Faixa:\s*([^\n]+)/i);
+  const qtdMatch = raw.match(/Quantidade de contas:\s*(\d+)/i) || raw.match(/Qtd\.?\s*contas:\s*(\d+)/i) || raw.match(/Qnt\.?\s*contas:\s*(\d+)/i);
+  const descMatch = raw.match(/Desconto(?:\s+aplicado)?:\s*([\d.,]+)\s*%/i);
+  const valorUnMatch = raw.match(/\(R\$\s*([\d.,]+)\s*\/?\s*un\)/i) || raw.match(/Valor unit[aá]rio[^\d]*([\d.,]+)/i);
+  const montMatch = raw.match(/Montante:\s*R\$\s*([\d.,]+)/i) || raw.match(/Montante:\s*([\d.,]+)/i);
+  const taxaMatch = raw.match(/Taxa:\s*([^\n]+)/i);
+
+  paint();
+  if (state.type === 'contas' || state.type === 'multi') {
+    if (faixaMatch) {
+      const label = faixaMatch[1].replace(/\s*[—\-]\s*R\$.*$/i, '').replace(/\s*\(R\$.*$/i, '').trim();
+      const ranges = rangesOfGrupo();
+      const all = (state.dados && state.dados.ranges) || [];
+      let hit = ranges.find((r) => normalizeText(r.nome).includes(normalizeText(label)) || normalizeText(label).includes(normalizeText(r.nome)));
+      if (!hit) hit = all.find((r) => normalizeText(r.nome).includes(normalizeText(label)) || normalizeText(label).includes(normalizeText(r.nome)));
+      if (hit) {
+        state.grupo = hit.grupo || state.grupo;
+        paint();
+        const faixa = document.getElementById('faixa');
+        if (faixa) {
+          faixa.value = hit.id;
+          const valor = document.getElementById('valor');
+          if (valor) valor.value = hit.valor;
+        }
+      } else if (label) {
+        state.customRange = true;
+        paint();
+        const custom = document.getElementById('custom-faixa');
+        if (custom) custom.value = label;
+      }
+    }
+    if (qtdMatch) {
+      const qtd = document.getElementById('qtd');
+      if (qtd) qtd.value = qtdMatch[1];
+    }
+    if (valorUnMatch) {
+      const valor = document.getElementById('valor');
+      if (valor) valor.value = String(parseMoneyLoose(valorUnMatch[1]));
+    }
+  }
+  if (state.type === 'montante' || state.type === 'multi') {
+    if (montMatch) {
+      const montante = document.getElementById('montante');
+      if (montante) montante.value = String(parseMoneyLoose(montMatch[1]));
+    }
+    if (qtdMatch) {
+      const qtdm = document.getElementById('qtdm');
+      if (qtdm) qtdm.value = qtdMatch[1];
+    }
+    if (taxaMatch) {
+      const taxa = document.getElementById('taxa');
+      const want = normalizeText(taxaMatch[1]);
+      if (taxa) {
+        const opts = Array.from(taxa.options);
+        const hit = opts.find((o) => normalizeText(o.text).includes(want) || want.includes(normalizeText(o.text)) || normalizeText(o.dataset.label || '') === want);
+        if (hit) taxa.value = hit.value;
+      }
+    }
+  }
+  if (descMatch) {
+    const desconto = document.getElementById('desconto');
+    if (desconto) desconto.value = String(descMatch[1]).replace('.', ',');
+  }
+  paintSummary();
+  toast('Orçamento colado no formulário.');
+  return true;
+}
+function paintAssignOnly() {
+  const assign = document.getElementById('assign');
+  const count = document.getElementById('qcount');
+  if (!assign) return;
+  const selected = assign.value;
+  const ops = operatorsForType();
+  assign.innerHTML = '<option value="">Sem operador designado (Livre na fila)</option>'
+    + ops.map((op) => '<option value="' + op.id + '">' + op.name + ' (' + op.role + ')</option>').join('');
+  if (selected && ops.some((op) => String(op.id) === String(selected))) assign.value = selected;
+  else assign.value = '';
+  if (count) count.textContent = queueLabel();
+}
+function blogueiraValor() {
+  const s = summary();
+  if (state.promocao && state.blogueiraOverride != null) return Number(state.blogueiraOverride) || 0;
+  return s.finalAmount;
+}
+function paintSummary() {
+  const s = summary();
+  const box = document.getElementById('summary');
+  if (!box) return;
+  const descLabel = state.type === 'multi'
+    ? (contasSummaryOf().discountPercent + '% · ' + montanteSummaryOf().discountPercent + '%')
+    : (s.discountPercent + '%');
+  const blog = blogueiraValor();
+  box.innerHTML =
+    '<div class="top"><span>Resumo Financeiro do Pedido</span><em>' + (state.type === 'montante' ? 'montante × taxa − desconto' : state.type === 'multi' ? 'contas + montante' : 'contas × faixa − desconto') + '</em></div>'
+    + '<div class="sum-grid">'
+    + '<div class="sum-card"><span>Subtotal</span><strong>' + money(s.subtotal) + '</strong></div>'
+    + '<div class="sum-card"><span>Desconto</span><strong class="amber">' + descLabel + '</strong></div>'
+    + '<div class="sum-card"><span>Valor Desconto</span><strong class="' + (s.discountAmount ? 'red' : '') + '">' + (s.discountAmount ? ('- ' + money(s.discountAmount)) : 'R$ 0,00') + '</strong></div>'
+    + '<div class="sum-card total"><span>Total Final</span><strong class="green">' + money(state.promocao ? blog : s.finalAmount) + '</strong></div>'
+    + '</div>'
+    + (state.type === 'multi'
+      ? ('<div class="blog-line"><span>Repasse Blogueira Contas:</span><strong style="color:#34d399">' + money(contasSummaryOf().finalAmount) + '</strong></div>'
+        + '<div class="blog-line"><span>Repasse Blogueira Montante:</span><strong style="color:#60a5fa">' + money(montanteSummaryOf().finalAmount) + '</strong></div>'
+        + '<div class="blog-line"><span>Total Blogueira:</span><strong style="color:#f472b6">' + money(s.finalAmount) + '</strong></div>')
+      : ('<div class="blog-line"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+        + '<span>Repasse Blogueira:</span>'
+        + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#d4d4d8;cursor:pointer">'
+        + '<input type="checkbox" id="promo"' + (state.promocao ? ' checked' : '') + ' style="accent-color:#f59e0b;width:14px;height:14px"> Promoção</label>'
+        + '</div>'
+        + (state.promocao
+          ? '<input id="blogger" type="number" min="0" step="0.01" value="' + blog + '" class="blog-input" style="border-color:rgba(245,158,11,.5);color:#fde68a">'
+          : '<strong style="color:#f472b6">' + money(blog) + '</strong>')
+        + '</div>'))
+    + (s.discountError ? '<div class="hint" style="color:#f87171">' + s.discountError + '</div>' : '');
+  const promo = document.getElementById('promo');
+  if (promo) promo.onchange = () => {
+    state.promocao = promo.checked;
+    state.blogueiraOverride = promo.checked ? summary().finalAmount : null;
+    paintSummary();
+  };
+  const blogger = document.getElementById('blogger');
+  if (blogger) blogger.oninput = () => { state.blogueiraOverride = parseFloat(blogger.value) || 0; };
+}
+function paintPendingHeader() {
+  loadPending();
+  if (!state.pendingDrafts.length) return '<span class="pending-empty">Nenhum ainda</span>';
+  return '<div class="pending-list">' + state.pendingDrafts.map((d, i) =>
+    '<button type="button" class="pending-item' + (state.pendingId === d.id ? ' on' : '') + '" data-pend="' + d.id + '">'
+    + '<span>Pedido ' + (i + 1) + ' · ' + pendingLabel(d.type) + '</span>'
+    + '<span class="x" data-del="' + d.id + '" title="Remover">×</span></button>'
+  ).join('') + '</div>';
+}
+function readFormDraft() {
+  return {
+    type: state.type,
+    registerDay: state.day,
+    clientName: document.getElementById('cliente')?.value || '',
+    clientId: state.clientId || '',
+    phone: document.getElementById('phone')?.value || '',
+    houseLinks: state.houseLinks.slice(),
+    notes: document.getElementById('notes')?.value || '',
+    assignedOperatorId: document.getElementById('assign')?.value || '',
+    promocao: !!state.promocao,
+    blogueiraOverride: state.blogueiraOverride,
+    grupo: state.grupo,
+    selectedRangeId: document.getElementById('faixa')?.value || '',
+    faixaDeposito: document.getElementById('faixa')?.selectedOptions?.[0]?.dataset?.nome || document.getElementById('custom-faixa')?.value || '',
+    isCustomRange: !!state.customRange,
+    customRangeText: document.getElementById('custom-faixa')?.value || '',
+    qtdContas: Number(document.getElementById('qtd')?.value) || 1,
+    valorPorConta: Number(document.getElementById('valor')?.value) || 0,
+    valorMontante: Number(document.getElementById('montante')?.value) || 0,
+    quantidadeMontante: Number(document.getElementById('qtdm')?.value) || 0,
+    taxa: Number(document.getElementById('taxa')?.selectedOptions?.[0]?.dataset?.taxa || 0) || 0,
+    selectedMontanteRateId: document.getElementById('taxa')?.value || '',
+    descontoContas: document.getElementById('desconto')?.value || '0',
+    descontoMontante: (document.getElementById('desconto-m') || document.getElementById('desconto'))?.value || '0',
+    noteImages: state.noteImages.slice(),
+    blogger: Number(document.getElementById('blogger')?.value) || null,
+  };
+}
+function applyDraft(d) {
+  if (!d) return;
+  state.type = d.type || 'contas';
+  state.day = d.registerDay || 'hoje';
+  state.clientId = d.clientId || '';
+  state.grupo = d.grupo || 'Grupo 01';
+  state.houseLinks = (d.houseLinks && d.houseLinks.length) ? d.houseLinks.slice() : [''];
+  state.customRange = !!d.isCustomRange;
+  state.noteImages = Array.isArray(d.noteImages) ? d.noteImages.slice(0, 4) : [];
+  state.pendingId = d.id || state.pendingId;
+  paint();
+  const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+  set('cliente', d.clientName || '');
+  set('phone', d.phone || '');
+  set('notes', d.notes || '');
+  state.promocao = !!d.promocao;
+  state.blogueiraOverride = d.blogueiraOverride != null ? d.blogueiraOverride : null;
+  set('qtd', d.qtdContas || 1);
+  set('valor', d.valorPorConta || 0);
+  set('montante', d.valorMontante || 0);
+  set('qtdm', d.quantidadeMontante || 0);
+  set('desconto', d.descontoContas || '0');
+  set('desconto-m', d.descontoMontante || '0');
+  if (d.selectedRangeId) set('faixa', d.selectedRangeId);
+  if (d.selectedMontanteRateId) set('taxa', d.selectedMontanteRateId);
+  if (d.assignedOperatorId) set('assign', d.assignedOperatorId);
+  if (d.customRangeText) set('custom-faixa', d.customRangeText);
+  paintHouseLinks();
+  paintImages();
+  paintSummary();
+  if (d.blogger != null) {
+    const blog = document.getElementById('blogger');
+    if (blog) blog.value = d.blogger;
+  }
+}
+function paintHouseLinks() {
+  const first = document.getElementById('link0');
+  if (first) first.value = state.houseLinks[0] || '';
+  const actions = document.getElementById('link-actions');
+  if (actions) {
+    const v = String(state.houseLinks[0] || '').trim();
+    actions.innerHTML = v
+      ? '<a href="' + hrefLink(v) + '" target="_blank" rel="noreferrer">[Abrir]</a><button type="button" id="copy-link0">[Copiar]</button>'
+      : '';
+    const copy = document.getElementById('copy-link0');
+    if (copy) copy.onclick = () => { try { navigator.clipboard.writeText(v); toast('Link copiado!'); } catch (e) {} };
+  }
+  const extra = document.getElementById('extra-links');
+  if (!extra) return;
+  if (state.houseLinks.length <= 1) { extra.style.display = 'none'; extra.innerHTML = ''; return; }
+  extra.style.display = 'grid';
+  extra.innerHTML = '<p>Outros links da casa</p>' + state.houseLinks.slice(1).map((link, i) => {
+    const idx = i + 1;
+    return '<div class="extra-line"><span>' + (idx + 1) + '</span>'
+      + '<input data-link="' + idx + '" value="' + String(link || '').replace(/"/g, '&quot;') + '" placeholder="https://...">'
+      + (String(link || '').trim() ? '<a class="mini" href="' + hrefLink(link) + '" target="_blank" title="Abrir">↗</a><button type="button" class="mini" data-copy="' + idx + '" title="Copiar">⧉</button>' : '')
+      + '<button type="button" class="mini danger" data-del-link="' + idx + '" title="Remover">×</button></div>';
+  }).join('');
+  extra.querySelectorAll('input[data-link]').forEach((inp) => {
+    inp.oninput = () => { state.houseLinks[Number(inp.dataset.link)] = inp.value; paintHouseLinks(); };
+  });
+  extra.querySelectorAll('[data-copy]').forEach((btn) => {
+    btn.onclick = () => {
+      const v = state.houseLinks[Number(btn.dataset.copy)] || '';
+      try { navigator.clipboard.writeText(v); toast('Link copiado!'); } catch (e) {}
+    };
+  });
+  extra.querySelectorAll('[data-del-link]').forEach((btn) => {
+    btn.onclick = () => {
+      state.houseLinks = state.houseLinks.filter((_, i) => i !== Number(btn.dataset.delLink));
+      if (!state.houseLinks.length) state.houseLinks = [''];
+      paintHouseLinks();
+    };
+  });
+}
+function paintImages() {
+  const box = document.getElementById('imgs');
+  if (!box) return;
+  if (!state.noteImages.length) { box.innerHTML = ''; return; }
+  box.innerHTML = state.noteImages.map((src, i) =>
+    '<div class="shot"><img src="' + src + '" alt=""><button type="button" data-rm-img="' + i + '">×</button></div>'
+  ).join('');
+  box.querySelectorAll('[data-rm-img]').forEach((btn) => {
+    btn.onclick = () => {
+      state.noteImages.splice(Number(btn.dataset.rmImg), 1);
+      paintImages();
+    };
+  });
+}
+function paint() {
+  const dados = state.dados;
+  if (!dados || !dados.ok) {
+    document.getElementById('app').innerHTML = '<div class="empty"><h3>Entre na empresa</h3><p>' + ((dados && dados.message) || 'Entre na empresa para registrar pedidos.') + '</p><p style="margin-top:12px"><button type="button" id="btn-login-host" class="primary">Entrar na empresa</button></p></div>';
+    // Não dispara login sozinho em loop (causava ConnectionAborted ao trocar de PC).
+    const btn = document.getElementById('btn-login-host');
+    if (btn) btn.onclick = () => { if (window.chrome && window.chrome.webview) postHost('login'); };
+    return;
+  }
+  snapForm();
+  const snap = state.formSnap || {};
+  document.getElementById('company').textContent = dados.companyName || 'Minha Empresa';
+  loadPending();
+  const ranges = rangesOfGrupo();
+  const rates = ratesOfGrupo();
+  const ops = operatorsForType();
+  const qtdSnap = Number(snap.qtd) || 1;
+  const montSnap = Number(snap.montante) || 0;
+  const campContas = campaignPct('contas', state.grupo, null, qtdSnap);
+  const campMontante = campaignPct('montante', state.montanteGrupo, montSnap, null);
+  const camp = state.type === 'montante' ? campMontante : campContas;
+  const discContas = discountFieldValue('contas', campContas);
+  const discMontante = discountFieldValue('montante', campMontante);
+  const selectedRange = (snap.faixa && ranges.find((r) => r.id === snap.faixa)) || ranges[0];
+  const app = document.getElementById('app');
+  const showContas = state.type === 'contas' || state.type === 'multi';
+  const showMontante = state.type === 'montante' || state.type === 'multi';
+  // Site: Operador Designado em faixa inteira (abaixo de Qtd/Valor/Desconto ou dos params Montante), não espremido na grade.
+  const operadorField =
+    '<div class="opbox" style="margin-top:4px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+    + '<label class="cap" style="margin:0;display:inline-flex;align-items:center;gap:6px">Operador Designado (Opcional)</label>'
+    + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#a1a1aa;cursor:pointer;margin:0">'
+    + '<input type="checkbox" id="only-queue"' + (state.onlyQueue ? ' checked' : '') + ' style="width:14px;height:14px;accent-color:#10b981"> Só quem está na fila'
+    + '<span class="qcount" id="qcount" style="margin-left:4px">' + queueLabel() + '</span></label></div>'
+    + '<select id="assign" style="height:42px;font-size:13px;width:100%"><option value="">Sem operador designado (Livre na fila)</option>'
+    + ops.map((op) => '<option value="' + op.id + '">' + op.name + ' · ' + (op.role === 'OPERADOR' ? 'Operador' : op.role) + '</option>').join('')
+    + '</select></div>';
+
+  app.innerHTML =
+    '<div class="head"><div class="brand" style="gap:12px;padding:0;border:0;background:transparent">'
+    + '<div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 5.5H20l-4.5 3.3 1.7 5.4L12 14.8 6.8 17.2l1.7-5.4L4 8.5h6.2z"/></svg></div>'
+    + '<div><h2>Registro Central de Pedido</h2><p class="sub">Cadastre o pedido com bases sincronizadas para a fila operacional</p></div></div>'
+    + '<div class="pending-box"><span>Pendentes</span>' + paintPendingHeader()
+    + '<div class="who">Conectado: ' + (dados.me.name || '—') + '</div></div></div>'
+    + '<form id="form">'
+    + '<div class="paste-hint">Ctrl+V cola orçamento da calculadora nos campos · Ctrl+V com print cola imagem nas anotações (até 4)</div>'
+    + '<div><label class="cap">Tipo do Pedido <span class="req">*</span></label><div class="seg" id="types">'
+    + '<button type="button" data-type="contas" class="' + (state.type === 'contas' ? 'on' : '') + '">Op. Contas</button>'
+    + '<button type="button" data-type="montante" class="' + (state.type === 'montante' ? 'on' : '') + '">Op. Montantes</button>'
+    + '<button type="button" data-type="multi" class="' + (state.type === 'multi' ? 'on' : '') + '">Mult Serviço</button>'
+    + '</div></div>'
+    + '<div><label class="cap">Dia do registro</label><div class="seg two" id="days">'
+    + '<button type="button" data-day="ontem" class="' + (state.day === 'ontem' ? 'on ontem' : '') + '">Ontem</button>'
+    + '<button type="button" data-day="hoje" class="' + (state.day === 'hoje' ? 'on hoje' : '') + '">Hoje</button>'
+    + '</div></div>'
+    + '<div class="grid2"><div class="rel"><label class="cap">Cliente <span class="req">*</span> ' + (state.clientId ? '<span class="badge">Cadastrado</span>' : '') + '</label>'
+    + '<input id="cliente" placeholder="Digite o nome do cliente..." autocomplete="off" required><div class="suggest" id="suggest"></div></div>'
+    + '<div class="rel"><label class="cap">WhatsApp / Telefone</label><input id="phone" placeholder="(00) 00000-0000" autocomplete="off"><div class="suggest" id="suggest-phone"></div></div></div>'
+    + (showContas
+      ? ('<div><label class="cap">Faixa de Depósito</label><div class="groups" id="groups">'
+        + ['Grupo 01','Grupo 02','Grupo 03'].map((g) => '<button type="button" data-g="' + g + '" class="' + (state.grupo === g ? 'on' : '') + '">' + g + '</button>').join('')
+        + '</div><select id="faixa"><option value="__custom__"' + (state.customRange ? ' selected' : '') + '>Outra / Digitar personalizado...</option>'
+        + ranges.map((r) => '<option value="' + r.id + '" data-valor="' + r.valor + '" data-nome="' + String(r.nome || '').replace(/"/g, '&quot;') + '"' + (!state.customRange && selectedRange && selectedRange.id === r.id ? ' selected' : '') + '>' + r.nome + ' (R$ ' + Number(r.valor).toFixed(2).replace('.', ',') + '/un)</option>').join('')
+        + '</select>'
+        + (state.customRange ? '<input id="custom-faixa" placeholder="Nome da faixa personalizada" style="margin-top:8px">' : '')
+        + '<div class="grid3" style="margin-top:12px"><div><label class="cap">Qtd Contas</label><input id="qtd" type="number" min="1" value="' + (snap.qtd || '1') + '"></div>'
+        + '<div><label class="cap">Valor por Conta (R$)</label><input id="valor" type="number" min="0" step="0.01" value="' + (snap.valor != null && snap.valor !== '' ? snap.valor : (selectedRange && !state.customRange ? selectedRange.valor : 0)) + '"></div>'
+        + '<div><label class="cap">Desconto (%)' + (campContas != null && !state.semDesconto ? ' <span style="color:#34d399">campanha</span>' : '') + '</label><div class="rel"><input id="desconto" value="' + discContas + '" title="' + (campContas != null ? ('Campanha: ' + campContas + '% pelo grupo da faixa') : '') + '" style="padding-right:28px"><span style="position:absolute;right:10px;top:11px;font-size:12px;font-weight:800;color:#71717a;pointer-events:none">%</span></div></div>'
+        + '</div>'
+        + (state.type === 'contas' ? operadorField : '')
+        + '</div>')
+      : '')
+    + (showMontante
+      ? ('<div class="mont-box"><div class="title">Parâmetros de Op. Montantes</div><div class="groups" id="mgroups">'
+        + '<button type="button" data-mg="Grupo 01" class="' + (state.montanteGrupo === 'Grupo 01' ? 'on' : '') + '">Grupo 01</button>'
+        + '<button type="button" data-mg="Grupo 02" class="' + (state.montanteGrupo === 'Grupo 02' ? 'on' : '') + '">Grupo 02</button></div>'
+        + '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">'
+        + '<div><label class="cap">Valor Montante (R$)</label><input id="montante" type="number" min="0" step="0.01" value="' + (snap.montante || '0') + '"></div>'
+        + '<div><label class="cap">Quantidade</label><input id="qtdm" type="number" min="0" value="' + (snap.qtdm || '0') + '" title="Preenchida pelo valor do montante, como na calculadora"></div>'
+        + '<div><label class="cap">Taxa</label><select id="taxa">' + rates.map((r) => '<option value="' + r.id + '" data-taxa="' + r.taxa + '" data-mult="' + (r.multiplicador || 0) + '" data-label="' + String(r.label || r.taxa).replace(/"/g, '&quot;') + '"' + (snap.taxa === r.id ? ' selected' : '') + '>' + (r.label || (r.taxa + '%')) + '</option>').join('') + '</select><div class="hint" id="aposta-hint" style="color:#fcd34d;font-weight:700;margin-top:4px"></div></div>'
+        + '<div><label class="cap">Desconto (%)' + (campMontante != null && !state.semDesconto ? ' <span style="color:#34d399">campanha</span>' : '') + ' <button type="button" id="sem-desc" style="border:0;background:transparent;color:#a1a1aa;font-size:9px;font-weight:900;cursor:pointer">Sem desconto</button></label><div class="rel"><input id="' + (showContas ? 'desconto-m' : 'desconto') + '" value="' + discMontante + '" title="' + (campMontante != null ? ('Campanha: ' + campMontante + '% pelo grupo/valor do montante') : '') + '" style="padding-right:28px"><span style="position:absolute;right:10px;top:11px;font-size:12px;font-weight:800;color:#71717a;pointer-events:none">%</span></div></div>'
+        + '</div>'
+        + (state.type === 'montante' ? operadorField : '')
+        + '</div>')
+      : '')
+    + (state.type === 'multi' ? operadorField : '')
+    + '<div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><label class="cap" style="margin:0">Link da Casa</label><div class="link-actions" id="link-actions"></div></div>'
+    + '<div class="link-row" style="margin-top:6px"><input id="link0" placeholder="https://..."><button type="button" class="plus" id="add-link" title="Adicionar outro link">+</button></div>'
+    + '<div class="extra-links" id="extra-links" style="display:none"></div></div>'
+    + '<div class="notes-wrap"><label class="cap">Anotações / Observações</label>'
+    + '<textarea id="notes" rows="2" placeholder="Instruções específicas para a operação... Ctrl+V cola uma imagem"></textarea>'
+    + '<div class="imgs" id="imgs"></div><div class="hint">Ctrl+V cola um print. Até 4 imagens.</div></div>'
+    + '<div class="summary" id="summary"></div>'
+    + '<div class="foot">'
+    + '<button type="button" class="soft" id="cancel">Cancelar</button>'
+    + '<button type="button" class="pend" id="pending">Pendente</button>'
+    + '<button type="submit" class="go" id="save">Registrar Pedido</button>'
+    + '</div></form>';
+
+  // type colors
+  const types = document.getElementById('types');
+  if (state.type === 'montante') types.classList.add('blue');
+  if (state.type === 'multi') types.classList.add('amber');
+
+  document.getElementById('types').onclick = (ev) => {
+    const btn = ev.target.closest('button[data-type]');
+    if (!btn) return;
+    state.type = btn.dataset.type;
+    state.customRange = false;
+    paint();
+  };
+  document.getElementById('days').onclick = (ev) => {
+    const btn = ev.target.closest('button[data-day]');
+    if (!btn) return;
+    state.day = btn.dataset.day;
+    paint();
+  };
+  document.querySelectorAll('[data-pend]').forEach((btn) => {
+    btn.onclick = (ev) => {
+      if (ev.target.closest('[data-del]')) return;
+      const draft = state.pendingDrafts.find((d) => d.id === btn.dataset.pend);
+      if (!draft) return;
+      applyDraft(draft);
+      toast('Pedido pendente carregado (' + pendingLabel(draft.type) + ').');
+    };
+  });
+  document.querySelectorAll('[data-del]').forEach((btn) => {
+    btn.onclick = (ev) => {
+      ev.stopPropagation();
+      savePendingList(state.pendingDrafts.filter((d) => d.id !== btn.dataset.del));
+      if (state.pendingId === btn.dataset.del) state.pendingId = null;
+      paint();
+    };
+  });
+  const groups = document.getElementById('groups');
+  if (groups) groups.onclick = (ev) => {
+    const btn = ev.target.closest('button[data-g]');
+    if (!btn) return;
+    state.grupo = btn.dataset.g;
+    state.customRange = false;
+    state.descontoManual.contas = false;
+    state.semDesconto = false;
+    paint();
+  };
+  const mgroups = document.getElementById('mgroups');
+  if (mgroups) mgroups.onclick = (ev) => {
+    const btn = ev.target.closest('button[data-mg]');
+    if (!btn) return;
+    state.montanteGrupo = btn.dataset.mg;
+    state.descontoManual.montante = false;
+    state.semDesconto = false;
+    paint();
+  };
+  const faixa = document.getElementById('faixa');
+  if (faixa) faixa.onchange = () => {
+    if (faixa.value === '__custom__') { state.customRange = true; paint(); return; }
+    state.customRange = false;
+    const opt = faixa.selectedOptions[0];
+    const valor = document.getElementById('valor');
+    if (valor) valor.value = opt ? opt.dataset.valor : 0;
+    if (!state.descontoManual.contas) {
+      const campNow = campaignPct('contas', state.grupo, null, Number(document.getElementById('qtd')?.value) || 1);
+      const desconto = document.getElementById('desconto');
+      if (desconto && campNow != null) desconto.value = String(campNow);
+    }
+    paintSummary();
+    updateApostaHint();
+  };
+  const montanteEl = document.getElementById('montante');
+  if (montanteEl) montanteEl.oninput = () => {
+    const qtdm = document.getElementById('qtdm');
+    if (qtdm) qtdm.value = qtdFromMontanteRules(montanteEl.value);
+    if (!state.descontoManual.montante && !state.semDesconto) {
+      const campNow = campaignPct('montante', state.montanteGrupo, Number(montanteEl.value) || 0, null);
+      const desconto = document.getElementById('desconto-m') || document.getElementById('desconto');
+      if (desconto && campNow != null) desconto.value = String(campNow);
+    }
+    paintSummary();
+    updateApostaHint();
+  };
+  ['qtd','valor','desconto','desconto-m','taxa','qtdm'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.oninput = () => {
+      if (id === 'desconto') { state.descontoManual.contas = true; state.semDesconto = false; }
+      if (id === 'desconto-m') { state.descontoManual.montante = true; state.semDesconto = false; }
+      if (id === 'qtd' && !state.descontoManual.contas && !state.semDesconto) {
+        const campNow = campaignPct('contas', state.grupo, null, Number(el.value) || 1);
+        const desconto = document.getElementById('desconto');
+        if (desconto && campNow != null) desconto.value = String(campNow);
+      }
+      paintSummary();
+      updateApostaHint();
+    };
+  });
+  const semDesc = document.getElementById('sem-desc');
+  if (semDesc) semDesc.onclick = () => {
+    state.semDesconto = true;
+    state.descontoManual.montante = true;
+    const el = document.getElementById('desconto-m') || document.getElementById('desconto');
+    if (el) el.value = '0';
+    paintSummary();
+  };
+  // Restaura campos que não entram no HTML inicial.
+  if (snap.cliente) document.getElementById('cliente').value = snap.cliente;
+  if (snap.phone) document.getElementById('phone').value = snap.phone;
+  if (snap.notes) document.getElementById('notes').value = snap.notes;
+  if (snap.assign) { const a = document.getElementById('assign'); if (a) a.value = snap.assign; }
+  if (snap.customFaixa) { const c = document.getElementById('custom-faixa'); if (c) c.value = snap.customFaixa; }
+  updateApostaHint();
+  const only = document.getElementById('only-queue');
+  if (only) only.onchange = () => {
+    state.onlyQueue = only.checked;
+    localStorage.setItem('dfs_assign_only_queue', only.checked ? '1' : '0');
+    paint();
+  };
+  const cliente = document.getElementById('cliente');
+  const phoneInput = document.getElementById('phone');
+  const suggest = document.getElementById('suggest');
+  const suggestPhone = document.getElementById('suggest-phone');
+  function renderClientHits(box, term) {
+    if (!box) return;
+    const q = String(term || '').trim();
+    if (q.length < 1) { box.style.display = 'none'; return; }
+    const hits = ((dados.clients) || []).filter((c) => clientMatches(c, q)).slice(0, 8);
+    if (!hits.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    box.innerHTML = '<div class="cap-list">Clientes encontrados (' + hits.length + ')</div>'
+      + hits.map((c) => '<button type="button" data-id="' + c.id + '"><strong>' + (c.name || 'Sem nome') + '</strong><div style="color:#a1a1aa;font-size:11px">' + (c.phone || 'Sem telefone') + '</div></button>').join('');
+  }
+  function pickClient(id) {
+    const client = (dados.clients || []).find((c) => c.id === id);
+    if (!client) return;
+    state.clientId = client.id;
+    cliente.value = client.name || '';
+    phoneInput.value = client.phone || '';
+    if (suggest) suggest.style.display = 'none';
+    if (suggestPhone) suggestPhone.style.display = 'none';
+  }
+  cliente.oninput = () => { state.clientId = ''; if (suggestPhone) suggestPhone.style.display = 'none'; renderClientHits(suggest, cliente.value); };
+  phoneInput.oninput = () => { state.clientId = ''; if (suggest) suggest.style.display = 'none'; renderClientHits(suggestPhone, phoneInput.value); };
+  suggest.onclick = (ev) => { const btn = ev.target.closest('button[data-id]'); if (btn) pickClient(btn.dataset.id); };
+  if (suggestPhone) suggestPhone.onclick = (ev) => { const btn = ev.target.closest('button[data-id]'); if (btn) pickClient(btn.dataset.id); };
+
+  document.getElementById('link0').oninput = (ev) => {
+    state.houseLinks[0] = ev.target.value;
+    paintHouseLinks();
+  };
+  document.getElementById('add-link').onclick = () => {
+    state.houseLinks.push('');
+    paintHouseLinks();
+  };
+  document.getElementById('cancel').onclick = () => {
+    resetFormAfterRegister();
+    paint();
+  };
+  document.getElementById('pending').onclick = () => {
+    const draft = Object.assign({ id: state.pendingId || ('pend-' + Date.now()), savedAt: Date.now() }, readFormDraft());
+    const without = state.pendingDrafts.filter((d) => d.id !== draft.id);
+    savePendingList([draft, ...without]);
+    state.pendingId = draft.id;
+    const idx = state.pendingDrafts.findIndex((d) => d.id === draft.id) + 1;
+    toast('Pedido ' + idx + ' pendente salvo. Clique nele no canto para continuar.');
+    paint();
+  };
+  document.getElementById('form').onsubmit = submitForm;
+  paintHouseLinks();
+  paintImages();
+  paintSummary();
+  updateApostaHint();
+}
+function qtdFromMontanteRules(value) {
+  const rules = ((state.dados && state.dados.rules) || []).filter((r) => !r.grupo || String(r.grupo) === state.montanteGrupo);
+  let best = null;
+  const n = Number(value) || 0;
+  rules.forEach((r) => { if (n >= Number(r.montante || 0)) best = r; });
+  return best ? Number(best.qtdContas) || 0 : 0;
+}
+function updateApostaHint() {
+  const hint = document.getElementById('aposta-hint');
+  const taxa = document.getElementById('taxa');
+  const montante = Number(document.getElementById('montante')?.value) || 0;
+  if (!hint || !taxa) return;
+  const opt = taxa.selectedOptions[0];
+  const mult = Number(opt && opt.dataset.mult) || 0;
+  if (mult > 0 && montante > 0) {
+    const aposta = Math.round(montante * mult * 100) / 100;
+    hint.textContent = 'Aposta ' + mult.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '×: ' + money(aposta);
+  } else hint.textContent = '';
+}
+/** Payload igual ao OrderRegistrationModal do site 1.4.24. */
+function buildBody(kind) {
+  const type = kind || (state.type === 'montante' ? 'montante' : 'contas');
+  const contas = contasSummaryOf();
+  const montante = montanteSummaryOf();
+  const moneySide = type === 'montante' ? montante : contas;
+  const assign = document.getElementById('assign');
+  const op = ((state.dados && state.dados.operators) || []).find((item) => item.id === (assign && assign.value));
+  const faixa = document.getElementById('faixa');
+  const taxa = document.getElementById('taxa');
+  const promoOn = !!state.promocao && (type === state.type || (state.type !== 'multi'));
+  const blog = (promoOn && type === state.type)
+    ? blogueiraValor()
+    : moneySide.finalAmount;
+  const mult = Number(taxa && taxa.selectedOptions[0] && taxa.selectedOptions[0].dataset.mult) || 0;
+  return {
+    type,
+    day: state.day,
+    clientId: state.clientId || null,
+    clientName: String(document.getElementById('cliente').value || '').trim(),
+    phone: String(document.getElementById('phone').value || '').trim(),
+    priority: 'Normal',
+    links: compactLinks(state.houseLinks).join('\n'),
+    notes: String(document.getElementById('notes').value || '').trim(),
+    noteImages: state.noteImages.slice(0, 4),
+    assignedOperatorId: assign ? assign.value : '',
+    assignedOperatorName: op ? op.name : '',
+    discountPercentage: moneySide.discountPercent,
+    promocao: promoOn && type === state.type ? !!state.promocao : false,
+    blogger: blog,
+    grupo: type === 'montante' ? state.montanteGrupo : state.grupo,
+    faixaDeposito: state.customRange
+      ? String(document.getElementById('custom-faixa')?.value || '').trim()
+      : (faixa && faixa.selectedOptions[0] && faixa.value !== '__custom__' ? faixa.selectedOptions[0].dataset.nome : ''),
+    qtdContas: contas.qtd,
+    valorPorConta: contas.valor,
+    valorMontante: montante.montante,
+    quantidadeMontante: montante.qtdm,
+    taxa: montante.taxa,
+    aposta: Math.round((montante.montante || 0) * mult * 100) / 100,
+    rollover: taxa && taxa.selectedOptions[0] ? taxa.selectedOptions[0].dataset.label : '',
+  };
+}
+async function submitForm(ev) {
+  ev.preventDefault();
+  if (state.submitting) return;
+  const clientName = String(document.getElementById('cliente')?.value || '').trim();
+  if (!clientName) { toast('Informe o nome do cliente.', true); return; }
+  const contas = contasSummaryOf();
+  const montante = montanteSummaryOf();
+  if (state.type !== 'montante' && contas.discountError) { toast(contas.discountError, true); return; }
+  if (state.type !== 'contas' && montante.discountError) { toast(montante.discountError, true); return; }
+  if (state.type === 'contas' || state.type === 'multi') {
+    if (!(contas.qtd > 0)) { toast('Informe a quantidade de contas.', true); return; }
+  }
+  if (state.type === 'montante' || state.type === 'multi') {
+    if (!(montante.montante > 0)) { toast('Informe o valor do montante.', true); return; }
+    if (!(montante.taxa > 0)) { toast('Selecione a taxa do montante.', true); return; }
+  }
+  const btn = document.getElementById('save');
+  state.submitting = true;
+  btn.disabled = true;
+  try {
+    if (state.type === 'multi') {
+      const contasRes = assertCreated(await postJson('/registro/criar', buildBody('contas')), 'Contas');
+      try {
+        assertCreated(await postJson('/registro/criar', buildBody('montante')), 'Montante');
+      } catch (secondErr) {
+        throw new Error('Contas ' + (contasRes.orderCode || '') + ' já gravou, mas Montante falhou: ' + (secondErr.message || 'erro') + '. Não envie Contas de novo.');
+      }
+      toast('Os dois serviços foram registrados. Os campos foram limpos para o próximo.');
+    } else {
+      const data = assertCreated(await postJson('/registro/criar', buildBody()));
+      toast('Pedido ' + data.orderCode + ' registrado. Os campos foram limpos para o próximo.');
+    }
+    if (state.pendingId) {
+      savePendingList(state.pendingDrafts.filter((d) => d.id !== state.pendingId));
+      state.pendingId = null;
+    }
+    resetFormAfterRegister();
+    paint();
+  } catch (err) {
+    toast(err.message || 'Não registrei o pedido.', true);
+  } finally {
+    state.submitting = false;
+    btn.disabled = false;
+  }
+}
+async function load(full) {
+  const res = await fetch('/registro/dados', { cache: 'no-store' });
+  const data = await res.json();
+  state.dados = data;
+  if (full || !document.getElementById('form')) paint();
+  else paintAssignOnly();
+}
+async function refreshQueueSoft() {
+  try {
+    const res = await fetch('/fila/estado', { cache: 'no-store' });
+    const data = await res.json();
+    if (!data || !data.ok || !state.dados) return;
+    state.dados.queue = {
+      contas: Array.isArray(data.contas) ? data.contas : [],
+      montante: Array.isArray(data.montante) ? data.montante : [],
+    };
+    paintAssignOnly();
+  } catch (e) {}
+}
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+document.addEventListener('paste', async (event) => {
+  if (!document.getElementById('form')) return;
+  const items = event.clipboardData && event.clipboardData.items;
+  let imageFile = null;
+  if (items) {
+    for (const item of items) {
+      if (item.kind === 'file' && String(item.type || '').startsWith('image/')) {
+        imageFile = item.getAsFile();
+        break;
+      }
+    }
+  }
+  if (imageFile) {
+    event.preventDefault();
+    if (state.noteImages.length >= 4) { toast('Máximo de 4 imagens.', true); return; }
+    try {
+      const url = await fileToDataUrl(imageFile);
+      state.noteImages.push(url);
+      paintImages();
+      toast('Imagem colada nas anotações.');
+    } catch (e) {
+      toast('Não colo a imagem.', true);
+    }
+    return;
+  }
+  const text = event.clipboardData && event.clipboardData.getData('text');
+  if (text && /OR[CÇ]AMENTO|Faixa:|Montante:|Desconto aplicado/i.test(text)) {
+    event.preventDefault();
+    applyBudgetText(text);
+  }
+});
+document.getElementById('open-calc').onclick = () => {
+  document.getElementById('open-calc').classList.toggle('on');
+  postHost('calc-toggle');
+};
+document.getElementById('goto-fila').onclick = () => { postHost('open-fila'); };
+document.getElementById('logout').onclick = async () => {
+  try { await fetch('/pedidos/sair', { method: 'POST' }); } catch (e) {}
+  try { localStorage.removeItem('dfs_auth_token'); sessionStorage.clear(); } catch (e) {}
+  postHost('sair');
+};
+if (window.chrome && window.chrome.webview) postHost('ready');
+load(true).catch((err) => {
+  document.getElementById('app').innerHTML = '<div class="empty"><h3>Não abri o registro</h3><p>' + (err.message || '') + '</p></div>';
+});
+setInterval(() => { refreshQueueSoft(); }, 2500);
+</script>
+</body>
+</html>

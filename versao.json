@@ -55,5 +55,30 @@
                                   "pedidos.ui",
                                   "fila-pedidos.ico"
                               ]
-                }
+                },
+    "registro":  {
+                     "version":  "1.0.18",
+                     "remover":  false,
+                     "files":  [
+                                   "app-versao.txt",
+                                   "RegistroCentral.exe",
+                                   "RegistroCentral.dll",
+                                   "RegistroCentral.deps.json",
+                                   "RegistroCentral.runtimeconfig.json",
+                                   "pedidos-app.mjs",
+                                   "registro.ui",
+                                   "calc.ui",
+                                   "node.exe",
+                                   "ui-seal.pak",
+                                   "elite-cpa-logo-4.png",
+                                   "icone.ico",
+                                   "icone.png",
+                                   "registro-central.ico",
+                                   "Microsoft.Web.WebView2.Core.dll",
+                                   "Microsoft.Web.WebView2.WinForms.dll",
+                                   "Microsoft.Web.WebView2.Wpf.dll",
+                                   "WebView2Loader.dll",
+                                   "runtimes/win-x64/native/WebView2Loader.dll"
+                               ]
+                 }
 }
