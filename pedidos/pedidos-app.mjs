@@ -2027,84 +2027,86 @@ const server = http.createServer((req, res) => {
   }
   if (url === '/pedidos/imagens' && req.method === 'GET') {
     const session = readSession();
-    if (!session) { sendJson(res, 200, { ok: false, images: {} }); return; }
+    if (!session) { sendJson(res, 200, { ok: false, images: {}, byCode: {} }); return; }
     const id = String(query.get('id') || '').trim();
     const ids = String(query.get('ids') || '').split(',').map((part) => part.trim()).filter(Boolean).slice(0, 40);
     const codes = String(query.get('codes') || '').split(',').map((part) => part.trim()).filter(Boolean).slice(0, 40);
     const wantedIds = id ? [id] : ids;
-    // No site, orderImages só responde com filtro por orderId/orderCode (coleção inteira = 500).
-    fetchOrderImages(session, wantedIds, codes).then((map) => {
-      if (id) sendJson(res, 200, { ok: true, images: map[id] || [] });
+    // Igual ao site: consulta orderImages por orderCode/orderId (coleção inteira = 500).
+    fetchOrderImages(session, wantedIds, codes).then((pack) => {
+      const map = (pack && pack.map) || {};
+      const byCode = (pack && pack.byCode) || {};
+      if (id) sendJson(res, 200, { ok: true, images: map[id] || [], byCode });
       else if (wantedIds.length) {
         const part = {};
         wantedIds.forEach((key) => { part[key] = map[key] || []; });
-        sendJson(res, 200, { ok: true, images: part });
-      } else sendJson(res, 200, { ok: true, images: {} });
-    }).catch(() => sendJson(res, 200, { ok: false, images: id ? [] : {} }));
+        sendJson(res, 200, { ok: true, images: part, byCode });
+      } else sendJson(res, 200, { ok: true, images: byCode, byCode });
+    }).catch(() => sendJson(res, 200, { ok: false, images: id ? [] : {}, byCode: {} }));
     return;
   }
   res.writeHead(404);
   res.end();
 });
 
+function companyImageFilters(session) {
+  const companyId = String((session && session.companyId) || '');
+  // ADM / sem empresa: sem filtro, senão some o print de outra empresa (igual dfs-extras).
+  if (!session || session.role === 'ADM_MASTER' || !companyId || companyId === 'all') return [];
+  return [{ field: 'companyId', op: '==', value: companyId }];
+}
+
+function pushImage(bucket, key, dataUrl) {
+  if (!key || !dataUrl || dataUrl.indexOf('data:image/') !== 0) return;
+  if (!bucket[key]) bucket[key] = [];
+  if (bucket[key].indexOf(dataUrl) < 0 && bucket[key].length < 4) bucket[key].push(dataUrl);
+}
+
+function absorbImageRows(rows, map, byCode) {
+  (rows || []).forEach((row) => {
+    const orderId = String(row.orderId || row.order_id || '');
+    const orderCode = String(row.orderCode || row.order_code || '');
+    const dataUrl = String(row.dataUrl || row.url || '');
+    pushImage(map, orderId, dataUrl);
+    pushImage(byCode, orderCode, dataUrl);
+  });
+}
+
 function fetchOrderImages(session, orderIds, orderCodes) {
   const ids = (orderIds || []).map((v) => String(v || '').trim()).filter(Boolean).slice(0, 40);
   const codes = (orderCodes || []).map((v) => String(v || '').trim()).filter(Boolean).slice(0, 40);
-  if (!ids.length && !codes.length) return Promise.resolve({});
-  const filters = [];
-  const companyId = String(session.companyId || '');
-  if (session.role !== 'ADM_MASTER' && companyId) {
-    filters.push({ field: 'companyId', op: '==', value: companyId });
-  }
-  // Um critério por vez: orderId+orderCode juntos no matches_filters exigiria os dois no mesmo doc.
-  if (ids.length) filters.push({ field: 'orderId', op: 'in', value: ids });
-  else filters.push({ field: 'orderCode', op: 'in', value: codes });
-  return panelRequest('query', {
-    collection: 'orderImages',
-    filters,
-    limit: 80,
-    dfs_token: session.token,
-  }).then((result) => {
-    const map = {};
-    const byCode = {};
-    rowsOf(result).forEach((row) => {
-      const orderId = String(row.orderId || '');
-      const orderCode = String(row.orderCode || '');
-      const dataUrl = String(row.dataUrl || row.url || '');
-      if (!dataUrl.startsWith('data:image/')) return;
-      if (orderId) {
-        if (!map[orderId]) map[orderId] = [];
-        if (map[orderId].length < 4) map[orderId].push(dataUrl);
-      }
-      if (orderCode) {
-        if (!byCode[orderCode]) byCode[orderCode] = [];
-        if (byCode[orderCode].length < 4) byCode[orderCode].push(dataUrl);
-      }
+  if (!ids.length && !codes.length) return Promise.resolve({ map: {}, byCode: {} });
+  const base = companyImageFilters(session);
+  const map = {};
+  const byCode = {};
+  // Site busca primeiro por orderCode — mais estável que só orderId.
+  const first = codes.length
+    ? panelRequest('query', {
+      collection: 'orderImages',
+      filters: base.concat([{ field: 'orderCode', op: 'in', value: codes }]),
+      limit: 80,
+      dfs_token: session.token,
+    })
+    : panelRequest('query', {
+      collection: 'orderImages',
+      filters: base.concat([{ field: 'orderId', op: 'in', value: ids }]),
+      limit: 80,
+      dfs_token: session.token,
     });
-    // Se pediu por id e veio vazio, tenta de novo só por código (prints antigos).
-    if (ids.length && codes.length) {
-      const missing = ids.filter((key) => !map[key] || !map[key].length);
-      if (missing.length) {
-        return panelRequest('query', {
-          collection: 'orderImages',
-          filters: (session.role !== 'ADM_MASTER' && companyId
-            ? [{ field: 'companyId', op: '==', value: companyId }]
-            : []).concat([{ field: 'orderCode', op: 'in', value: codes }]),
-          limit: 80,
-          dfs_token: session.token,
-        }).then((second) => {
-          rowsOf(second).forEach((row) => {
-            const orderId = String(row.orderId || '');
-            const dataUrl = String(row.dataUrl || row.url || '');
-            if (!orderId || !dataUrl.startsWith('data:image/')) return;
-            if (!map[orderId]) map[orderId] = [];
-            if (map[orderId].length < 4 && map[orderId].indexOf(dataUrl) < 0) map[orderId].push(dataUrl);
-          });
-          return map;
-        }).catch(() => map);
-      }
-    }
-    return map;
+  return first.then((result) => {
+    absorbImageRows(rowsOf(result), map, byCode);
+    const missing = ids.filter((key) => !map[key] || !map[key].length);
+    if (!missing.length || !ids.length) return { map, byCode };
+    // Completa o que faltou pelo orderId (prints sem código ou código divergente).
+    return panelRequest('query', {
+      collection: 'orderImages',
+      filters: base.concat([{ field: 'orderId', op: 'in', value: missing }]),
+      limit: 80,
+      dfs_token: session.token,
+    }).then((second) => {
+      absorbImageRows(rowsOf(second), map, byCode);
+      return { map, byCode };
+    }).catch(() => ({ map, byCode }));
   });
 }
 

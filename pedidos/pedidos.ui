@@ -321,7 +321,7 @@ const tabs = [
   ['concluidos', '✓ Concluído'],
   ['cancelados', 'Cancelados'],
 ];
-const state = { period: 'todos', tab: 'todos', orders: [], me: {}, companyName: '', images: {}, imageFresh: {}, imagesReady: false };
+const state = { period: 'todos', tab: 'todos', orders: [], me: {}, companyName: '', images: {}, imagesByCode: {}, imageFresh: {}, imagesReady: false };
 const saqueDraft = {};
 let focusSaque = null;
 let skipSaqueSnapshot = false;
@@ -551,7 +551,10 @@ function card(order) {
 }
 function fillShots(root) {
   (root || document).querySelectorAll('[data-shots]').forEach((box) => {
-    const list = state.images[box.getAttribute('data-shots')] || [];
+    const id = box.getAttribute('data-shots') || '';
+    const code = String(box.getAttribute('data-code') || '').trim();
+    let list = state.images[id] || [];
+    if ((!list || !list.length) && code && state.imagesByCode) list = state.imagesByCode[code] || [];
     box.replaceChildren();
     if (!list.length) { box.hidden = true; return; }
     box.hidden = false;
@@ -1022,9 +1025,14 @@ function loadImages() {
     + (codes.length ? ('&codes=' + encodeURIComponent(codes.join(','))) : '');
   fetch('/pedidos/imagens?' + qs, { cache: 'no-store' }).then((res) => res.json()).then((payload) => {
     const images = (payload && payload.images) || {};
+    const byCode = (payload && payload.byCode) || {};
     ids.forEach((id) => {
       state.images[id] = images[id] || [];
       state.imageFresh[id] = Date.now();
+    });
+    Object.keys(byCode).forEach((code) => {
+      if (!state.imagesByCode) state.imagesByCode = {};
+      state.imagesByCode[code] = byCode[code] || [];
     });
     state.imagesLoading = false;
     fillShots();
