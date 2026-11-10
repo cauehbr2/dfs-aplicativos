@@ -1076,6 +1076,9 @@ function queueStateFromOps(session, contas, montante, meta) {
     ok: true,
     me: { id: meId, name: session.name || '' },
     resetTime: (meta && meta.resetTime) || '00:00',
+    resetDate: (meta && meta.resetDate) || '',
+    resetMode: (meta && meta.resetMode) || '',
+    resetArmedAt: (meta && meta.resetArmedAt) || '',
     lastResetAt: (meta && meta.lastResetAt) || '',
     lastResetType: (meta && meta.lastResetType) || '',
     contas: contasOps,
@@ -1084,19 +1087,120 @@ function queueStateFromOps(session, contas, montante, meta) {
     meMontante: montanteOps.find((op) => String(op.userId) === meId) || null,
   };
 }
+function buildOnceResetAt(resetDate, resetTime) {
+  const date = String(resetDate || '').trim();
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const parts = String(resetTime || '00:00').split(':');
+  const target = new Date(date + 'T00:00:00');
+  if (isNaN(target.getTime())) return null;
+  target.setHours(parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, 0, 0);
+  return target;
+}
+function resolveQueueResetFire(settings, now = new Date()) {
+  const resetTime = String((settings && settings.resetTime) || '').trim();
+  const resetDate = String((settings && settings.resetDate) || '').trim();
+  const mode = (settings && settings.resetMode) || (resetDate ? 'once' : 'daily');
+  if (!resetTime || mode === 'off') return { shouldFire: false, fireAt: null, afterOnce: false, needsArm: false };
+  const armedAt = settings && settings.resetArmedAt ? new Date(settings.resetArmedAt).getTime() : 0;
+  const lastTs = settings && settings.lastResetAt ? new Date(settings.lastResetAt).getTime() : 0;
+  if (!armedAt || isNaN(armedAt)) return { shouldFire: false, fireAt: null, afterOnce: mode === 'once', needsArm: true };
+  const lastOk = isNaN(lastTs) ? 0 : lastTs;
+  if (mode === 'once' || resetDate) {
+    const fireAt = buildOnceResetAt(resetDate, resetTime);
+    if (!fireAt) return { shouldFire: false, fireAt: null, afterOnce: true, needsArm: false };
+    const t = fireAt.getTime();
+    if (t <= armedAt || now.getTime() < t || lastOk >= t) return { shouldFire: false, fireAt, afterOnce: true, needsArm: false };
+    return { shouldFire: true, fireAt, afterOnce: true, needsArm: false };
+  }
+  const parts = String(resetTime).split(':');
+  const cycleStart = new Date(now);
+  cycleStart.setHours(parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, 0, 0);
+  if (cycleStart.getTime() > now.getTime()) cycleStart.setDate(cycleStart.getDate() - 1);
+  const t = cycleStart.getTime();
+  if (t <= armedAt || lastOk >= t) return { shouldFire: false, fireAt: cycleStart, afterOnce: false, needsArm: false };
+  return { shouldFire: true, fireAt: cycleStart, afterOnce: false, needsArm: false };
+}
+async function ensureQueueAutoReset(session, settingsDoc) {
+  const settings = settingsDoc || {};
+  const now = new Date();
+  const verdict = resolveQueueResetFire(settings, now);
+  const stamp = now.toISOString();
+  if (verdict.needsArm) {
+    await panelRequest('write', {
+      op: 'set',
+      collection: 'queueSettings',
+      id: 'global',
+      merge: true,
+      data: { resetArmedAt: stamp, updatedAt: stamp, updatedBy: 'Sistema' },
+      dfs_token: session.token,
+    });
+    return { ...(settings || {}), resetArmedAt: stamp };
+  }
+  if (!verdict.shouldFire || !verdict.fireAt) return settings;
+  const resetTime = settings.resetTime || '00:00';
+  const by = verdict.afterOnce
+    ? ('Reset Único Automático (' + resetTime + ')')
+    : ('Reset Diário Automático (' + resetTime + ')');
+  const mark = {
+    lastResetAt: verdict.fireAt.toISOString(),
+    lastResetType: 'auto',
+    lastResetBy: 'Sistema',
+    updatedAt: stamp,
+    updatedBy: by,
+  };
+  if (verdict.afterOnce) {
+    mark.resetDate = '';
+    mark.resetMode = 'off';
+  }
+  await Promise.all([
+    panelRequest('write', {
+      op: 'set', collection: 'queueSectors', id: 'contas', merge: true,
+      data: { sector: 'contas', operators: [], updatedAt: stamp, updatedBy: by },
+      dfs_token: session.token,
+    }),
+    panelRequest('write', {
+      op: 'set', collection: 'queueSectors', id: 'montante', merge: true,
+      data: { sector: 'montante', operators: [], updatedAt: stamp, updatedBy: by },
+      dfs_token: session.token,
+    }),
+    panelRequest('write', {
+      op: 'set', collection: 'queueSettings', id: 'global', merge: true,
+      data: mark,
+      dfs_token: session.token,
+    }),
+  ]);
+  return { ...(settings || {}), ...mark };
+}
 async function loadQueueState(session) {
   try {
-    const [settingsDoc, contasDoc, montanteDoc] = await Promise.all([
+    let [settingsDoc, contasDoc, montanteDoc] = await Promise.all([
       readDoc(session, 'queueSettings', 'global'),
       readDoc(session, 'queueSectors', 'contas'),
       readDoc(session, 'queueSectors', 'montante'),
     ]);
+    settingsDoc = await ensureQueueAutoReset(session, settingsDoc || {});
+    if (settingsDoc && (settingsDoc.lastResetType === 'auto')) {
+      // releitura se limpou setores
+      const refreshed = await Promise.all([
+        readDoc(session, 'queueSectors', 'contas'),
+        readDoc(session, 'queueSectors', 'montante'),
+      ]);
+      contasDoc = refreshed[0];
+      montanteDoc = refreshed[1];
+    }
     const resetTime = (settingsDoc && settingsDoc.resetTime) || '00:00';
     const lastResetAt = settingsDoc && settingsDoc.lastResetAt;
     const lastResetType = (settingsDoc && settingsDoc.lastResetType) || '';
     const contas = filterActiveCycleQueueOperators((contasDoc && contasDoc.operators) || [], resetTime, lastResetAt);
     const montante = filterActiveCycleQueueOperators((montanteDoc && montanteDoc.operators) || [], resetTime, lastResetAt);
-    const state = queueStateFromOps(session, contas, montante, { resetTime, lastResetAt, lastResetType });
+    const state = queueStateFromOps(session, contas, montante, {
+      resetTime,
+      lastResetAt,
+      lastResetType,
+      resetDate: (settingsDoc && settingsDoc.resetDate) || '',
+      resetMode: (settingsDoc && settingsDoc.resetMode) || '',
+      resetArmedAt: (settingsDoc && settingsDoc.resetArmedAt) || '',
+    });
     writeQueueStateCache(state);
     return state;
   } catch (e) {
