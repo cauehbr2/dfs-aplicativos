@@ -391,7 +391,11 @@ function templateMontante(vals){
   const extras=extraLinhasMontante(vals);
   let body='';
   if(tpl){
-    body=renderBudget(resolveBudgetBody(tpl),{
+    var __bodySrc=resolveBudgetBody(tpl);
+    if(tpl.id==='montante-formal' && __bodySrc.indexOf('aposta valida')<0){
+      __bodySrc="💬 *ORÇAMENTO MONTANTE*\n\nChave Pix - {{tipoPix}}\nChave: ```{{chavePix}}```\nNome: {{nomeTitular}}\nBanco: {{banco}}\n\nGrupo: {{grupo}}\nMontante: R$ {{montante}}\nQuant. total de aposta valida: R$ {{apostaValida}}\n\nQnt. contas: {{qtdContas}}\nTaxa: {{taxa}}%\nDesconto: {{desconto}}%\n\n✅*Total: R$ {{valorFinal}}*\n\n*MARCAR ESTA MENSAGEM COM O COMPROVANTE*";
+    }
+    body=renderBudget(__bodySrc,{
       ...pixVars(vals.pix),
       grupo,
       montante: plain(vals.montante),
@@ -400,13 +404,14 @@ function templateMontante(vals){
       desconto: vals.desc,
       valorFinal: plain(vals.final),
       extraLinhas: extras,
+      apostaValida: (Number(vals.mult)>0 && Number(vals.montante)>0) ? plain(Math.round(Number(vals.montante)*Number(vals.mult)*100)/100) : '',
     });
     if(grupo && body.indexOf(grupo)<0){
       body=/Montante:/i.test(body)?body.replace(/Montante:/i,'Grupo: '+grupo+'\nMontante:'):('Grupo: '+grupo+'\n'+body);
     }
     if(extras && body.indexOf('aposta valida')<0){
       body=/Montante:\s*R\$[^\n]*/i.test(body)
-        ? body.replace(/(Montante:\s*R\$[^\n]*)/i,'$1\n'+extras.trim())
+        ? body.replace(/(Montante:\s*R\$[^\n]*)/i,'$1\n\n'+extras.replace(/\s+$/,''))
         : (extras+body);
     }
   } else {
