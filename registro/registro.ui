@@ -22,7 +22,7 @@
   .fab { width:38px; height:38px; display:grid; place-items:center; background:linear-gradient(180deg,#34d399,#059669); color:#052e16; box-shadow:0 8px 18px rgba(16,185,129,.25); }
   .fab.on { background:#27272a; color:#fafafa; box-shadow:none; }
   .fab svg { width:18px; height:18px; }
-  main { flex:1; min-height:0; overflow:hidden; padding:14px 16px; display:flex; }
+  main { flex:1; min-height:0; overflow:hidden; padding:10px 12px; display:flex; }
   .panel { width:100%; max-width:896px; margin:0 auto; background:#09090b; border:1px solid var(--line); border-radius:24px; overflow:hidden; display:flex; flex-direction:column; min-height:0; flex:1; box-shadow:0 25px 50px rgba(0,0,0,.35); }
   .head { display:flex; justify-content:space-between; gap:12px; padding:12px 20px; border-bottom:1px solid rgba(39,39,42,.8); background:rgba(24,24,27,.45); align-items:flex-start; flex-shrink:0; }
   .head h2 { margin:0; font-size:15px; font-weight:800; letter-spacing:.02em; }
@@ -36,7 +36,8 @@
   .pending-item.on { border-color:rgba(245,158,11,.5); background:rgba(245,158,11,.15); color:#fde68a; }
   .pending-item .x { margin-left:auto; color:#71717a; padding:2px 4px; border-radius:6px; }
   .pending-item .x:hover { color:#f87171; background:rgba(239,68,68,.1); }
-  form { padding:16px 20px; display:flex; flex-direction:column; gap:12px; overflow:hidden; flex:1; min-height:0; align-content:start; }
+  form { padding:12px 16px 14px; display:flex; flex-direction:column; gap:10px; overflow:hidden; flex:1; min-height:0; }
+  .form-scroll { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:10px; padding-right:2px; }
   .assign-block { border:1px solid rgba(39,39,42,.8); background:rgba(9,9,11,.5); border-radius:12px; padding:12px; display:grid; gap:10px; }
   .assign-block .queue-lab { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-weight:700; color:#d4d4d8; cursor:pointer; flex-wrap:wrap; margin:0; }
   .assign-block .queue-lab input { width:14px; height:14px; accent-color:#10b981; flex-shrink:0; }
@@ -127,6 +128,23 @@
   @media (max-width:900px) {
     .grid2, .grid3, .grid4, .sum-grid { grid-template-columns:1fr 1fr; }
     .panel { border-radius:16px; }
+  }
+  @media (max-width:760px) {
+    .grid2, .grid3, .grid4, .sum-grid { grid-template-columns:1fr; }
+    .seg { grid-template-columns:1fr; }
+    .bar { flex-wrap:wrap; height:auto; padding:10px 12px; }
+    main { padding:8px; }
+  }
+  @media (max-height:720px) {
+    .head { padding:8px 14px; }
+    form { padding:10px 12px 12px; gap:8px; }
+    .form-scroll { gap:8px; }
+    .summary { padding:8px; }
+    .sum-card { padding:8px; }
+    .foot { padding-top:8px; }
+    label.cap { margin-bottom:4px; }
+    input, select, textarea { padding:8px 10px; font-size:12px; }
+    .seg button { padding:8px 6px; font-size:10px; }
   }
 </style>
 </head>
@@ -869,6 +887,7 @@ function paint() {
     + '<div class="pending-box"><span>Pendentes</span>' + paintPendingHeader()
     + '<div class="who">Conectado: ' + (dados.me.name || '—') + '</div></div></div>'
     + '<form id="form">'
+    + '<div class="form-scroll" id="form-scroll">'
     + '<div class="paste-hint">Ctrl+V cola orçamento da calculadora nos campos · Ctrl+V com print cola imagem nas anotações (até 4)</div>'
     + '<div><label class="cap">Tipo do Pedido <span class="req">*</span></label><div class="seg" id="types">'
     + '<button type="button" data-type="contas" class="' + (state.type === 'contas' ? 'on' : '') + '">Op. Contas</button>'
@@ -913,6 +932,7 @@ function paint() {
     + '<textarea id="notes" rows="2" placeholder="Instruções específicas para a operação... Ctrl+V cola uma imagem"></textarea>'
     + '<div class="imgs" id="imgs"></div><div class="hint">Ctrl+V cola um print. Até 4 imagens.</div></div>'
     + ((state.type === 'contas' || state.type === 'montante') ? operadorERepasseBlock : '')
+    + '</div>'
     + '<div class="summary" id="summary"></div>'
     + '<div class="foot">'
     + '<button type="button" class="soft" id="cancel">Cancelar</button>'
@@ -1091,6 +1111,7 @@ function paint() {
   paintImages();
   paintSummary();
   updateApostaHint();
+  requestAnimationFrame(() => reportIdealHeight());
 }
 function qtdFromMontanteRules(value) {
   const rules = ((state.dados && state.dados.rules) || []).filter((r) => !r.grupo || String(r.grupo) === state.montanteGrupo);
@@ -1296,12 +1317,43 @@ function loadVersion() {
     if (el && data && data.version) el.textContent = 'Versão ' + data.version;
   }).catch(() => {});
 }
+function reportIdealHeight() {
+  try {
+    const bar = document.querySelector('.shell > .bar');
+    const panel = document.querySelector('.panel');
+    const head = document.querySelector('.head');
+    const scroll = document.getElementById('form-scroll');
+    const summary = document.getElementById('summary');
+    const foot = document.querySelector('.foot');
+    if (!panel) return;
+    let body = 0;
+    if (scroll) {
+      const prev = scroll.style.overflow;
+      scroll.style.overflow = 'visible';
+      body = scroll.scrollHeight;
+      scroll.style.overflow = prev || '';
+    }
+    const chrome = 42 + 24
+      + (bar ? bar.offsetHeight : 0)
+      + (head ? head.offsetHeight : 0)
+      + (summary ? summary.offsetHeight : 0)
+      + (foot ? foot.offsetHeight : 0)
+      + 28;
+    const need = Math.ceil(chrome + body);
+    if (need > 200) postHost('resize:' + need);
+  } catch (e) {}
+}
 if (window.chrome && window.chrome.webview) postHost('ready');
 loadVersion();
-load(true).catch((err) => {
+load(true).then(() => {
+  requestAnimationFrame(() => reportIdealHeight());
+}).catch((err) => {
   document.getElementById('app').innerHTML = '<div class="empty"><h3>Não abri o registro</h3><p>' + (err.message || '') + '</p></div>';
 });
 setInterval(() => { refreshQueueSoft(); }, 2500);
+window.addEventListener('resize', () => {
+  // Só recompacta layout CSS; o host manda no tamanho da janela.
+});
 </script>
 </body>
 </html>

@@ -1,2 +1,2 @@
-﻿- Registro **1.0.33**: mostra a versão no canto (como a Fila).
-- Tela preta apos aviso de update: recarrega WebView2 ao fechar o dialogo (ShowDialog sem owner). Registro 1.0.32 / Pedidos 1.0.22 / Calc 1.1.42 / Op 1.0.84.
+﻿- Registro **1.0.35**: janela redimensionável; conteúdo acompanha e, no limite, rola (resumo/botões ficam).
+- Aviso de update **dentro** da janela do app; ao clicar Atualizar fecha, atualiza e reabre. Cache-bust no manifesto. Registro 1.0.34 / Pedidos 1.0.23 / Calc 1.1.43 / Op 1.0.85.
