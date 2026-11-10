@@ -378,10 +378,17 @@ function templateContas(vals){
   }
   return stamp(appendBudgetMessage(body, cfg.messageContas));
 }
+function extraLinhasMontante(vals){
+  const mult=Number(vals.mult)||0;
+  const mont=Number(vals.montante)||0;
+  if(!(mult>0&&mont>0)) return '';
+  return 'Quant. total de aposta valida: R$ '+plain(Math.round(mont*mult*100)/100)+'\n\n';
+}
 function templateMontante(vals){
   const cfg=budgetCfg();
   const tpl=findBudgetTemplate(cfg.templateIdMontante,'MONTANTE');
   const grupo=normalizeMontanteGrupo(state.mgrupo);
+  const extras=extraLinhasMontante(vals);
   let body='';
   if(tpl){
     body=renderBudget(resolveBudgetBody(tpl),{
@@ -392,13 +399,19 @@ function templateMontante(vals){
       taxa: vals.taxa,
       desconto: vals.desc,
       valorFinal: plain(vals.final),
+      extraLinhas: extras,
     });
     if(grupo && body.indexOf(grupo)<0){
       body=/Montante:/i.test(body)?body.replace(/Montante:/i,'Grupo: '+grupo+'\nMontante:'):('Grupo: '+grupo+'\n'+body);
     }
+    if(extras && body.indexOf('aposta valida')<0){
+      body=/Montante:\s*R\$[^\n]*/i.test(body)
+        ? body.replace(/(Montante:\s*R\$[^\n]*)/i,'$1\n'+extras.trim())
+        : (extras+body);
+    }
   } else {
     body='📋 --- ORÇAMENTO (MONTANTE) ---\n'+pixHeader(vals.pix)
-      +'Grupo: '+grupo+'\nMontante: R$ '+plain(vals.montante)+'\nQuantidade de contas: '+String(vals.qtd).padStart(2,'0')+'\nTaxa aplicada: '+vals.taxa+'%\nDesconto aplicado: '+vals.desc+'%\n💰 Valor final: R$ '+plain(vals.final);
+      +'Grupo: '+grupo+'\nMontante: R$ '+plain(vals.montante)+'\n'+extras+'Quantidade de contas: '+String(vals.qtd).padStart(2,'0')+'\nTaxa aplicada: '+vals.taxa+'%\nDesconto aplicado: '+vals.desc+'%\n💰 Valor final: R$ '+plain(vals.final);
   }
   return stamp(appendBudgetMessage(body, cfg.messageMontante));
 }
@@ -635,7 +648,9 @@ function refresh(){
         const taxa=Number(r&&r.taxa)||0; const mont=Number(item.montante)||0; const desc=Number(item.desc)||0; const qtd=Number(item.qtd)||qtdRule(mont);
         const sub=Math.round(mont*(taxa/100)*100)/100; const disc=Math.round(sub*desc/100*100)/100; const final=Math.max(0,Math.round((sub-disc)*100)/100);
         total+=final;
-        lines.push('Montante '+(i+1)+'\nGrupo: '+normalizeMontanteGrupo(state.mgrupo)+'\nMontante: R$ '+plain(mont)+'\nQnt. contas: '+String(qtd).padStart(2,'0')+'\nTaxa: '+taxa+'%\nDesconto: '+desc+'%\nSubtotal: R$ '+plain(final));
+        const mult=Number(r&&r.multiplicador)||0;
+        const aposta=(mult>0&&mont>0)?('Quant. total de aposta valida: R$ '+plain(Math.round(mont*mult*100)/100)+'\n'):'';
+        lines.push('Montante '+(i+1)+'\nGrupo: '+normalizeMontanteGrupo(state.mgrupo)+'\nMontante: R$ '+plain(mont)+'\n'+aposta+'Qnt. contas: '+String(qtd).padStart(2,'0')+'\nTaxa: '+taxa+'%\nDesconto: '+desc+'%\nSubtotal: R$ '+plain(final));
       }
     });
     const tot=document.getElementById('multi-total'); if(tot) tot.textContent=money(total);

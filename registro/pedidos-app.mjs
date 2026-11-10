@@ -1076,6 +1076,9 @@ function queueStateFromOps(session, contas, montante, meta) {
     ok: true,
     me: { id: meId, name: session.name || '' },
     resetTime: (meta && meta.resetTime) || '00:00',
+    resetDate: (meta && meta.resetDate) || '',
+    resetMode: (meta && meta.resetMode) || '',
+    resetArmedAt: (meta && meta.resetArmedAt) || '',
     lastResetAt: (meta && meta.lastResetAt) || '',
     lastResetType: (meta && meta.lastResetType) || '',
     contas: contasOps,
@@ -1084,19 +1087,120 @@ function queueStateFromOps(session, contas, montante, meta) {
     meMontante: montanteOps.find((op) => String(op.userId) === meId) || null,
   };
 }
+function buildOnceResetAt(resetDate, resetTime) {
+  const date = String(resetDate || '').trim();
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const parts = String(resetTime || '00:00').split(':');
+  const target = new Date(date + 'T00:00:00');
+  if (isNaN(target.getTime())) return null;
+  target.setHours(parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, 0, 0);
+  return target;
+}
+function resolveQueueResetFire(settings, now = new Date()) {
+  const resetTime = String((settings && settings.resetTime) || '').trim();
+  const resetDate = String((settings && settings.resetDate) || '').trim();
+  const mode = (settings && settings.resetMode) || (resetDate ? 'once' : 'daily');
+  if (!resetTime || mode === 'off') return { shouldFire: false, fireAt: null, afterOnce: false, needsArm: false };
+  const armedAt = settings && settings.resetArmedAt ? new Date(settings.resetArmedAt).getTime() : 0;
+  const lastTs = settings && settings.lastResetAt ? new Date(settings.lastResetAt).getTime() : 0;
+  if (!armedAt || isNaN(armedAt)) return { shouldFire: false, fireAt: null, afterOnce: mode === 'once', needsArm: true };
+  const lastOk = isNaN(lastTs) ? 0 : lastTs;
+  if (mode === 'once' || resetDate) {
+    const fireAt = buildOnceResetAt(resetDate, resetTime);
+    if (!fireAt) return { shouldFire: false, fireAt: null, afterOnce: true, needsArm: false };
+    const t = fireAt.getTime();
+    if (t <= armedAt || now.getTime() < t || lastOk >= t) return { shouldFire: false, fireAt, afterOnce: true, needsArm: false };
+    return { shouldFire: true, fireAt, afterOnce: true, needsArm: false };
+  }
+  const parts = String(resetTime).split(':');
+  const cycleStart = new Date(now);
+  cycleStart.setHours(parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, 0, 0);
+  if (cycleStart.getTime() > now.getTime()) cycleStart.setDate(cycleStart.getDate() - 1);
+  const t = cycleStart.getTime();
+  if (t <= armedAt || lastOk >= t) return { shouldFire: false, fireAt: cycleStart, afterOnce: false, needsArm: false };
+  return { shouldFire: true, fireAt: cycleStart, afterOnce: false, needsArm: false };
+}
+async function ensureQueueAutoReset(session, settingsDoc) {
+  const settings = settingsDoc || {};
+  const now = new Date();
+  const verdict = resolveQueueResetFire(settings, now);
+  const stamp = now.toISOString();
+  if (verdict.needsArm) {
+    await panelRequest('write', {
+      op: 'set',
+      collection: 'queueSettings',
+      id: 'global',
+      merge: true,
+      data: { resetArmedAt: stamp, updatedAt: stamp, updatedBy: 'Sistema' },
+      dfs_token: session.token,
+    });
+    return { ...(settings || {}), resetArmedAt: stamp };
+  }
+  if (!verdict.shouldFire || !verdict.fireAt) return settings;
+  const resetTime = settings.resetTime || '00:00';
+  const by = verdict.afterOnce
+    ? ('Reset Único Automático (' + resetTime + ')')
+    : ('Reset Diário Automático (' + resetTime + ')');
+  const mark = {
+    lastResetAt: verdict.fireAt.toISOString(),
+    lastResetType: 'auto',
+    lastResetBy: 'Sistema',
+    updatedAt: stamp,
+    updatedBy: by,
+  };
+  if (verdict.afterOnce) {
+    mark.resetDate = '';
+    mark.resetMode = 'off';
+  }
+  await Promise.all([
+    panelRequest('write', {
+      op: 'set', collection: 'queueSectors', id: 'contas', merge: true,
+      data: { sector: 'contas', operators: [], updatedAt: stamp, updatedBy: by },
+      dfs_token: session.token,
+    }),
+    panelRequest('write', {
+      op: 'set', collection: 'queueSectors', id: 'montante', merge: true,
+      data: { sector: 'montante', operators: [], updatedAt: stamp, updatedBy: by },
+      dfs_token: session.token,
+    }),
+    panelRequest('write', {
+      op: 'set', collection: 'queueSettings', id: 'global', merge: true,
+      data: mark,
+      dfs_token: session.token,
+    }),
+  ]);
+  return { ...(settings || {}), ...mark };
+}
 async function loadQueueState(session) {
   try {
-    const [settingsDoc, contasDoc, montanteDoc] = await Promise.all([
+    let [settingsDoc, contasDoc, montanteDoc] = await Promise.all([
       readDoc(session, 'queueSettings', 'global'),
       readDoc(session, 'queueSectors', 'contas'),
       readDoc(session, 'queueSectors', 'montante'),
     ]);
+    settingsDoc = await ensureQueueAutoReset(session, settingsDoc || {});
+    if (settingsDoc && (settingsDoc.lastResetType === 'auto')) {
+      // releitura se limpou setores
+      const refreshed = await Promise.all([
+        readDoc(session, 'queueSectors', 'contas'),
+        readDoc(session, 'queueSectors', 'montante'),
+      ]);
+      contasDoc = refreshed[0];
+      montanteDoc = refreshed[1];
+    }
     const resetTime = (settingsDoc && settingsDoc.resetTime) || '00:00';
     const lastResetAt = settingsDoc && settingsDoc.lastResetAt;
     const lastResetType = (settingsDoc && settingsDoc.lastResetType) || '';
     const contas = filterActiveCycleQueueOperators((contasDoc && contasDoc.operators) || [], resetTime, lastResetAt);
     const montante = filterActiveCycleQueueOperators((montanteDoc && montanteDoc.operators) || [], resetTime, lastResetAt);
-    const state = queueStateFromOps(session, contas, montante, { resetTime, lastResetAt, lastResetType });
+    const state = queueStateFromOps(session, contas, montante, {
+      resetTime,
+      lastResetAt,
+      lastResetType,
+      resetDate: (settingsDoc && settingsDoc.resetDate) || '',
+      resetMode: (settingsDoc && settingsDoc.resetMode) || '',
+      resetArmedAt: (settingsDoc && settingsDoc.resetArmedAt) || '',
+    });
     writeQueueStateCache(state);
     return state;
   } catch (e) {
@@ -2022,72 +2126,92 @@ const server = http.createServer((req, res) => {
   }
   if (url === '/pedidos/sair' && req.method === 'POST') {
     try { fs.unlinkSync(sessionFile); } catch (e) {}
-    imageMap = null;
-    imageMapPromise = null;
     sendJson(res, 200, { ok: true });
     return;
   }
   if (url === '/pedidos/imagens' && req.method === 'GET') {
     const session = readSession();
-    if (!session) { sendJson(res, 200, { ok: false, images: {} }); return; }
-    const id = String(query.get('id') || '');
-    const ids = String(query.get('ids') || '').split(',').map((part) => part.trim()).filter(Boolean).slice(0, 6);
-    const sendMap = (map) => {
-      if (id) sendJson(res, 200, { ok: true, images: map[id] || [] });
-      else if (ids.length) {
+    if (!session) { sendJson(res, 200, { ok: false, images: {}, byCode: {} }); return; }
+    const id = String(query.get('id') || '').trim();
+    const ids = String(query.get('ids') || '').split(',').map((part) => part.trim()).filter(Boolean).slice(0, 40);
+    const codes = String(query.get('codes') || '').split(',').map((part) => part.trim()).filter(Boolean).slice(0, 40);
+    const wantedIds = id ? [id] : ids;
+    // Igual ao site: consulta orderImages por orderCode/orderId (coleção inteira = 500).
+    fetchOrderImages(session, wantedIds, codes).then((pack) => {
+      const map = (pack && pack.map) || {};
+      const byCode = (pack && pack.byCode) || {};
+      if (id) sendJson(res, 200, { ok: true, images: map[id] || [], byCode });
+      else if (wantedIds.length) {
         const part = {};
-        ids.forEach((key) => { part[key] = map[key] || []; });
-        sendJson(res, 200, { ok: true, images: part });
-      } else sendJson(res, 200, { ok: true, images: {} });
-    };
-    loadImageMap(session).then((map) => {
-      const wanted = id ? [id] : ids;
-      const missing = wanted.some((key) => !map[key] || !map[key].length);
-      if (missing && Date.now() - imageMapAt >= 4000) {
-        imageMap = null;
-        return loadImageMap(session, true).then(sendMap);
-      }
-      sendMap(map);
-    }).catch(() => sendJson(res, 200, { ok: false, images: id ? [] : {} }));
+        wantedIds.forEach((key) => { part[key] = map[key] || []; });
+        sendJson(res, 200, { ok: true, images: part, byCode });
+      } else sendJson(res, 200, { ok: true, images: byCode, byCode });
+    }).catch(() => sendJson(res, 200, { ok: false, images: id ? [] : {}, byCode: {} }));
     return;
   }
   res.writeHead(404);
   res.end();
 });
 
-let imageMap = null;
-let imageMapAt = 0;
-let imageMapPromise = null;
-function loadImageMap(session, force) {
-  if (!force && imageMap && Date.now() - imageMapAt < 4000) return Promise.resolve(imageMap);
-  if (!force && imageMapPromise) return imageMapPromise;
-  const companyId = String(session.companyId || '');
-  const filters = session.role === 'ADM_MASTER' || !companyId
-    ? []
-    : [{ field: 'companyId', op: '==', value: companyId }];
-  imageMapPromise = panelRequest('query', {
-    collection: 'orderImages',
-    filters,
-    limit: 0,
-    dfs_token: session.token,
-  }).then((result) => {
-    const map = {};
-    rowsOf(result).forEach((row) => {
-      const orderId = String(row.orderId || '');
-      const dataUrl = String(row.dataUrl || row.url || '');
-      if (!orderId || !dataUrl.startsWith('data:image/')) return;
-      if (!map[orderId]) map[orderId] = [];
-      if (map[orderId].length < 4) map[orderId].push(dataUrl);
-    });
-    imageMap = map;
-    imageMapAt = Date.now();
-    imageMapPromise = null;
-    return map;
-  }).catch((err) => {
-    imageMapPromise = null;
-    throw err;
+function companyImageFilters(session) {
+  const companyId = String((session && session.companyId) || '');
+  // ADM / sem empresa: sem filtro, senão some o print de outra empresa (igual dfs-extras).
+  if (!session || session.role === 'ADM_MASTER' || !companyId || companyId === 'all') return [];
+  return [{ field: 'companyId', op: '==', value: companyId }];
+}
+
+function pushImage(bucket, key, dataUrl) {
+  if (!key || !dataUrl || dataUrl.indexOf('data:image/') !== 0) return;
+  if (!bucket[key]) bucket[key] = [];
+  if (bucket[key].indexOf(dataUrl) < 0 && bucket[key].length < 4) bucket[key].push(dataUrl);
+}
+
+function absorbImageRows(rows, map, byCode) {
+  (rows || []).forEach((row) => {
+    const orderId = String(row.orderId || row.order_id || '');
+    const orderCode = String(row.orderCode || row.order_code || '');
+    const dataUrl = String(row.dataUrl || row.url || '');
+    pushImage(map, orderId, dataUrl);
+    pushImage(byCode, orderCode, dataUrl);
   });
-  return imageMapPromise;
+}
+
+function fetchOrderImages(session, orderIds, orderCodes) {
+  const ids = (orderIds || []).map((v) => String(v || '').trim()).filter(Boolean).slice(0, 40);
+  const codes = (orderCodes || []).map((v) => String(v || '').trim()).filter(Boolean).slice(0, 40);
+  if (!ids.length && !codes.length) return Promise.resolve({ map: {}, byCode: {} });
+  const base = companyImageFilters(session);
+  const map = {};
+  const byCode = {};
+  // Site busca primeiro por orderCode — mais estável que só orderId.
+  const first = codes.length
+    ? panelRequest('query', {
+      collection: 'orderImages',
+      filters: base.concat([{ field: 'orderCode', op: 'in', value: codes }]),
+      limit: 80,
+      dfs_token: session.token,
+    })
+    : panelRequest('query', {
+      collection: 'orderImages',
+      filters: base.concat([{ field: 'orderId', op: 'in', value: ids }]),
+      limit: 80,
+      dfs_token: session.token,
+    });
+  return first.then((result) => {
+    absorbImageRows(rowsOf(result), map, byCode);
+    const missing = ids.filter((key) => !map[key] || !map[key].length);
+    if (!missing.length || !ids.length) return { map, byCode };
+    // Completa o que faltou pelo orderId (prints sem código ou código divergente).
+    return panelRequest('query', {
+      collection: 'orderImages',
+      filters: base.concat([{ field: 'orderId', op: 'in', value: missing }]),
+      limit: 80,
+      dfs_token: session.token,
+    }).then((second) => {
+      absorbImageRows(rowsOf(second), map, byCode);
+      return { map, byCode };
+    }).catch(() => ({ map, byCode }));
+  });
 }
 
 const listenPort = Number(process.env.DFS_PORT || 8767) || 8767;
