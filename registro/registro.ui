@@ -166,6 +166,7 @@ const state = {
   dados: null,
   clientId: '',
   onlyQueue: localStorage.getItem('dfs_assign_only_queue') === '1',
+  assignKeepFree: false,
   houseLinks: [''],
   noteImages: [],
   pendingId: null,
@@ -178,6 +179,7 @@ const state = {
   formSnap: null,
   skipSnap: false,
   submitting: false,
+  _queueSig: '',
 };
 function emptyFormSnap() {
   return {
@@ -197,6 +199,7 @@ function resetFormAfterRegister() {
   state.blogueiraOverride = null;
   state.semDesconto = false;
   state.descontoManual = { contas: false, montante: false };
+  state.assignKeepFree = false;
   state.day = 'hoje';
   state.formSnap = emptyFormSnap();
   state.skipSnap = true;
@@ -630,8 +633,18 @@ function paintAssignOnly() {
   const ops = operatorsForType();
   assign.innerHTML = '<option value="">Sem operador designado (Livre na fila)</option>'
     + ops.map((op) => '<option value="' + op.id + '">' + op.name + ' (' + op.role + ')</option>').join('');
-  if (selected && ops.some((op) => String(op.id) === String(selected))) assign.value = selected;
-  else assign.value = '';
+  // Só fila: acompanha o 1º. "Livre" (vazio) só fica se o usuário escolheu de propósito.
+  if (state.onlyQueue) {
+    if (selected === '' && state.assignKeepFree) assign.value = '';
+    else if (ops[0]) {
+      assign.value = String(ops[0].id);
+      state.assignKeepFree = false;
+    } else assign.value = '';
+  } else if (selected && ops.some((op) => String(op.id) === String(selected))) {
+    assign.value = selected;
+  } else {
+    assign.value = '';
+  }
   if (count) count.textContent = queueLabel();
 }
 function blogueiraValor() {
@@ -828,7 +841,14 @@ function paint() {
   const camp = state.type === 'montante' ? campMontante : campContas;
   const discContas = discountFieldValue('contas', campContas);
   const discMontante = discountFieldValue('montante', campMontante);
-  const selectedRange = (snap.faixa && ranges.find((r) => r.id === snap.faixa)) || ranges[0];
+  const faixaAindaVale = !!(snap.faixa && ranges.some((r) => r.id === snap.faixa));
+  const selectedRange = (faixaAindaVale && ranges.find((r) => r.id === snap.faixa)) || ranges[0] || null;
+  // Valor da faixa: se a faixa mudou (outro grupo / lista nova), sempre puxa o cadastro — não fica preso no 0 antigo.
+  const valorDaFaixa = selectedRange && !state.customRange
+    ? (faixaAindaVale && snap.faixa === selectedRange.id && snap.valor !== '' && snap.valor != null
+      ? snap.valor
+      : (selectedRange.valor != null ? selectedRange.valor : 0))
+    : (snap.valor != null && snap.valor !== '' ? snap.valor : 0);
   const app = document.getElementById('app');
   const showContas = state.type === 'contas' || state.type === 'multi';
   const showMontante = state.type === 'montante' || state.type === 'multi';
@@ -888,7 +908,7 @@ function paint() {
         + '</select>'
         + (state.customRange ? '<input id="custom-faixa" placeholder="Nome da faixa personalizada" style="margin-top:8px">' : '')
         + '<div class="grid3" style="margin-top:12px"><div><label class="cap">Qtd Contas</label><input id="qtd" type="number" min="1" value="' + (snap.qtd || '1') + '"></div>'
-        + '<div><label class="cap">Valor por Conta (R$)</label><input id="valor" type="number" min="0" step="0.01" value="' + (snap.valor != null && snap.valor !== '' ? snap.valor : (selectedRange && !state.customRange ? selectedRange.valor : 0)) + '"></div>'
+        + '<div><label class="cap">Valor por Conta (R$)</label><input id="valor" type="number" min="0" step="0.01" value="' + valorDaFaixa + '"></div>'
         + '<div><label class="cap">Desconto (%)' + (campContas != null && !state.semDesconto ? ' <span style="color:#34d399">campanha</span>' : '') + '</label><div class="rel"><input id="desconto" value="' + discContas + '" title="' + (campContas != null ? ('Campanha: ' + campContas + '% pelo grupo da faixa') : '') + '" style="padding-right:28px"><span style="position:absolute;right:10px;top:11px;font-size:12px;font-weight:800;color:#71717a;pointer-events:none">%</span></div></div>'
         + '</div></div>')
       : '')
@@ -961,6 +981,11 @@ function paint() {
     state.customRange = false;
     state.descontoManual.contas = false;
     state.semDesconto = false;
+    // Troca de grupo: zera faixa/valor do snap pra 1ª faixa do grupo preencher sozinha.
+    if (state.formSnap) {
+      state.formSnap.faixa = '';
+      state.formSnap.valor = '';
+    }
     paint();
   };
   const mgroups = document.getElementById('mgroups');
@@ -978,7 +1003,14 @@ function paint() {
     state.customRange = false;
     const opt = faixa.selectedOptions[0];
     const valor = document.getElementById('valor');
-    if (valor) valor.value = opt ? opt.dataset.valor : 0;
+    const novoValor = opt && opt.dataset.valor != null && opt.dataset.valor !== ''
+      ? opt.dataset.valor
+      : '0';
+    if (valor) valor.value = novoValor;
+    if (state.formSnap) {
+      state.formSnap.faixa = faixa.value;
+      state.formSnap.valor = novoValor;
+    }
     if (!state.descontoManual.contas) {
       const campNow = campaignPct('contas', state.grupo, null, Number(document.getElementById('qtd')?.value) || 1);
       const desconto = document.getElementById('desconto');
@@ -1029,9 +1061,18 @@ function paint() {
   if (snap.assign) { const a = document.getElementById('assign'); if (a) a.value = snap.assign; }
   if (snap.customFaixa) { const c = document.getElementById('custom-faixa'); if (c) c.value = snap.customFaixa; }
   updateApostaHint();
+  const assignEl = document.getElementById('assign');
+  if (assignEl) {
+    assignEl.onchange = () => {
+      state.assignKeepFree = !String(assignEl.value || '');
+    };
+  }
+  // Só fila: se não escolheu "Livre", já deixa o 1º da fila.
+  if (state.onlyQueue && !state.assignKeepFree) paintAssignOnly();
   const only = document.getElementById('only-queue');
   if (only) only.onchange = () => {
     state.onlyQueue = only.checked;
+    if (only.checked) state.assignKeepFree = false;
     localStorage.setItem('dfs_assign_only_queue', only.checked ? '1' : '0');
     paint();
   };
@@ -1197,10 +1238,25 @@ async function submitForm(ev) {
     btn.disabled = false;
   }
 }
+function queueSig(data) {
+  const pack = (list) => (Array.isArray(list) ? list : []).map((x) => String((x && (x.userId || x.id || '')) + '|' + (x && x.position != null ? x.position : ''))).join(',');
+  return pack(data && data.contas) + '#' + pack(data && data.montante);
+}
+function catalogSig(data) {
+  if (!data) return '';
+  return [
+    (data.clients || []).length,
+    (data.ranges || []).length,
+    (data.rates || []).length,
+    (data.operators || []).length,
+    (data.pix || []).length,
+  ].join('|');
+}
 async function load(full) {
   const res = await fetch('/registro/dados', { cache: 'no-store' });
   const data = await res.json();
   state.dados = data;
+  state._catalogSig = catalogSig(data);
   if (full || !document.getElementById('form')) paint();
   else paintAssignOnly();
 }
@@ -1209,11 +1265,35 @@ async function refreshQueueSoft() {
     const res = await fetch('/fila/estado', { cache: 'no-store' });
     const data = await res.json();
     if (!data || !data.ok || !state.dados) return;
+    const nextSig = queueSig(data);
+    state._queueSig = nextSig;
     state.dados.queue = {
       contas: Array.isArray(data.contas) ? data.contas : [],
       montante: Array.isArray(data.montante) ? data.montante : [],
     };
     paintAssignOnly();
+  } catch (e) {}
+}
+async function refreshCatalogSoft() {
+  try {
+    if (!state.dados || state.submitting) return;
+    if (document.getElementById('suggest')?.style.display === 'block') return;
+    if (document.getElementById('suggest-phone')?.style.display === 'block') return;
+    const res = await fetch('/registro/dados', { cache: 'no-store' });
+    const data = await res.json();
+    if (!data) return;
+    const nextSig = catalogSig(data);
+    const keepQueue = state.dados.queue;
+    state.dados = data;
+    if (keepQueue) state.dados.queue = keepQueue;
+    if (nextSig !== state._catalogSig) {
+      state._catalogSig = nextSig;
+      // Remonta mantendo o que já está digitado (snapForm dentro do paint).
+      if (document.getElementById('form')) paint();
+      else paintAssignOnly();
+    } else {
+      paintAssignOnly();
+    }
   } catch (e) {}
 }
 function fileToDataUrl(file) {
@@ -1293,6 +1373,8 @@ load(true).catch((err) => {
   document.getElementById('app').innerHTML = '<div class="empty"><h3>Não abri o registro</h3><p>' + (err.message || '') + '</p></div>';
 });
 setInterval(() => { refreshQueueSoft(); }, 2500);
+setInterval(() => { refreshCatalogSoft(); }, 12000);
+window.addEventListener('focus', () => { refreshQueueSoft(); refreshCatalogSoft(); });
 </script>
 </body>
 </html>

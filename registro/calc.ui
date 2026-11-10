@@ -29,10 +29,10 @@
   .groups button.on { background:rgba(5,150,105,.8); color:#fff; }
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
-  .qbar { display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap; margin:0 0 6px; }
-  .qbar label { display:inline-flex; align-items:center; gap:6px; margin:0; font-size:11px; font-weight:700; color:#a1a1aa; cursor:pointer; text-transform:none; letter-spacing:0; }
+  .qbar { display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap; margin:0 0 8px; padding:8px 10px; background:rgba(24,24,27,.7); border:1px solid #27272a; border-radius:10px; }
+  .qbar label { display:inline-flex; align-items:center; gap:6px; margin:0; font-size:11px; font-weight:800; color:#d4d4d8; cursor:pointer; text-transform:none; letter-spacing:0; }
   .qbar input { width:14px; height:14px; accent-color:#10b981; padding:0; }
-  .qbar .count { font-size:10px; font-weight:700; color:#71717a; font-variant-numeric:tabular-nums; }
+  .qbar .count { font-size:10px; font-weight:700; color:#a1a1aa; font-variant-numeric:tabular-nums; }
   .card { background:rgba(24,24,27,.5); border:1px solid rgba(39,39,42,.8); border-radius:12px; padding:12px; display:grid; gap:8px; }
   .card .line { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#a1a1aa; }
   .card .line strong { color:#fff; font-weight:600; }
@@ -79,7 +79,8 @@ const state = {
   dados: null,
   grupo: 'Grupo 01',
   mgrupo: 'Grupo 01',
-  onlyQueue: localStorage.getItem(CALC_ONLY_QUEUE_KEY) === '1',
+  // Padrão ligado: Pix da fila sempre filtrado até o usuário desmarcar.
+  onlyQueue: localStorage.getItem(CALC_ONLY_QUEUE_KEY) !== '0',
   edited: { contas: false, montante: false, multiplo: false },
   descontoManual: { contas: false, montante: false },
   text: { contas: '', montante: '', multiplo: '' },
@@ -401,12 +402,15 @@ function templateMontante(vals){
 }
 function pixBlock(tab){
   const keys=pix(tab);
+  const emptyHint=state.onlyQueue && !keys.length
+    ? '<div class="hint" style="margin-top:4px">Nenhuma chave Pix de quem está na fila agora.</div>'
+    : '';
   return '<div><label class="cap">Chave Pix do Depósito</label>'
-    +'<div class="qbar"><label><input type="checkbox" id="only-queue"'+(state.onlyQueue?' checked':'')+'> Só quem está na fila</label>'
+    +'<div class="qbar" id="pix-queue-bar"><label><input type="checkbox" id="only-queue"'+(state.onlyQueue?' checked':'')+'> Só quem está na fila</label>'
     +'<span class="count" id="qcount">'+pixCountLabel(tab)+'</span></div>'
     +'<select id="pix"><option value="">-- Selecione uma Pix --</option>'
     +keys.map(k=>'<option value="'+k.id+'" data-chave="'+String(k.chave||'').replace(/"/g,'&quot;')+'" data-nome="'+String(k.nome||'').replace(/"/g,'&quot;')+'" data-banco="'+String(k.banco||'').replace(/"/g,'&quot;')+'" data-tipo="'+String(k.tipo||'Pix').replace(/"/g,'&quot;')+'">'+formatPixLabel(k)+'</option>').join('')
-    +'</select></div>';
+    +'</select>'+emptyHint+'</div>';
 }
 function wireOnlyQueue(){
   const only=document.getElementById('only-queue');
@@ -488,7 +492,15 @@ function paint(){
     renderMulti();
   }
   wireOnlyQueue();
-  if(snap.pix){ const p=document.getElementById('pix'); if(p) p.value=snap.pix; }
+  {
+    const p=document.getElementById('pix');
+    if(p){
+      const keys=pix(state.tab==='montante'?'montante':'contas');
+      if(state.onlyQueue && keys[0]) p.value=String(keys[0].id);
+      else if(snap.pix && [...p.options].some(o=>o.value===snap.pix)) p.value=snap.pix;
+      else if(keys[0]) p.value=String(keys[0].id);
+    }
+  }
   ['qtd','desconto','taxa','qtdm','pix'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     el.oninput=()=>{
@@ -647,22 +659,84 @@ async function load(){
   state.dados=await res.json();
   paint();
 }
+function queueSig(data){
+  const pack=(list)=> (Array.isArray(list)?list:[]).map(x=>String((x&& (x.userId||x.id||''))+'|'+(x&&x.position!=null?x.position:''))).join(',');
+  return pack(data&&data.contas)+'#'+pack(data&&data.montante);
+}
+function pickPixAfterQueue(select, keys, prevValue, queueChanged){
+  if(!select) return;
+  const first=keys[0];
+  // Com "Só quem está na fila", a Pix acompanha o 1º da fila sempre que a fila muda.
+  if(state.onlyQueue){
+    select.value=first?String(first.id):'';
+    return;
+  }
+  if(prevValue && keys.some(k=>String(k.id)===String(prevValue))) select.value=prevValue;
+  else select.value='';
+}
 async function refreshQueueSoft(){
   try{
     const res=await fetch('/fila/estado',{cache:'no-store'});
     const data=await res.json();
     if(!data||!data.ok||!state.dados) return;
+    const nextSig=queueSig(data);
+    const queueChanged=nextSig!==state._queueSig;
+    state._queueSig=nextSig;
     state.dados.queue={ contas:Array.isArray(data.contas)?data.contas:[], montante:Array.isArray(data.montante)?data.montante:[] };
     const select=document.getElementById('pix'); const count=document.getElementById('qcount');
     if(!select) return;
     const selected=select.value; const tab=state.tab==='montante'?'montante':'contas'; const keys=pix(tab);
     select.innerHTML='<option value="">-- Selecione uma Pix --</option>'+keys.map(k=>'<option value="'+k.id+'" data-chave="'+k.chave+'" data-nome="'+k.nome+'" data-banco="'+k.banco+'" data-tipo="'+k.tipo+'">'+formatPixLabel(k)+'</option>').join('');
-    if(selected && keys.some(k=>String(k.id)===String(selected))) select.value=selected; else select.value='';
+    pickPixAfterQueue(select, keys, selected, queueChanged);
     if(count) count.textContent=pixCountLabel(tab);
+    if(queueChanged && state.onlyQueue) refresh();
+  }catch(e){}
+}
+async function refreshCatalogSoft(){
+  try{
+    if(!state.dados) return;
+    const res=await fetch('/registro/dados',{cache:'no-store'});
+    const data=await res.json();
+    if(!data) return;
+    const keepQueue=state.dados.queue;
+    state.dados=data;
+    if(keepQueue) state.dados.queue=keepQueue;
+    // Atualiza faixas/taxas/Pix sem remontar o formulário inteiro.
+    const tab=state.tab;
+    if(tab==='contas'||tab==='montante'||tab==='multiplo'){
+      const faixa=document.getElementById('faixa');
+      const taxa=document.getElementById('taxa');
+      const pixEl=document.getElementById('pix');
+      const snapPix=pixEl?pixEl.value:'';
+      const snapFaixa=faixa?faixa.value:'';
+      const snapTaxa=taxa?taxa.value:'';
+      if(faixa && tab==='contas'){
+        const rs=ranges();
+        faixa.innerHTML=rs.map(r=>'<option value="'+r.id+'" data-valor="'+r.valor+'" data-nome="'+r.nome+'">'+r.nome+'</option>').join('');
+        if(snapFaixa && [...faixa.options].some(o=>o.value===snapFaixa)) faixa.value=snapFaixa;
+        else if(rs[0]) faixa.value=rs[0].id;
+      }
+      if(taxa && tab==='montante'){
+        const rt=rates();
+        taxa.innerHTML=rt.map(r=>'<option value="'+r.id+'" data-taxa="'+r.taxa+'" data-mult="'+(r.mult||r.multiplier||'')+'">'+(r.label||r.taxa+'%')+'</option>').join('');
+        if(snapTaxa && [...taxa.options].some(o=>o.value===snapTaxa)) taxa.value=snapTaxa;
+        else if(rt[0]) taxa.value=rt[0].id;
+      }
+      if(pixEl){
+        const keys=pix(tab==='montante'?'montante':'contas');
+        pixEl.innerHTML='<option value="">-- Selecione uma Pix --</option>'+keys.map(k=>'<option value="'+k.id+'" data-chave="'+k.chave+'" data-nome="'+k.nome+'" data-banco="'+k.banco+'" data-tipo="'+k.tipo+'">'+formatPixLabel(k)+'</option>').join('');
+        pickPixAfterQueue(pixEl, keys, snapPix, false);
+        const count=document.getElementById('qcount');
+        if(count) count.textContent=pixCountLabel(tab==='montante'?'montante':'contas');
+      }
+      refresh();
+    }
   }catch(e){}
 }
 load().catch(err=>{ document.getElementById('box').textContent=err.message||'Falha ao carregar.'; });
 setInterval(refreshQueueSoft, 2500);
+setInterval(refreshCatalogSoft, 12000);
+window.addEventListener('focus', ()=>{ refreshQueueSoft(); refreshCatalogSoft(); });
 </script>
 </body>
 </html>
