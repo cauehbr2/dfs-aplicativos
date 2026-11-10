@@ -147,20 +147,39 @@ async function adoptPanelToken(token) {
 function panelRequest(apiPath, payload) {
   const origin = readOrigin();
   if (!origin) return Promise.reject(new Error('Sem site da empresa.'));
-  const body = new URLSearchParams();
-  body.set('action', 'dfs');
-  body.set('path', apiPath);
-  if (payload && payload.dfs_token) body.set('dfs_token', payload.dfs_token);
-  body.set('dfs_json', JSON.stringify(payload || {}));
-  const data = body.toString();
+  const token = payload && payload.dfs_token ? String(payload.dfs_token) : '';
+  const jsonStr = JSON.stringify(payload || {});
+  // Prints em dataUrl estouram form-urlencoded (HostGator corta). JSON no body aguenta.
+  const hasDataUrl = !!(payload && payload.data && typeof payload.data.dataUrl === 'string');
+  const useJson = hasDataUrl || jsonStr.length > 45000;
   return new Promise((resolve, reject) => {
-    const req = https.request(new URL('/wp-admin/admin-ajax.php', origin), {
+    const url = new URL('/wp-admin/admin-ajax.php', origin);
+    url.searchParams.set('action', 'dfs');
+    url.searchParams.set('path', String(apiPath || ''));
+    if (token && useJson) url.searchParams.set('dfs_token', token);
+    let data;
+    const headers = { 'Content-Length': 0 };
+    if (useJson) {
+      data = jsonStr;
+      headers['Content-Type'] = 'application/json; charset=utf-8';
+      if (token) {
+        headers.Authorization = 'Bearer ' + token;
+        headers['X-DFS-Token'] = token;
+      }
+    } else {
+      const body = new URLSearchParams();
+      body.set('action', 'dfs');
+      body.set('path', String(apiPath || ''));
+      if (token) body.set('dfs_token', token);
+      body.set('dfs_json', jsonStr);
+      data = body.toString();
+      headers['Content-Type'] = 'application/x-www-form-urlencoded;charset=UTF-8';
+    }
+    headers['Content-Length'] = Buffer.byteLength(data);
+    const req = https.request(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-        'Content-Length': Buffer.byteLength(data),
-      },
-      timeout: 60000,
+      headers,
+      timeout: 90000,
     }, (response) => {
       const chunks = [];
       response.on('data', (chunk) => chunks.push(chunk));
@@ -1225,19 +1244,78 @@ function orderCodeNow() {
   return 'PED-' + dateStr + '-' + suffix;
 }
 function rangeGroupOf(item) {
+  // Espelho de resolveDepositRangeCategory do site: categoria gravada; senão Lista no fim do nome.
   const raw = String((item && (item.categoria || item.grupo || item.group)) || '').replace(/\s+/g, ' ').trim();
-  if (/grupo\s*0*1/i.test(raw)) return 'Grupo 01';
-  if (/grupo\s*0*2/i.test(raw)) return 'Grupo 02';
-  if (/grupo\s*0*3/i.test(raw)) return 'Grupo 03';
-  const fromName = String((item && item.nome) || '').match(/\s+(Grupo\s*\d+)\s*$/i);
-  return fromName ? fromName[1].replace(/grupo\s*/i, 'Grupo ') : (raw || 'Grupo 01');
+  const explicit = normalizeCategoryLabel(raw);
+  if (explicit) return explicit;
+  const fromLista = String((item && item.nome) || '').trim().match(/\s+(lista\s*\d+)\s*$/i);
+  if (fromLista) return normalizeCategoryLabel(fromLista[1]);
+  return '';
+}
+function montanteGroupOf(item) {
+  const raw = String((item && (item.grupo || item.categoria || item.group)) || '').replace(/\s+/g, ' ').trim();
+  const match = raw.match(/(?:grupo|lista)\s*0*(\d+)/i);
+  if (match) {
+    const n = match[1].padStart(2, '0');
+    if (n === '01') return 'Grupo 01';
+    if (n === '02') return 'Grupo 02';
+  }
+  return 'Grupo 01';
+}
+function loadBudgetTemplatesFile() {
+  try {
+    const file = path.join(__dirname, 'budget-templates.json');
+    if (!fs.existsSync(file)) return { templates: [], defaults: { CONTAS: 'contas-formal', MONTANTE: 'montante-formal', MULTIPLO: 'multi-formal' } };
+    const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return {
+      templates: Array.isArray(json.templates) ? json.templates : [],
+      defaults: json.defaults && typeof json.defaults === 'object'
+        ? json.defaults
+        : { CONTAS: 'contas-formal', MONTANTE: 'montante-formal', MULTIPLO: 'multi-formal' },
+    };
+  } catch (err) {
+    return { templates: [], defaults: { CONTAS: 'contas-formal', MONTANTE: 'montante-formal', MULTIPLO: 'multi-formal' } };
+  }
+}
+function parseBudgetDefaults(data, fallbackIds) {
+  const empty = {
+    messageMontante: '',
+    messageContas: '',
+    messageMultiplo: '',
+    templateIdContas: fallbackIds.CONTAS || 'contas-formal',
+    templateIdMontante: fallbackIds.MONTANTE || 'montante-formal',
+    templateIdMultiplo: fallbackIds.MULTIPLO || 'multi-formal',
+    templateBodies: {},
+  };
+  if (!data || typeof data !== 'object') return empty;
+  const bodies = {};
+  if (data.templateBodies && typeof data.templateBodies === 'object' && !Array.isArray(data.templateBodies)) {
+    Object.entries(data.templateBodies).forEach(([key, body]) => {
+      if (typeof body === 'string' && body.trim()) bodies[key] = body;
+    });
+  }
+  const pickId = (value, fallback) => {
+    const id = typeof value === 'string' ? value.trim() : '';
+    if (!id || id === 'contas-classico' || id === 'montante-classico' || id === 'multi-classico') return fallback;
+    return id;
+  };
+  return {
+    messageMontante: typeof data.messageMontante === 'string' ? data.messageMontante : '',
+    messageContas: typeof data.messageContas === 'string' ? data.messageContas : '',
+    messageMultiplo: typeof data.messageMultiplo === 'string' ? data.messageMultiplo : '',
+    templateIdContas: pickId(data.templateIdContas, empty.templateIdContas),
+    templateIdMontante: pickId(data.templateIdMontante, empty.templateIdMontante),
+    templateIdMultiplo: pickId(data.templateIdMultiplo, empty.templateIdMultiplo),
+    templateBodies: bodies,
+  };
 }
 async function loadRegistroDados(session) {
   const companyId = String(session.companyId || '').trim();
   if (!companyId) throw new Error('Entre na empresa para registrar pedidos.');
   const filters = [{ field: 'companyId', op: '==', value: companyId }];
   const token = session.token;
-  const [rangesRes, ratesRes, rulesRes, campaignsRes, usersRes, clientsRes, queueState] = await Promise.all([
+  const catalog = loadBudgetTemplatesFile();
+  const [rangesRes, ratesRes, rulesRes, campaignsRes, usersRes, clientsRes, queueState, budgetRes] = await Promise.all([
     panelRequest('query', { collection: 'calculatorRanges', filters, limit: 0, dfs_token: token }),
     panelRequest('query', { collection: 'calculatorMontanteRates', filters, limit: 0, dfs_token: token }),
     panelRequest('query', { collection: 'calculatorMontanteAccountRules', filters, limit: 0, dfs_token: token }),
@@ -1245,11 +1323,13 @@ async function loadRegistroDados(session) {
     panelRequest('query', { collection: 'users', filters, limit: 0, dfs_token: token }),
     panelRequest('query', { collection: 'clients', filters, limit: 0, dfs_token: token }),
     loadQueueState(session).catch(() => ({ ok: false, contas: [], montante: [] })),
+    panelRequest('read', { collection: 'settings', id: 'calculator_budget_' + companyId, dfs_token: token }).catch(() => null),
   ]);
   const ranges = rowsOf(rangesRes).map((item) => ({
     id: item.id,
     nome: String(item.nome || ''),
     valor: Number(item.valor) || 0,
+    categoria: String(item.categoria || item.grupo || item.group || ''),
     grupo: rangeGroupOf(item),
     order: item.order,
   })).filter((item) => item.nome).sort((a, b) => Number(a.order ?? 9999) - Number(b.order ?? 9999));
@@ -1266,14 +1346,14 @@ async function loadRegistroDados(session) {
       multiplicador,
       observacao: obs,
       label: item.label || (obs ? (base + ' · ' + obs) : base),
-      grupo: rangeGroupOf(item),
+      grupo: montanteGroupOf(item),
       order: item.order,
     };
   }).sort((a, b) => Number(a.order ?? 9999) - Number(b.order ?? 9999));
   const rules = rowsOf(rulesRes).map((item) => ({
     montante: Number(item.montante) || 0,
     qtdContas: Number(item.qtdContas) || 0,
-    grupo: rangeGroupOf(item),
+    grupo: montanteGroupOf(item),
   })).filter((item) => item.montante > 0).sort((a, b) => a.montante - b.montante);
   const campaigns = rowsOf(campaignsRes);
   const users = rowsOf(usersRes).filter((user) => user.status === 'active');
@@ -1315,6 +1395,10 @@ async function loadRegistroDados(session) {
       });
     });
   });
+  const budgetRaw = budgetRes && budgetRes.json
+    ? (budgetRes.json.data || budgetRes.json.doc || budgetRes.json)
+    : null;
+  const budgetDefaults = parseBudgetDefaults(budgetRaw, catalog.defaults || {});
   return {
     ok: true,
     me: {
@@ -1333,6 +1417,9 @@ async function loadRegistroDados(session) {
     operators,
     clients,
     pix,
+    budgetDefaults,
+    budgetTemplates: catalog.templates || [],
+    budgetDefaultIds: catalog.defaults || {},
     queue: {
       contas: Array.isArray(queueState.contas) ? queueState.contas : [],
       montante: Array.isArray(queueState.montante) ? queueState.montante : [],
@@ -1531,7 +1618,8 @@ async function createRegisteredOrder(session, body) {
     pixReceivedBy: String(body.pixReceivedBy || '').trim(),
     links: String(body.links || '').trim(),
     notes: String(body.notes || '').trim(),
-    noteImages,
+    // Prints ficam só em orderImages (base64 no pedido estoura a lista da Fila no site).
+    noteImages: [],
     assignedOperatorId: assignedOperatorId || null,
     assignedOperatorName: assignedOperatorId ? (assignedOperatorName || null) : null,
     assignedAt: assignedOperatorId ? now : null,
@@ -1593,12 +1681,14 @@ async function createRegisteredOrder(session, body) {
   // A Fila lê prints em orderImages (não no campo noteImages do pedido).
   if (noteImages.length) {
     for (let i = 0; i < noteImages.length; i++) {
+      let imgRes;
       try {
-        await panelRequest('write', {
+        imgRes = await panelRequest('write', {
           op: 'create',
           collection: 'orderImages',
           data: {
             orderId: id,
+            orderCode: payload.orderCode,
             companyId,
             dataUrl: noteImages[i],
             index: i,
@@ -1609,6 +1699,12 @@ async function createRegisteredOrder(session, body) {
         });
       } catch (imgErr) {
         throw new Error('Pedido ' + payload.orderCode + ' gravou, mas a imagem ' + (i + 1) + ' não: ' + (imgErr.message || 'erro') + '.');
+      }
+      const imgJson = (imgRes && imgRes.json) || {};
+      const imgOk = imgRes && imgRes.status < 400 && imgJson && !imgJson.error && (imgJson.id || (imgJson.data && imgJson.id !== false));
+      if (!imgOk) {
+        const msg = (imgJson && (imgJson.message || (imgJson.error && imgJson.error.message))) || ('HTTP ' + ((imgRes && imgRes.status) || '?'));
+        throw new Error('Pedido ' + payload.orderCode + ' gravou, mas a imagem ' + (i + 1) + ' não: ' + msg + '.');
       }
     }
     imageMap = null;

@@ -101,11 +101,56 @@ function queuePos(key, tab){
   for(const op of sector){ if(Number(op.position)>0 && op.active!==false && normName(op.name||op.userName||'')===nome) return Number(op.position)||9999; }
   return null;
 }
-function ranges(){ return ((state.dados&&state.dados.ranges)||[]).filter(r=>String(r.grupo||'Grupo 01')===state.grupo); }
+function normalizeMontanteGrupo(value){
+  const raw=String(value||'').trim();
+  if(!raw) return 'Grupo 01';
+  const match=raw.match(/(?:grupo|lista)\s*0*(\d+)/i);
+  if(match){
+    const n=match[1].padStart(2,'0');
+    if(n==='01') return 'Grupo 01';
+    if(n==='02') return 'Grupo 02';
+  }
+  return 'Grupo 01';
+}
+function rangeCategoryOf(r){
+  const explicit=normalizeCategoryLabel(String((r&&(r.grupo||r.categoria))||''));
+  if(explicit) return explicit;
+  const match=String((r&&r.nome)||'').trim().match(/\s+(lista\s*\d+)\s*$/i);
+  return match?normalizeCategoryLabel(match[1]):'';
+}
+function contasGroups(){
+  const all=(state.dados&&state.dados.ranges)||[];
+  const seen={}; const list=[];
+  all.forEach(r=>{
+    const g=rangeCategoryOf(r);
+    if(!g) return;
+    const key=g.toLowerCase();
+    if(seen[key]) return;
+    seen[key]=1;
+    list.push(g);
+  });
+  // Mesma ordem visual do site: Grupo/Lista 01, 02, 03…
+  list.sort((a,b)=>{
+    const na=(String(a).match(/(\d+)/)||[])[1]||'99';
+    const nb=(String(b).match(/(\d+)/)||[])[1]||'99';
+    return Number(na)-Number(nb)||String(a).localeCompare(String(b),'pt-BR');
+  });
+  return list.length?list:['Grupo 01','Grupo 02','Grupo 03'];
+}
+function ranges(){
+  const all=(state.dados&&state.dados.ranges)||[];
+  const groups=contasGroups();
+  if(!state.grupo||!groups.includes(state.grupo)) state.grupo=groups[0]||'Grupo 01';
+  return all.filter(r=>sameDepositGroup(rangeCategoryOf(r), state.grupo));
+}
 function rates(){
   const all=(state.dados&&state.dados.rates)||[];
-  const hit=all.filter(r=>String(r.grupo||'Grupo 01')===state.mgrupo);
-  return hit.length?hit:all.filter(r=>String(r.grupo||'')==='Grupo 01'||!r.grupo);
+  const target=normalizeMontanteGrupo(state.mgrupo);
+  state.mgrupo=target;
+  const matched=all.filter(r=>normalizeMontanteGrupo(r.grupo)===target);
+  if(matched.length) return matched;
+  if(target!=='Grupo 01') return all.filter(r=>normalizeMontanteGrupo(r.grupo)==='Grupo 01');
+  return matched;
 }
 function pixAll(tab){ return ((state.dados&&state.dados.pix)||[]).filter(p=>tab==='montante'?p.montante!==false:p.contas!==false); }
 function pix(tab){
@@ -233,30 +278,126 @@ function discountValue(module, campVal){
   return campVal!=null?String(campVal):(snap.desconto||'0');
 }
 function qtdRule(value){
-  const rules=((state.dados&&state.dados.rules)||[]).filter(r=>!r.grupo||String(r.grupo)===state.mgrupo);
+  const target=normalizeMontanteGrupo(state.mgrupo);
+  const all=((state.dados&&state.dados.rules)||[]);
+  let rules=all.filter(r=>normalizeMontanteGrupo(r.grupo)===target);
+  if(!rules.length && target!=='Grupo 01') rules=all.filter(r=>normalizeMontanteGrupo(r.grupo)==='Grupo 01');
   let best=null; const n=Number(value)||0;
   rules.forEach(r=>{ if(n>=Number(r.montante||0)) best=r; });
   return best?Number(best.qtdContas)||0:0;
 }
 function stamp(text){
-  const raw=String(text||'').replace(/\n\nGerado em:.*$/s,'').trimEnd();
+  const raw=String(text||'').replace(/\n*Gerado em: \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}(?::\d{2})?\s*$/,'').trimEnd();
   if(!raw) return raw;
   const d=new Date();
   const date=d.toLocaleDateString('pt-BR');
-  const time=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const time=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
   return raw+'\n\nGerado em: '+date+' às '+time;
 }
+function formatTipoPixBudget(tipo){
+  const raw=String(tipo||'').trim();
+  if(!raw) return 'Não informada';
+  const upper=raw.toLocaleUpperCase('pt-BR');
+  if(upper==='CPF'||upper==='CNPJ') return upper;
+  if(upper==='TELEFONE') return 'Telefone';
+  if(upper==='EMAIL'||upper==='E-MAIL') return 'E-mail';
+  if(upper==='ALEATORIA'||upper==='ALEATÓRIA') return 'Aleatória';
+  return raw.charAt(0).toLocaleUpperCase('pt-BR')+raw.slice(1).toLocaleLowerCase('pt-BR');
+}
+function budgetCfg(){
+  const d=(state.dados&&state.dados.budgetDefaults)||{};
+  const ids=(state.dados&&state.dados.budgetDefaultIds)||{};
+  return {
+    messageContas:d.messageContas||'',
+    messageMontante:d.messageMontante||'',
+    messageMultiplo:d.messageMultiplo||'',
+    templateIdContas:d.templateIdContas||ids.CONTAS||'contas-formal',
+    templateIdMontante:d.templateIdMontante||ids.MONTANTE||'montante-formal',
+    templateIdMultiplo:d.templateIdMultiplo||ids.MULTIPLO||'multi-formal',
+    templateBodies:d.templateBodies||{},
+    templates:Array.isArray(state.dados&&state.dados.budgetTemplates)?state.dados.budgetTemplates:[],
+  };
+}
+function findBudgetTemplate(id, kind){
+  const cfg=budgetCfg();
+  const list=cfg.templates.filter(t=>t&&t.kind===kind);
+  const found=list.find(t=>t.id===id);
+  if(found) return found;
+  const fallback=kind==='CONTAS'?cfg.templateIdContas:(kind==='MONTANTE'?cfg.templateIdMontante:cfg.templateIdMultiplo);
+  return list.find(t=>t.id===fallback)||list[0]||null;
+}
+function resolveBudgetBody(tpl){
+  if(!tpl) return '';
+  const custom=(budgetCfg().templateBodies||{})[tpl.id];
+  if(typeof custom==='string'&&custom.trim()) return custom;
+  return String(tpl.body||'');
+}
+function renderBudget(body, vars){
+  return String(body||'').replace(/\{\{(\w+)\}\}/g,(_,key)=>{
+    const value=vars[key];
+    if(value===undefined||value===null) return '';
+    return String(value);
+  });
+}
+function appendBudgetMessage(base, message){
+  const trimmed=String(message||'').trim();
+  if(!trimmed) return base;
+  return String(base||'').trimEnd()+'\n\n'+trimmed;
+}
+function pixVars(opt){
+  return {
+    tipoPix: formatTipoPixBudget(opt&&opt.dataset?opt.dataset.tipo:''),
+    chavePix: (opt&&opt.dataset&&opt.dataset.chave)||'Não informada',
+    nomeTitular: (opt&&opt.dataset&&opt.dataset.nome)||'Não informada',
+    banco: (opt&&opt.dataset&&opt.dataset.banco)||'Não informada',
+  };
+}
 function pixHeader(opt){
-  if(!opt||!opt.dataset.chave) return 'Chave Pix - Pix\nChave : ``` ```\nNome: \nBanco: \n\n';
-  return 'Chave Pix - '+(opt.dataset.tipo||'Pix')+'\nChave : ```'+opt.dataset.chave+'```\nNome: '+(opt.dataset.nome||'')+'\nBanco: '+(opt.dataset.banco||'')+'\n\n';
+  const v=pixVars(opt);
+  return 'Chave Pix - '+v.tipoPix+'\nChave : ```'+v.chavePix+'```\nNome: '+v.nomeTitular+'\nBanco: '+v.banco+'\n\n';
 }
 function templateContas(vals){
-  return stamp('📋 --- ORÇAMENTO (CONTAS) ---\n'+pixHeader(vals.pix)
-    +'Faixa: '+vals.faixa+'\nQuantidade de contas: '+String(vals.qtd).padStart(2,'0')+'\nDesconto aplicado: '+vals.desc+'%\n💰 Valor final: R$ '+plain(vals.final));
+  const cfg=budgetCfg();
+  const tpl=findBudgetTemplate(cfg.templateIdContas,'CONTAS');
+  let body='';
+  if(tpl){
+    body=renderBudget(resolveBudgetBody(tpl),{
+      ...pixVars(vals.pix),
+      faixa: vals.faixa||'Nenhuma',
+      qtdContas: String(vals.qtd).padStart(2,'0'),
+      desconto: vals.desc,
+      valorUnitario: plain(vals.valor),
+      valorFinal: plain(vals.final),
+    });
+  } else {
+    body='📋 --- ORÇAMENTO (CONTAS) ---\n'+pixHeader(vals.pix)
+      +'Faixa: '+vals.faixa+'\nQuantidade de contas: '+String(vals.qtd).padStart(2,'0')+'\nDesconto aplicado: '+vals.desc+'%\n💰 Valor final: R$ '+plain(vals.final);
+  }
+  return stamp(appendBudgetMessage(body, cfg.messageContas));
 }
 function templateMontante(vals){
-  return stamp('📋 --- ORÇAMENTO (MONTANTE) ---\n'+pixHeader(vals.pix)
-    +'Montante: R$ '+plain(vals.montante)+'\nQuantidade de contas: '+String(vals.qtd).padStart(2,'0')+'\nTaxa aplicada: '+vals.taxa+'%\nDesconto aplicado: '+vals.desc+'%\n💰 Valor final: R$ '+plain(vals.final));
+  const cfg=budgetCfg();
+  const tpl=findBudgetTemplate(cfg.templateIdMontante,'MONTANTE');
+  const grupo=normalizeMontanteGrupo(state.mgrupo);
+  let body='';
+  if(tpl){
+    body=renderBudget(resolveBudgetBody(tpl),{
+      ...pixVars(vals.pix),
+      grupo,
+      montante: plain(vals.montante),
+      qtdContas: String(vals.qtd).padStart(2,'0'),
+      taxa: vals.taxa,
+      desconto: vals.desc,
+      valorFinal: plain(vals.final),
+    });
+    if(grupo && body.indexOf(grupo)<0){
+      body=/Montante:/i.test(body)?body.replace(/Montante:/i,'Grupo: '+grupo+'\nMontante:'):('Grupo: '+grupo+'\n'+body);
+    }
+  } else {
+    body='📋 --- ORÇAMENTO (MONTANTE) ---\n'+pixHeader(vals.pix)
+      +'Grupo: '+grupo+'\nMontante: R$ '+plain(vals.montante)+'\nQuantidade de contas: '+String(vals.qtd).padStart(2,'0')+'\nTaxa aplicada: '+vals.taxa+'%\nDesconto aplicado: '+vals.desc+'%\n💰 Valor final: R$ '+plain(vals.final);
+  }
+  return stamp(appendBudgetMessage(body, cfg.messageMontante));
 }
 function pixBlock(tab){
   const keys=pix(tab);
@@ -285,7 +426,7 @@ function paint(){
     const disc=discountValue('montante', c);
     box.innerHTML=
       '<div><label class="cap">Valor Montante (R$)</label><input id="montante" type="number" min="0" step="0.01" placeholder="Ex: 1000" value="'+(snap.montante||'')+'"></div>'
-      +'<div class="groups" id="groups"><button type="button" data-g="Grupo 01" class="'+(state.mgrupo==='Grupo 01'?'on':'')+'">Grupo 01</button><button type="button" data-g="Grupo 02" class="'+(state.mgrupo==='Grupo 02'?'on':'')+'">Grupo 02</button></div>'
+      +'<div class="groups" id="groups"><button type="button" data-g="Grupo 01" class="'+(normalizeMontanteGrupo(state.mgrupo)==='Grupo 01'?'on':'')+'">Grupo 01</button><button type="button" data-g="Grupo 02" class="'+(normalizeMontanteGrupo(state.mgrupo)==='Grupo 02'?'on':'')+'">Grupo 02</button></div>'
       +'<div class="row3"><div><label class="cap">Taxa</label><select id="taxa">'+list.map(r=>'<option value="'+r.id+'" data-taxa="'+r.taxa+'" data-mult="'+(r.multiplicador||0)+'" data-label="'+String(r.label||r.taxa).replace(/"/g,'&quot;')+'"'+(snap.taxa===r.id?' selected':'')+'>'+(r.label||(r.taxa+'%'))+'</option>').join('')+'</select><div class="aposta" id="aposta"></div></div>'
       +'<div><label class="cap">Desconto (%)'+(c!=null?'<span class="camp">campanha</span>':'')+'</label><input id="desconto" type="number" value="'+disc+'" title="'+(c!=null?('Campanha: '+c+'%'):'')+'"></div>'
       +'<div><label class="cap">Qtd. Contas</label><input id="qtdm" type="number" min="0" value="'+(snap.qtdm||'0')+'"></div></div>'
@@ -293,7 +434,7 @@ function paint(){
       +'<div class="card" id="result"></div>'
       +'<div id="edit-wrap" style="display:none"><div class="edit-lab"><span>Texto do Orçamento (editável)</span><button type="button" id="reset">Resetar pelo modelo</button></div><textarea id="text"></textarea></div>'
       +'<button type="button" class="go" id="copy" disabled>Copiar Texto do Orçamento</button>';
-    document.getElementById('groups').onclick=(ev)=>{ const b=ev.target.closest('button[data-g]'); if(!b)return; state.mgrupo=b.dataset.g; state.descontoManual.montante=false; paint(); };
+    document.getElementById('groups').onclick=(ev)=>{ const b=ev.target.closest('button[data-g]'); if(!b)return; state.mgrupo=normalizeMontanteGrupo(b.dataset.g); state.descontoManual.montante=false; state.edited.montante=false; paint(); };
     document.getElementById('montante').oninput=()=>{
       document.getElementById('qtdm').value=qtdRule(document.getElementById('montante').value);
       if(!state.descontoManual.montante){
@@ -307,7 +448,7 @@ function paint(){
     const c=cContas;
     const disc=discountValue('contas', c);
     box.innerHTML=
-      '<div><label class="cap">Grupo da Faixa</label><div class="groups" id="groups">'+['Grupo 01','Grupo 02','Grupo 03'].map(g=>'<button type="button" data-g="'+g+'" class="'+(state.grupo===g?'on':'')+'">'+g+'</button>').join('')+'</div>'
+      '<div><label class="cap">Grupo da Faixa</label><div class="groups" id="groups">'+contasGroups().map(g=>'<button type="button" data-g="'+g+'" class="'+(sameDepositGroup(state.grupo,g)?'on':'')+'">'+g+'</button>').join('')+'</div>'
       +'<label class="cap">Faixa de Depósito</label><select id="faixa">'+list.map(r=>'<option value="'+r.id+'" data-valor="'+r.valor+'" data-nome="'+String(r.nome||'').replace(/"/g,'&quot;')+'"'+(snap.faixa===r.id?' selected':'')+'>'+r.nome+' — '+money(r.valor)+'</option>').join('')+'</select></div>'
       +'<div class="row2"><div><label class="cap">Qtd. de Contas</label><input id="qtd" type="number" min="1" value="'+(snap.qtd||'1')+'"></div>'
       +'<div><label class="cap">Desconto (%)'+(c!=null?'<span class="camp">campanha</span>':'')+'</label><input id="desconto" type="number" value="'+disc+'" title="'+(c!=null?('Campanha: '+c+'% pelo grupo da faixa'):'')+'"></div></div>'
@@ -315,7 +456,15 @@ function paint(){
       +'<div class="card" id="result"></div>'
       +'<div id="edit-wrap" style="display:none"><div class="edit-lab"><span>Texto do Orçamento (editável)</span><button type="button" id="reset">Resetar pelo modelo</button></div><textarea id="text"></textarea></div>'
       +'<button type="button" class="go" id="copy" disabled>Copiar Texto do Orçamento</button>';
-    document.getElementById('groups').onclick=(ev)=>{ const b=ev.target.closest('button[data-g]'); if(!b)return; state.grupo=b.dataset.g; state.descontoManual.contas=false; paint(); };
+    document.getElementById('groups').onclick=(ev)=>{
+      const b=ev.target.closest('button[data-g]'); if(!b)return;
+      state.grupo=b.dataset.g;
+      state.descontoManual.contas=false;
+      state.edited.contas=false;
+      // Igual ao site: ao clicar no grupo, já pega a 1ª faixa.
+      state.formSnap=Object.assign({}, state.formSnap||{}, { faixa:'' });
+      paint();
+    };
     document.getElementById('faixa').onchange=()=>{
       if(!state.descontoManual.contas){
         const now=camp('contas', state.grupo, null, Number(document.getElementById('qtd')?.value)||1);
@@ -454,11 +603,25 @@ function refresh(){
         const taxa=Number(r&&r.taxa)||0; const mont=Number(item.montante)||0; const desc=Number(item.desc)||0; const qtd=Number(item.qtd)||qtdRule(mont);
         const sub=Math.round(mont*(taxa/100)*100)/100; const disc=Math.round(sub*desc/100*100)/100; const final=Math.max(0,Math.round((sub-disc)*100)/100);
         total+=final;
-        lines.push('Montante '+(i+1)+'\nMontante: R$ '+plain(mont)+'\nQnt. contas: '+String(qtd).padStart(2,'0')+'\nTaxa: '+taxa+'%\nDesconto: '+desc+'%\nSubtotal: R$ '+plain(final));
+        lines.push('Montante '+(i+1)+'\nGrupo: '+normalizeMontanteGrupo(state.mgrupo)+'\nMontante: R$ '+plain(mont)+'\nQnt. contas: '+String(qtd).padStart(2,'0')+'\nTaxa: '+taxa+'%\nDesconto: '+desc+'%\nSubtotal: R$ '+plain(final));
       }
     });
     const tot=document.getElementById('multi-total'); if(tot) tot.textContent=money(total);
-    const body=stamp('📋 --- ORÇAMENTO MÚLTIPLO ---\n'+pixHeader(document.getElementById('pix')?.selectedOptions?.[0])+lines.join('\n\n')+'\n\nTotal geral: R$ '+plain(total));
+    const cfg=budgetCfg();
+    const tpl=findBudgetTemplate(cfg.templateIdMultiplo,'MULTIPLO');
+    const pixOpt=document.getElementById('pix')?.selectedOptions?.[0];
+    let body='';
+    if(tpl){
+      body=renderBudget(resolveBudgetBody(tpl),{
+        ...pixVars(pixOpt),
+        itemsBody: lines.join('\n\n'),
+        totalGeral: plain(total),
+        itemCount: state.multi.length,
+      });
+    } else {
+      body='📋 --- ORÇAMENTO MÚLTIPLO ---\n'+pixHeader(pixOpt)+lines.join('\n\n')+'\n\nTotal geral: R$ '+plain(total);
+    }
+    body=stamp(appendBudgetMessage(body, cfg.messageMultiplo));
     if(text && !state.edited.multiplo){ state.text.multiplo=body; text.value=body; }
     else if(text) text.value=state.text.multiplo;
   }

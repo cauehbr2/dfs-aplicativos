@@ -10,35 +10,41 @@
   html, body { height:100%; margin:0; overflow:hidden; }
   body { font-family: Inter, Segoe UI, system-ui, sans-serif; background:var(--bg); color:var(--text); }
   .shell { height:100%; display:flex; flex-direction:column; overflow:hidden; }
-  .bar { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); background:#0c0c0e; flex-shrink:0; }
-  .brand { display:flex; align-items:center; gap:10px; min-width:0; }
+  .bar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-bottom:1px solid var(--line); background:#0c0c0e; flex-shrink:0; }
+  .brand { display:flex; align-items:center; gap:12px; min-width:0; }
   .mark { width:36px; height:36px; border-radius:12px; display:grid; place-items:center; background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.25); color:var(--green); flex-shrink:0; }
-  .brand h1 { margin:0; font-size:14px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .brand h1 { margin:0; font-size:15px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .brand p { margin:2px 0 0; font-size:11px; color:var(--muted); }
-  .actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   button { font-family:inherit; }
   .ghost, .fab, .go, .soft, .pend { border:0; cursor:pointer; border-radius:12px; font-weight:800; }
   .ghost { background:#18181b; color:#e4e4e7; border:1px solid var(--line); padding:9px 12px; font-size:11px; }
   .fab { width:38px; height:38px; display:grid; place-items:center; background:linear-gradient(180deg,#34d399,#059669); color:#052e16; box-shadow:0 8px 18px rgba(16,185,129,.25); }
   .fab.on { background:#27272a; color:#fafafa; box-shadow:none; }
   .fab svg { width:18px; height:18px; }
-  main { flex:1; min-height:0; overflow:hidden; padding:12px 14px; display:flex; }
-  .panel { width:100%; max-width:672px; margin:0 auto; background:#09090b; border:1px solid var(--line); border-radius:24px; overflow:hidden; display:flex; flex-direction:column; min-height:0; flex:1; box-shadow:0 25px 50px rgba(0,0,0,.35); }
-  .head { display:flex; justify-content:space-between; gap:12px; padding:18px 20px; border-bottom:1px solid rgba(39,39,42,.8); background:rgba(24,24,27,.45); align-items:flex-start; flex-shrink:0; }
+  main { flex:1; min-height:0; overflow:hidden; padding:14px 16px; display:flex; }
+  .panel { width:100%; max-width:896px; margin:0 auto; background:#09090b; border:1px solid var(--line); border-radius:24px; overflow:hidden; display:flex; flex-direction:column; min-height:0; flex:1; box-shadow:0 25px 50px rgba(0,0,0,.35); }
+  .head { display:flex; justify-content:space-between; gap:12px; padding:12px 20px; border-bottom:1px solid rgba(39,39,42,.8); background:rgba(24,24,27,.45); align-items:flex-start; flex-shrink:0; }
   .head h2 { margin:0; font-size:15px; font-weight:800; letter-spacing:.02em; }
-  .head .sub { margin:3px 0 0; font-size:12px; color:var(--muted); }
+  .head .sub { margin:3px 0 0; font-size:11px; color:var(--muted); }
   .who { font-size:11px; color:var(--muted); text-align:right; margin-top:6px; }
-  .pending-box { text-align:right; min-width:150px; max-width:240px; }
+  .pending-box { text-align:right; min-width:150px; max-width:260px; }
   .pending-box > span { display:block; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#fbbf24; margin-bottom:6px; }
   .pending-empty { font-size:11px; color:#71717a; }
-  .pending-list { display:flex; flex-direction:column; gap:4px; }
+  .pending-list { display:flex; flex-direction:column; gap:4px; max-height:88px; overflow:auto; }
   .pending-item { display:flex; align-items:center; gap:6px; border:1px solid #27272a; background:#09090b; color:#d4d4d8; border-radius:12px; padding:6px 8px; cursor:pointer; text-align:left; width:100%; font-size:11px; font-weight:800; }
   .pending-item.on { border-color:rgba(245,158,11,.5); background:rgba(245,158,11,.15); color:#fde68a; }
   .pending-item .x { margin-left:auto; color:#71717a; padding:2px 4px; border-radius:6px; }
   .pending-item .x:hover { color:#f87171; background:rgba(239,68,68,.1); }
-  form { padding:20px; display:flex; flex-direction:column; gap:18px; overflow-y:auto; flex:1; min-height:0; }
-  form::-webkit-scrollbar { width:8px; }
-  form::-webkit-scrollbar-thumb { background:#3f3f46; border-radius:8px; }
+  form { padding:16px 20px; display:flex; flex-direction:column; gap:12px; overflow:hidden; flex:1; min-height:0; align-content:start; }
+  .assign-block { border:1px solid rgba(39,39,42,.8); background:rgba(9,9,11,.5); border-radius:12px; padding:12px; display:grid; gap:10px; }
+  .assign-block .queue-lab { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-weight:700; color:#d4d4d8; cursor:pointer; flex-wrap:wrap; margin:0; }
+  .assign-block .queue-lab input { width:14px; height:14px; accent-color:#10b981; flex-shrink:0; }
+  .assign-block select { width:100%; height:40px; font-size:12px; }
+  .assign-block .repasse { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; padding-top:8px; border-top:1px solid rgba(39,39,42,.7); font-size:12px; }
+  .assign-block .repasse span { color:#a1a1aa; font-weight:600; }
+  .assign-block .repasse label { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:#d4d4d8; cursor:pointer; margin:0; }
+  .paste-hint { display:none; }
   label.cap { display:block; font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#a1a1aa; margin-bottom:6px; }
   label.cap .req { color:var(--green); }
   label.cap .hint { text-transform:none; letter-spacing:0; font-weight:600; color:#71717a; font-size:9px; margin-left:6px; }
@@ -55,10 +61,10 @@
   .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   input, select, textarea { width:100%; background:#18181b; border:1px solid #27272a; border-radius:12px; color:#fff; padding:10px 12px; font-size:13px; outline:none; }
   input:focus, select:focus, textarea:focus { border-color:#10b981; }
-  textarea { min-height:64px; resize:vertical; }
+  textarea { min-height:48px; max-height:48px; resize:none; }
   .groups { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
-  .groups button { flex:1; min-width:84px; border:1px solid #27272a; border-radius:10px; padding:8px; background:#09090b; color:#71717a; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
-  .groups button.on { background:rgba(16,185,129,.85); color:#fff; border-color:transparent; }
+  .groups button { flex:1; min-width:84px; border:0; border-radius:10px; padding:8px; background:#27272a; color:#d4d4d8; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
+  .groups button.on { background:#10b981; color:#052e16; }
   .mont-box { padding:14px; background:rgba(59,130,246,.05); border:1px solid rgba(59,130,246,.2); border-radius:16px; display:grid; gap:12px; }
   .mont-box .title { font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#60a5fa; }
   .opbox .row { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
@@ -83,8 +89,9 @@
   .imgs .shot { position:relative; width:72px; height:72px; border-radius:10px; overflow:hidden; border:1px solid #27272a; background:#18181b; }
   .imgs img { width:100%; height:100%; object-fit:cover; display:block; }
   .imgs .shot button { position:absolute; top:2px; right:2px; width:20px; height:20px; border:0; border-radius:6px; background:rgba(0,0,0,.7); color:#fff; cursor:pointer; font-size:12px; }
-  .hint { font-size:10px; color:#71717a; margin-top:4px; }
-  .summary { background:rgba(24,24,27,.9); border:1px solid var(--line); border-radius:16px; padding:14px; display:grid; gap:12px; }
+  .hint { font-size:10px; color:#71717a; margin-top:2px; }
+  .notes-wrap .hint { display:none; }
+  .summary { background:rgba(24,24,27,.9); border:1px solid var(--line); border-radius:16px; padding:10px; display:grid; gap:8px; flex-shrink:0; }
   .summary .top { display:flex; justify-content:space-between; gap:8px; align-items:center; }
   .summary .top span { font-size:11px; color:#a1a1aa; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
   .summary .top em { font-style:normal; font-size:10px; color:#71717a; }
@@ -115,8 +122,8 @@
   .suggest button:hover { background:rgba(16,185,129,.1); }
   .rel { position:relative; }
   .badge { font-size:10px; color:#34d399; font-weight:800; background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.2); padding:2px 8px; border-radius:6px; }
-  .paste-hint { font-size:10px; color:#71717a; background:#18181b; border:1px dashed #3f3f46; border-radius:10px; padding:8px 10px; }
-  @media (max-width:720px) {
+  .paste-hint { display:none; }
+  @media (max-width:900px) {
     .grid2, .grid3, .grid4, .sum-grid { grid-template-columns:1fr 1fr; }
     .panel { border-radius:16px; }
   }
@@ -652,24 +659,24 @@ function paintSummary() {
       ? ('<div class="blog-line"><span>Repasse Blogueira Contas:</span><strong style="color:#34d399">' + money(contasSummaryOf().finalAmount) + '</strong></div>'
         + '<div class="blog-line"><span>Repasse Blogueira Montante:</span><strong style="color:#60a5fa">' + money(montanteSummaryOf().finalAmount) + '</strong></div>'
         + '<div class="blog-line"><span>Total Blogueira:</span><strong style="color:#f472b6">' + money(s.finalAmount) + '</strong></div>')
-      : ('<div class="blog-line"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-        + '<span>Repasse Blogueira:</span>'
-        + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#d4d4d8;cursor:pointer">'
-        + '<input type="checkbox" id="promo"' + (state.promocao ? ' checked' : '') + ' style="accent-color:#f59e0b;width:14px;height:14px"> Promoção</label>'
-        + '</div>'
-        + (state.promocao
-          ? '<input id="blogger" type="number" min="0" step="0.01" value="' + blog + '" class="blog-input" style="border-color:rgba(245,158,11,.5);color:#fde68a">'
-          : '<strong style="color:#f472b6">' + money(blog) + '</strong>')
-        + '</div>'))
+      : '')
     + (s.discountError ? '<div class="hint" style="color:#f87171">' + s.discountError + '</div>' : '');
+  bindPromoControls();
+}
+function bindPromoControls() {
   const promo = document.getElementById('promo');
   if (promo) promo.onchange = () => {
     state.promocao = promo.checked;
     state.blogueiraOverride = promo.checked ? summary().finalAmount : null;
-    paintSummary();
+    // Repinta o bloco Operador+Repasse (contas/montante) e o resumo.
+    paint();
   };
   const blogger = document.getElementById('blogger');
-  if (blogger) blogger.oninput = () => { state.blogueiraOverride = parseFloat(blogger.value) || 0; };
+  if (blogger) blogger.oninput = () => {
+    state.blogueiraOverride = parseFloat(blogger.value) || 0;
+    const total = document.querySelector('#summary .sum-card.total strong');
+    if (total) total.textContent = money(blogueiraValor());
+  };
 }
 function paintPendingHeader() {
   loadPending();
@@ -825,17 +832,33 @@ function paint() {
   const app = document.getElementById('app');
   const showContas = state.type === 'contas' || state.type === 'multi';
   const showMontante = state.type === 'montante' || state.type === 'multi';
-  // Site: Operador Designado em faixa inteira (abaixo de Qtd/Valor/Desconto ou dos params Montante), não espremido na grade.
-  const operadorField =
+  // Site (contas/montante): Operador + Repasse ficam DEPOIS de Anotações, ANTES do Resumo.
+  const operadorSelect =
+    '<select id="assign"><option value="">Sem operador designado (Livre na fila)</option>'
+    + ops.map((op) => '<option value="' + op.id + '">' + op.name + ' · ' + (op.role === 'OPERADOR' ? 'Operador' : op.role) + '</option>').join('')
+    + '</select>';
+  const operadorFieldMulti =
     '<div class="opbox" style="margin-top:4px">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
-    + '<label class="cap" style="margin:0;display:inline-flex;align-items:center;gap:6px">Operador Designado (Opcional)</label>'
+    + '<label class="cap" style="margin:0">Operador Designado (Opcional)</label>'
     + '<label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#a1a1aa;cursor:pointer;margin:0">'
     + '<input type="checkbox" id="only-queue"' + (state.onlyQueue ? ' checked' : '') + ' style="width:14px;height:14px;accent-color:#10b981"> Só quem está na fila'
     + '<span class="qcount" id="qcount" style="margin-left:4px">' + queueLabel() + '</span></label></div>'
-    + '<select id="assign" style="height:42px;font-size:13px;width:100%"><option value="">Sem operador designado (Livre na fila)</option>'
-    + ops.map((op) => '<option value="' + op.id + '">' + op.name + ' · ' + (op.role === 'OPERADOR' ? 'Operador' : op.role) + '</option>').join('')
-    + '</select></div>';
+    + operadorSelect + '</div>';
+  const blog = blogueiraValor();
+  const operadorERepasseBlock =
+    '<div class="assign-block" data-dfs-assign-block="1">'
+    + '<label class="queue-lab"><input type="checkbox" id="only-queue"' + (state.onlyQueue ? ' checked' : '') + '> Só quem está na fila'
+    + '<span class="qcount" id="qcount">' + queueLabel() + '</span></label>'
+    + operadorSelect
+    + '<div class="repasse"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    + '<span>Repasse Blogueira:</span>'
+    + '<label><input type="checkbox" id="promo"' + (state.promocao ? ' checked' : '') + ' style="accent-color:#f59e0b;width:14px;height:14px"> Promoção</label>'
+    + '</div>'
+    + (state.promocao
+      ? '<input id="blogger" type="number" min="0" step="0.01" value="' + blog + '" class="blog-input" style="border-color:rgba(245,158,11,.5);color:#fde68a">'
+      : '<strong style="color:#f472b6">' + money(blog) + '</strong>')
+    + '</div></div>';
 
   app.innerHTML =
     '<div class="head"><div class="brand" style="gap:12px;padding:0;border:0;background:transparent">'
@@ -867,9 +890,7 @@ function paint() {
         + '<div class="grid3" style="margin-top:12px"><div><label class="cap">Qtd Contas</label><input id="qtd" type="number" min="1" value="' + (snap.qtd || '1') + '"></div>'
         + '<div><label class="cap">Valor por Conta (R$)</label><input id="valor" type="number" min="0" step="0.01" value="' + (snap.valor != null && snap.valor !== '' ? snap.valor : (selectedRange && !state.customRange ? selectedRange.valor : 0)) + '"></div>'
         + '<div><label class="cap">Desconto (%)' + (campContas != null && !state.semDesconto ? ' <span style="color:#34d399">campanha</span>' : '') + '</label><div class="rel"><input id="desconto" value="' + discContas + '" title="' + (campContas != null ? ('Campanha: ' + campContas + '% pelo grupo da faixa') : '') + '" style="padding-right:28px"><span style="position:absolute;right:10px;top:11px;font-size:12px;font-weight:800;color:#71717a;pointer-events:none">%</span></div></div>'
-        + '</div>'
-        + (state.type === 'contas' ? operadorField : '')
-        + '</div>')
+        + '</div></div>')
       : '')
     + (showMontante
       ? ('<div class="mont-box"><div class="title">Parâmetros de Op. Montantes</div><div class="groups" id="mgroups">'
@@ -880,17 +901,16 @@ function paint() {
         + '<div><label class="cap">Quantidade</label><input id="qtdm" type="number" min="0" value="' + (snap.qtdm || '0') + '" title="Preenchida pelo valor do montante, como na calculadora"></div>'
         + '<div><label class="cap">Taxa</label><select id="taxa">' + rates.map((r) => '<option value="' + r.id + '" data-taxa="' + r.taxa + '" data-mult="' + (r.multiplicador || 0) + '" data-label="' + String(r.label || r.taxa).replace(/"/g, '&quot;') + '"' + (snap.taxa === r.id ? ' selected' : '') + '>' + (r.label || (r.taxa + '%')) + '</option>').join('') + '</select><div class="hint" id="aposta-hint" style="color:#fcd34d;font-weight:700;margin-top:4px"></div></div>'
         + '<div><label class="cap">Desconto (%)' + (campMontante != null && !state.semDesconto ? ' <span style="color:#34d399">campanha</span>' : '') + ' <button type="button" id="sem-desc" style="border:0;background:transparent;color:#a1a1aa;font-size:9px;font-weight:900;cursor:pointer">Sem desconto</button></label><div class="rel"><input id="' + (showContas ? 'desconto-m' : 'desconto') + '" value="' + discMontante + '" title="' + (campMontante != null ? ('Campanha: ' + campMontante + '% pelo grupo/valor do montante') : '') + '" style="padding-right:28px"><span style="position:absolute;right:10px;top:11px;font-size:12px;font-weight:800;color:#71717a;pointer-events:none">%</span></div></div>'
-        + '</div>'
-        + (state.type === 'montante' ? operadorField : '')
-        + '</div>')
+        + '</div></div>')
       : '')
-    + (state.type === 'multi' ? operadorField : '')
+    + (state.type === 'multi' ? operadorFieldMulti : '')
     + '<div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><label class="cap" style="margin:0">Link da Casa</label><div class="link-actions" id="link-actions"></div></div>'
     + '<div class="link-row" style="margin-top:6px"><input id="link0" placeholder="https://..."><button type="button" class="plus" id="add-link" title="Adicionar outro link">+</button></div>'
     + '<div class="extra-links" id="extra-links" style="display:none"></div></div>'
     + '<div class="notes-wrap"><label class="cap">Anotações / Observações</label>'
     + '<textarea id="notes" rows="2" placeholder="Instruções específicas para a operação... Ctrl+V cola uma imagem"></textarea>'
     + '<div class="imgs" id="imgs"></div><div class="hint">Ctrl+V cola um print. Até 4 imagens.</div></div>'
+    + ((state.type === 'contas' || state.type === 'montante') ? operadorERepasseBlock : '')
     + '<div class="summary" id="summary"></div>'
     + '<div class="foot">'
     + '<button type="button" class="soft" id="cancel">Cancelar</button>'
@@ -1204,6 +1224,28 @@ function fileToDataUrl(file) {
     reader.readAsDataURL(file);
   });
 }
+function compressImageDataUrl(dataUrl, maxW, quality) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, (maxW || 1200) / Math.max(1, img.width));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality == null ? 0.72 : quality));
+      } catch (err) {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
 document.addEventListener('paste', async (event) => {
   if (!document.getElementById('form')) return;
   const items = event.clipboardData && event.clipboardData.items;
@@ -1220,7 +1262,8 @@ document.addEventListener('paste', async (event) => {
     event.preventDefault();
     if (state.noteImages.length >= 4) { toast('Máximo de 4 imagens.', true); return; }
     try {
-      const url = await fileToDataUrl(imageFile);
+      const raw = await fileToDataUrl(imageFile);
+      const url = await compressImageDataUrl(raw, 1200, 0.72);
       state.noteImages.push(url);
       paintImages();
       toast('Imagem colada nas anotações.');
