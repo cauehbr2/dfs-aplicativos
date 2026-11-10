@@ -121,6 +121,8 @@
   .co, .status { display:inline-flex; align-items:center; gap:4px; }
   .co svg, .status svg { width:12px; height:12px; flex:none; }
   .money-wrap { text-align:right; }
+  .money-wrap.saque .money { color:#6ee7b7; }
+  .saque-kind { display:inline-flex; margin-left:8px; padding:2px 8px; border-radius:999px; background:rgba(0,0,0,.25); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
   .from { display:block; color:#fbbf24; font-size:10px; font-weight:800; }
   .desc { font-size:11px; color:#fcd34d; background:rgba(69,26,3,.6); border:1px solid rgba(146,64,14,.5); border-radius:8px; padding:2px 8px; }
   .blogger { font-size:11px; border-radius:8px; padding:2px 8px; }
@@ -171,8 +173,10 @@
   .hist span { float:right; color:#71717a; font-size:11px; font-family:ui-monospace, Consolas, monospace; }
   .hist p { margin:6px 0 0; font-size:12px; color:#d4d4d8; }
   .shot { max-height:176px; max-width:240px; width:auto; height:auto; object-fit:contain; border-radius:8px; border:1px solid #3f3f46; background:#09090b; display:block; cursor:zoom-in; }
-  .shots { display:flex; flex-wrap:wrap; gap:8px; }
+  .shots { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; padding:10px; border-radius:14px; border:1px solid rgba(16,185,129,.35); background:rgba(6,78,59,.16); }
   .shots[hidden] { display:none; }
+  .shots-cap { width:100%; margin:0 0 2px; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#6ee7b7; }
+  .shots .shot { width:72px; height:72px; object-fit:cover; border-radius:12px; border:1px solid #3f3f46; background:#09090b; cursor:zoom-in; }
   .zoom { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.9); display:flex; align-items:center; justify-content:center; padding:24px; }
   .zoom[hidden] { display:none; }
   .zoom img { max-width:100%; max-height:100%; object-fit:contain; }
@@ -236,6 +240,7 @@
     <div class="head-side">
       <div class="who">
         <span id="account">Conectado: —</span>
+        <button type="button" class="ghost" id="goto-registro">Registro Central</button>
         <button type="button" class="ghost" id="logout">Sair</button>
       </div>
       <button type="button" class="fila-side" id="open-fila" title="Fila operacional">
@@ -393,7 +398,7 @@ function tabOf(order, listName) {
   if (listName === 'meus') return mine && open;
   if (listName === 'assumidos') return order.status === 'Assumido' || order.status === 'Em andamento';
   if (listName === 'finalizados') return order.status === 'Finalizado';
-  if (listName === 'concluidos') return order.status === 'Concluído';
+  if (listName === 'concluidos') return order.status === 'Concluído' && seesModule(order);
   if (listName === 'cancelados') return order.status === 'Cancelado';
   return true;
 }
@@ -410,15 +415,24 @@ function when(iso) {
   if (!iso || Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' }).replace(',', ' às');
 }
-function oversight() {
+function hasPerm(id) {
   if (state.me.role === 'ADM_MASTER') return true;
-  return Array.isArray(state.me.permissions) && state.me.permissions.indexOf('order_queue_edit') >= 0;
+  return Array.isArray(state.me.permissions) && state.me.permissions.indexOf(id) >= 0;
+}
+function oversight() {
+  return hasPerm('order_queue_edit');
+}
+function canViewOrders() {
+  return hasPerm('order_queue_view');
+}
+function canExcludeOrders() {
+  return hasPerm('order_queue_exclude');
 }
 function waitingOrder(order) {
   return order.status === 'Aguardando operador' || order.status === 'Registrado' || order.status === 'Retornado para fila';
 }
 function visibleOrder(order) {
-  if (oversight()) return true;
+  if (canViewOrders()) return true;
   const me = state.me.id;
   if (!me) return false;
   if (waitingOrder(order)) return true;
@@ -439,6 +453,14 @@ function modMark(order) {
 }
 function mine(order) {
   return state.me.id && order.responsibleOperatorId === state.me.id;
+}
+function seesModule(order) {
+  if (state.me.role === 'ADM_MASTER') return true;
+  const perms = Array.isArray(state.me.permissions) ? state.me.permissions : [];
+  const contas = perms.indexOf('contas') >= 0;
+  const montante = perms.indexOf('montante') >= 0;
+  if (contas === montante) return true;
+  return contas ? order.type === 'contas' : order.type === 'montante';
 }
 function moduleOn(order, module) {
   const added = order.addedModules;
@@ -480,7 +502,7 @@ function card(order) {
     ? '<span class="blogger ' + (contas ? 'contas' : 'montante') + '">Blogueira ' + (contas ? 'Contas' : 'Montante') + ': <strong>' + money.format(order.blogger) + '</strong></span>'
     : '';
   const pix = order.pixReceivedBy ? '<span class="pix">Pix: <strong>' + esc(order.pixReceivedBy) + '</strong></span>' : '';
-  const phone = oversight() && order.phone ? '<span class="co">' + esc(order.phone) + '</span>' : '';
+  const phone = (canViewOrders() || mine(order)) && order.phone ? '<span class="co">' + esc(order.phone) + '</span>' : '';
   const notes = order.notes ? '<p class="notes">"' + esc(order.notes) + '"</p>' : '';
   const links = (order.links || []).length
     ? '<div class="links">' + order.links.map((link) => '<div class="link"><a href="' + esc(hrefOf(link)) + '" target="_blank" rel="noreferrer">' + esc(link) + '</a><button type="button" class="icon copy" data-copy="' + esc(link) + '" title="Copiar link">' + copyIcon + '</button></div>').join('') + '</div>'
@@ -490,12 +512,21 @@ function card(order) {
   const check = showCheck
     ? '<label class="check" title="Pedido finalizado"><input type="checkbox" data-finish="' + esc(order.id) + '"' + (finished ? ' checked' : '') + ((order.status === 'Concluído' || (order.status === 'Finalizado' && !oversight())) ? ' disabled' : '') + '></label>'
     : '';
+  const pack = saquePack(order);
+  const saqueMoney = order.status === 'Concluído'
+    ? '<div class="money-wrap saque"><span class="money-k">' + (contas ? 'Saque Contas' : 'Saque Montante') + '</span><span class="money">' + money.format(pack.total) + '</span>'
+      + (pack.lines.length > 1 ? '<span class="from">' + pack.lines.map((value) => money.format(value)).join(' + ') + '</span>' : '')
+      + '</div>'
+    : '';
   const doneNote = order.status === 'Finalizado'
     ? '<div class="done-note"><b>Pedido finalizado.</b> Completo. Aguardando o valor do saque.</div>'
     : order.status === 'Concluído'
-      ? '<div class="done-note"><b>Pedido concluído.</b>' + (Number(order.withdrawal) > 0 ? ' Saque ' + money.format(order.withdrawal) + '.' : ' Finalizado.') + '</div>'
+      ? '<div class="done-note"><b>Pedido concluído.</b><span class="saque-kind">' + (contas ? 'Saque Contas' : 'Saque Montante') + '</span> <b>' + money.format(pack.total) + '</b>'
+        + (pack.lines.length > 1 ? ' <span>' + pack.lines.map((value) => money.format(value)).join(' + ') + '</span>' : '')
+        + ' <span>Qtd. contas: <b>' + String(contas ? (order.qtd || 0) : (order.quantidade || 0)).padStart(2, '0') + '</b></span>'
+        + '</div>'
       : '';
-  const shotRow = '<div class="shots" data-shots="' + esc(order.id) + '" hidden></div>';
+  const shotRow = '<div class="shots" data-shots="' + esc(order.id) + '" data-code="' + esc(order.orderCode || '') + '" hidden></div>';
   const waiting = order.status === 'Aguardando operador' || order.status === 'Registrado' || order.status === 'Retornado para fila';
   const claim = (waiting || order.assignedOperatorId === state.me.id) && !order.responsibleOperatorId && !closed(order);
   const other = order.status === 'Designado' && !order.responsibleOperatorId && order.assignedOperatorId && order.assignedOperatorId !== state.me.id && oversight();
@@ -503,8 +534,8 @@ function card(order) {
   if (claim) buttons.push('<button type="button" class="assumir" data-assumir="' + esc(order.id) + '" data-takeover="0">Assumir</button>');
   if (other) buttons.push('<button type="button" class="assumir other" data-assumir="' + esc(order.id) + '" data-takeover="1" title="Assumir porque ' + esc(order.assignedOperatorName || 'o operador') + ' está cheio ou ocupado">Outro assumir</button>');
   if (order.status === 'Finalizado' && (oversight() || mine(order))) buttons.push('<button type="button" class="concluir" data-concluir="' + esc(order.id) + '">✓ Concluído</button>');
-  if (oversight() && !closed(order)) buttons.push('<button type="button" class="icon back" data-act="return" data-id="' + esc(order.id) + '" title="Retornar à fila">' + back + '</button>');
-  if (oversight() && !closed(order)) buttons.push('<button type="button" class="icon stop" data-act="cancel" data-id="' + esc(order.id) + '" title="Cancelar pedido">' + ban + '</button>');
+  if (canExcludeOrders() && !closed(order)) buttons.push('<button type="button" class="icon back" data-act="return" data-id="' + esc(order.id) + '" title="Retornar à fila">' + back + '</button>');
+  if (canExcludeOrders() && !closed(order)) buttons.push('<button type="button" class="icon stop" data-act="cancel" data-id="' + esc(order.id) + '" title="Cancelar pedido">' + ban + '</button>');
   buttons.push('<button type="button" class="icon" data-act="history" data-id="' + esc(order.id) + '" title="Histórico de movimentações">' + clock + '</button>');
   return '<article class="card ' + prio + (pending ? ' pendencia' : '') + '">'
     + '<div class="top"><div class="chips"><span class="code">' + esc(order.orderCode) + '</span>'
@@ -513,7 +544,7 @@ function card(order) {
     + (pending ? '<span class="pend">Pendência anterior</span>' : '')
     + '</div><div class="right">' + check + '<span class="prio ' + prio + '">' + (order.priority === 'Urgente' ? '🔥 ' : order.priority === 'Alta' ? '⚡ ' : '') + esc(order.priority || 'Normal') + '</span></div></div>'
     + '<div class="mid"><div><h3 class="client">' + esc(order.clientName) + '</h3>' + phone + '<div class="co">' + building + esc(order.companyName) + '</div></div>'
-    + '<div class="money-wrap"><span class="money-k">Valor Previsto</span><span class="money">' + money.format(order.totalValue || 0) + '</span>' + from + '</div></div>'
+    + '<div class="money-wrap"><span class="money-k">Valor Previsto</span><span class="money">' + money.format(order.totalValue || 0) + '</span>' + from + '</div>' + saqueMoney + '</div>'
     + '<div class="meta"><span class="status ' + statusClass(order.status) + '">' + clock + esc(order.status === 'Finalizado' ? 'Finalizado' : order.status) + '</span>' + who + off + faixa + pix + blog + '</div>'
     + doneNote + saqueBox(order) + notes + links + shotRow
     + '<div class="foot"><span>Registrado em ' + esc(when(order.createdAt)) + ' por <strong>' + esc(order.registeredByName || '—') + '</strong></span><div class="acts">' + buttons.join('') + '</div></div></article>';
@@ -524,11 +555,16 @@ function fillShots(root) {
     box.replaceChildren();
     if (!list.length) { box.hidden = true; return; }
     box.hidden = false;
+    const cap = document.createElement('p');
+    cap.className = 'shots-cap';
+    cap.textContent = 'Comprovantes';
+    box.appendChild(cap);
     list.forEach((src, index) => {
       const img = document.createElement('img');
       img.className = 'shot';
       img.alt = 'Print ' + (index + 1);
       img.src = src;
+      img.onclick = () => openZoom(src);
       box.appendChild(img);
     });
   });
@@ -546,6 +582,15 @@ function moneyInput(value) {
   const normal = text.includes(',') ? text.replace(/\./g, '').replace(',', '.') : text;
   const n = parseFloat(normal);
   return Number.isFinite(n) ? n : 0;
+}
+function saquePack(order) {
+  const lines = (Array.isArray(order.saques) ? order.saques : []).map((item) => moneyInput(item)).filter((value) => value > 0);
+  let total = lines.reduce((sum, value) => sum + value, 0);
+  if (!lines.length) {
+    total = Number(order.withdrawal) || 0;
+    if (total > 0) lines.push(total);
+  }
+  return { lines, total: Math.round(total * 100) / 100 };
 }
 function saqueValues(order) {
   const draft = saqueDraft[order.id];
@@ -650,6 +695,9 @@ document.getElementById('open-fila').addEventListener('click', () => {
   const button = document.getElementById('open-fila');
   button.classList.toggle('on');
   if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('fila-toggle');
+});
+document.getElementById('goto-registro').addEventListener('click', () => {
+  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('open-registro');
 });
 function toast(message) {
   const el = document.getElementById('toast');
@@ -929,9 +977,14 @@ async function load() {
   const response = await fetch('/pedidos', { cache: 'no-store' });
   const data = await response.json();
   if (!data || !data.ok) {
-    document.getElementById('list').innerHTML = '<div class="empty"><h4>Entre na empresa</h4><p>' + esc((data && data.message) || 'A sessão da calculadora não está neste PC.') + '</p></div>';
+    document.getElementById('list').innerHTML = '<div class="empty"><h4>Entre na empresa</h4><p>' + esc((data && data.message) || 'Entre na empresa para ver os pedidos.') + '</p></div>';
+    if (!state.askedLogin && window.chrome && window.chrome.webview) {
+      state.askedLogin = true;
+      window.chrome.webview.postMessage('login');
+    }
     return;
   }
+  state.askedLogin = false;
   state.orders = data.orders || [];
   state.me = data.me || {};
   state.companyName = data.companyName || state.me.companyName || 'Minha Empresa';
@@ -950,18 +1003,24 @@ loadVersion();
 if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('ready');
 function loadImages() {
   const ids = [];
-  const push = (id) => {
-    if (!id || ids.indexOf(id) >= 0 || ids.length >= 6) return;
+  const codes = [];
+  const push = (box) => {
+    const id = box && box.getAttribute('data-shots');
+    if (!id || ids.indexOf(id) >= 0 || ids.length >= 40) return;
     const cached = state.images[id];
     if (cached && cached.length) return;
     if (cached && state.imageFresh[id] && Date.now() - state.imageFresh[id] < 4000) return;
     ids.push(id);
+    const code = String(box.getAttribute('data-code') || '').trim();
+    if (code && codes.indexOf(code) < 0) codes.push(code);
   };
-  document.querySelectorAll('#alert [data-shots]').forEach((box) => push(box.getAttribute('data-shots')));
-  document.querySelectorAll('[data-shots]').forEach((box) => push(box.getAttribute('data-shots')));
+  document.querySelectorAll('#alert [data-shots]').forEach((box) => push(box));
+  document.querySelectorAll('[data-shots]').forEach((box) => push(box));
   if (!ids.length || state.imagesLoading) return;
   state.imagesLoading = true;
-  fetch('/pedidos/imagens?ids=' + encodeURIComponent(ids.join(',')), { cache: 'no-store' }).then((res) => res.json()).then((payload) => {
+  const qs = 'ids=' + encodeURIComponent(ids.join(','))
+    + (codes.length ? ('&codes=' + encodeURIComponent(codes.join(','))) : '');
+  fetch('/pedidos/imagens?' + qs, { cache: 'no-store' }).then((res) => res.json()).then((payload) => {
     const images = (payload && payload.images) || {};
     ids.forEach((id) => {
       state.images[id] = images[id] || [];
@@ -1011,7 +1070,7 @@ function syncAlert() {
   document.getElementById('alert-cards').innerHTML = pending.map((order) => {
     const montante = order.type === 'montante';
     const notes = order.notes ? '<p class="notes">"' + esc(order.notes) + '"</p>' : '';
-    return '<article class="alert-card"><h3>' + esc(order.clientName) + '</h3><p>' + (montante ? 'Op. Montante' : 'Op. Contas') + ' · ' + esc(order.companyName || 'Empresa') + '</p><p class="blog ' + (montante ? 'montante' : 'contas') + '">Blogueira ' + (montante ? 'Montante' : 'Contas') + ': ' + money.format(order.blogger || order.totalValue || 0) + '</p><p class="code">' + esc(order.orderCode) + '</p>' + notes + '<div class="shots alert-shots" data-shots="' + esc(order.id) + '" hidden></div><button type="button" class="accept" data-accept="' + esc(order.id) + '"' + (acceptingId ? ' disabled' : '') + '>' + (acceptingId === order.id ? 'Aceitando...' : 'Aceitar pedido') + '</button></article>';
+    return '<article class="alert-card"><h3>' + esc(order.clientName) + '</h3><p>' + (montante ? 'Op. Montante' : 'Op. Contas') + ' · ' + esc(order.companyName || 'Empresa') + '</p><p class="blog ' + (montante ? 'montante' : 'contas') + '">Blogueira ' + (montante ? 'Montante' : 'Contas') + ': ' + money.format(order.blogger || order.totalValue || 0) + '</p><p class="code">' + esc(order.orderCode) + '</p>' + notes + '<div class="shots alert-shots" data-shots="' + esc(order.id) + '" data-code="' + esc(order.orderCode || '') + '" hidden></div><button type="button" class="accept" data-accept="' + esc(order.id) + '"' + (acceptingId ? ' disabled' : '') + '>' + (acceptingId === order.id ? 'Aceitando...' : 'Aceitar pedido') + '</button></article>';
   }).join('');
   box.hidden = false;
   fillShots(box);
@@ -1056,7 +1115,7 @@ document.getElementById('alert').addEventListener('click', async (event) => {
 load().catch(() => {
   document.getElementById('list').innerHTML = '<div class="empty"><h4>Não carregou a fila</h4><p>O programa não conseguiu ler os pedidos.</p></div>';
 });
-setInterval(() => { load().catch(() => {}); }, 8000);
+setInterval(() => { load().catch(() => {}); }, 2000);
 </script>
 </body>
 </html>
