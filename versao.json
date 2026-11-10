@@ -1,6 +1,6 @@
 {
     "calculadora": {
-        "version": "1.1.39",
+        "version": "1.1.40",
         "remover": false,
         "files": [
             "app-versao.txt",
@@ -18,11 +18,14 @@
             "Microsoft.Web.WebView2.WinForms.dll",
             "Microsoft.Web.WebView2.Wpf.dll",
             "WebView2Loader.dll",
-            "runtimes/win-x64/native/WebView2Loader.dll"
+            "runtimes/win-x64/native/WebView2Loader.dll",
+            "Calculadora.dll",
+            "Calculadora.deps.json",
+            "Calculadora.runtimeconfig.json"
         ]
     },
     "operacoes": {
-        "version": "1.0.81",
+        "version": "1.0.82",
         "remover": false,
         "files": [
             "app-versao.txt",
@@ -39,11 +42,14 @@
             "Microsoft.Web.WebView2.WinForms.dll",
             "Microsoft.Web.WebView2.Wpf.dll",
             "WebView2Loader.dll",
-            "runtimes/win-x64/native/WebView2Loader.dll"
+            "runtimes/win-x64/native/WebView2Loader.dll",
+            "Operacoes.dll",
+            "Operacoes.deps.json",
+            "Operacoes.runtimeconfig.json"
         ]
     },
     "pedidos": {
-        "version": "1.0.19",
+        "version": "1.0.20",
         "remover": false,
         "files": [
             "app-versao.txt",
@@ -57,7 +63,7 @@
         ]
     },
     "registro": {
-        "version": "1.0.29",
+        "version": "1.0.30",
         "remover": false,
         "files": [
             "app-versao.txt",
