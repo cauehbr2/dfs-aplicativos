@@ -115,6 +115,7 @@
   .go:disabled { opacity:.5; cursor:wait; }
   .toast { position:fixed; right:18px; bottom:18px; background:#14532d; color:#bbf7d0; border:1px solid #166534; padding:12px 14px; border-radius:12px; font-size:13px; font-weight:700; display:none; z-index:50; max-width:360px; }
   .toast.err { background:#450a0a; color:#fecaca; border-color:#7f1d1d; }
+  .corner-version { position:fixed; right:14px; bottom:8px; z-index:20; color:#71717a; font-size:11px; font-weight:700; letter-spacing:.04em; pointer-events:none; }
   .empty { padding:40px 20px; text-align:center; color:var(--muted); }
   .suggest { position:absolute; left:0; right:0; top:100%; margin-top:4px; background:#18181b; border:1px solid #3f3f46; border-radius:14px; max-height:220px; overflow:auto; z-index:30; display:none; }
   .suggest .cap-list { padding:6px 12px; font-size:10px; font-weight:800; color:#71717a; text-transform:uppercase; background:#09090b; }
@@ -155,6 +156,7 @@
     </div>
   </main>
 </div>
+<span class="corner-version" id="app-version"></span>
 <div class="toast" id="toast"></div>
 <script>
 const PENDING_KEY = 'dfs_order_pending_drafts_v1';
@@ -1288,7 +1290,14 @@ document.getElementById('logout').onclick = async () => {
   try { localStorage.removeItem('dfs_auth_token'); sessionStorage.clear(); } catch (e) {}
   postHost('sair');
 };
+function loadVersion() {
+  fetch('/registro/versao', { cache: 'no-store' }).then((res) => res.json()).then((data) => {
+    const el = document.getElementById('app-version');
+    if (el && data && data.version) el.textContent = 'Versão ' + data.version;
+  }).catch(() => {});
+}
 if (window.chrome && window.chrome.webview) postHost('ready');
+loadVersion();
 load(true).catch((err) => {
   document.getElementById('app').innerHTML = '<div class="empty"><h3>Não abri o registro</h3><p>' + (err.message || '') + '</p></div>';
 });

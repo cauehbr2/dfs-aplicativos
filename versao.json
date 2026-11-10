@@ -63,7 +63,7 @@
         ]
     },
     "registro": {
-        "version": "1.0.32",
+        "version": "1.0.33",
         "remover": false,
         "files": [
             "app-versao.txt",

@@ -1,2 +1,2 @@
-﻿- Tela preta apos aviso de update: recarrega WebView2 ao fechar o dialogo (ShowDialog sem owner). Registro 1.0.32 / Pedidos 1.0.22 / Calc 1.1.42 / Op 1.0.84.
-- Update: libera arquivo travado (mata PID/Node da porta, robocopy com retry, pasta temp unica). Registro 1.0.31 / Pedidos 1.0.21 / Calc 1.1.41 / Op 1.0.83.
+﻿- Registro **1.0.33**: mostra a versão no canto (como a Fila).
+- Tela preta apos aviso de update: recarrega WebView2 ao fechar o dialogo (ShowDialog sem owner). Registro 1.0.32 / Pedidos 1.0.22 / Calc 1.1.42 / Op 1.0.84.
