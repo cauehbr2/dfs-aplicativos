@@ -327,7 +327,7 @@ const tabs = [
   ['concluidos', '✓ Concluído'],
   ['cancelados', 'Cancelados'],
 ];
-const state = { period: 'todos', tab: 'todos', orders: [], me: {}, companyName: '', images: {}, imagesByCode: {}, imageFresh: {}, imagesReady: false };
+const state = { period: 'hoje', tab: 'todos', orders: [], me: {}, companyName: '', images: {}, imagesByCode: {}, imageFresh: {}, imagesReady: false };
 const saqueDraft = {};
 let focusSaque = null;
 let skipSaqueSnapshot = false;
