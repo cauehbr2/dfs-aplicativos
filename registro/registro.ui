@@ -22,9 +22,9 @@
   .fab { width:38px; height:38px; display:grid; place-items:center; background:linear-gradient(180deg,#34d399,#059669); color:#052e16; box-shadow:0 8px 18px rgba(16,185,129,.25); }
   .fab.on { background:#27272a; color:#fafafa; box-shadow:none; }
   .fab svg { width:18px; height:18px; }
-  main { flex:1; min-height:0; overflow:hidden; padding:14px 16px; display:flex; }
+  main { flex:1; min-height:0; overflow:hidden; padding:10px 14px; display:flex; }
   .panel { width:100%; max-width:896px; margin:0 auto; background:#09090b; border:1px solid var(--line); border-radius:24px; overflow:hidden; display:flex; flex-direction:column; min-height:0; flex:1; box-shadow:0 25px 50px rgba(0,0,0,.35); }
-  .head { display:flex; justify-content:space-between; gap:12px; padding:12px 20px; border-bottom:1px solid rgba(39,39,42,.8); background:rgba(24,24,27,.45); align-items:flex-start; flex-shrink:0; }
+  .head { display:flex; justify-content:space-between; gap:12px; padding:10px 18px; border-bottom:1px solid rgba(39,39,42,.8); background:rgba(24,24,27,.45); align-items:flex-start; flex-shrink:0; }
   .head h2 { margin:0; font-size:15px; font-weight:800; letter-spacing:.02em; }
   .head .sub { margin:3px 0 0; font-size:11px; color:var(--muted); }
   .who { font-size:11px; color:var(--muted); text-align:right; margin-top:6px; }
@@ -36,9 +36,11 @@
   .pending-item.on { border-color:rgba(245,158,11,.5); background:rgba(245,158,11,.15); color:#fde68a; }
   .pending-item .x { margin-left:auto; color:#71717a; padding:2px 4px; border-radius:6px; }
   .pending-item .x:hover { color:#f87171; background:rgba(239,68,68,.1); }
-  form { padding:16px 20px; display:flex; flex-direction:column; gap:12px; overflow:hidden; flex:1; min-height:0; align-content:start; }
-  .form-scroll { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:12px; padding-right:2px; }
-  .form-end { flex-shrink:0; display:flex; flex-direction:column; gap:12px; background:#09090b; padding-top:4px; }
+  form { padding:12px 18px; display:flex; flex-direction:column; gap:10px; overflow:hidden; flex:1; min-height:0; align-content:start; }
+  /* Sem barra enquanto a janela ainda pode crescer; só rola no limite da tela. */
+  .form-scroll { flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:10px; padding-right:0; }
+  .form-scroll.can-scroll { overflow:auto; padding-right:2px; }
+  .form-end { flex-shrink:0; display:flex; flex-direction:column; gap:10px; background:#09090b; padding-top:2px; }
   .assign-block { border:1px solid rgba(39,39,42,.8); background:rgba(9,9,11,.5); border-radius:12px; padding:12px; display:grid; gap:10px; }
   .assign-block .queue-lab { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-weight:700; color:#d4d4d8; cursor:pointer; flex-wrap:wrap; margin:0; }
   .assign-block .queue-lab input { width:14px; height:14px; accent-color:#10b981; flex-shrink:0; }
@@ -236,14 +238,49 @@ function autoGrowNotes() {
   const next = Math.min(180, Math.max(64, el.scrollHeight));
   el.style.height = next + 'px';
 }
+function measureNaturalPanelHeight() {
+  const panel = document.querySelector('.panel');
+  const scroll = document.querySelector('.form-scroll');
+  if (!panel) return 0;
+  const prev = scroll ? {
+    overflow: scroll.style.overflow,
+    flex: scroll.style.flex,
+    minHeight: scroll.style.minHeight,
+    height: scroll.style.height,
+  } : null;
+  if (scroll) {
+    scroll.classList.remove('can-scroll');
+    scroll.style.overflow = 'visible';
+    scroll.style.flex = '0 0 auto';
+    scroll.style.minHeight = 'auto';
+    scroll.style.height = 'auto';
+  }
+  const h = panel.scrollHeight;
+  if (scroll && prev) {
+    scroll.style.overflow = prev.overflow;
+    scroll.style.flex = prev.flex;
+    scroll.style.minHeight = prev.minHeight;
+    scroll.style.height = prev.height;
+  }
+  return h;
+}
 function fitWindowToContent() {
   try {
-    const shell = document.querySelector('.shell');
-    const panel = document.querySelector('.panel');
-    if (!shell || !panel) return;
-    // Cabeçalho nativo (~42) + borda + folga.
-    const need = Math.ceil(panel.getBoundingClientRect().height + 56);
+    const scroll = document.querySelector('.form-scroll');
+    const bar = document.querySelector('.shell > .bar');
+    const panelH = measureNaturalPanelHeight();
+    if (!panelH) return;
+    const barH = bar ? bar.offsetHeight : 0;
+    // barra nativa + padding do main + painel + folga
+    const need = Math.ceil(barH + 20 + panelH + 50);
     postHost('resize:' + need);
+    // Depois do resize do host: só libera rolagem se ainda não couber.
+    clearTimeout(fitWindowToContent._t);
+    fitWindowToContent._t = setTimeout(() => {
+      if (!scroll) return;
+      const overflow = scroll.scrollHeight > scroll.clientHeight + 6;
+      scroll.classList.toggle('can-scroll', overflow);
+    }, 120);
   } catch (e) {}
 }
 async function postJson(url, body) {
