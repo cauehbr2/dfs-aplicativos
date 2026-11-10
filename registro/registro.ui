@@ -37,6 +37,8 @@
   .pending-item .x { margin-left:auto; color:#71717a; padding:2px 4px; border-radius:6px; }
   .pending-item .x:hover { color:#f87171; background:rgba(239,68,68,.1); }
   form { padding:16px 20px; display:flex; flex-direction:column; gap:12px; overflow:hidden; flex:1; min-height:0; align-content:start; }
+  .form-scroll { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:12px; padding-right:2px; }
+  .form-end { flex-shrink:0; display:flex; flex-direction:column; gap:12px; background:#09090b; padding-top:4px; }
   .assign-block { border:1px solid rgba(39,39,42,.8); background:rgba(9,9,11,.5); border-radius:12px; padding:12px; display:grid; gap:10px; }
   .assign-block .queue-lab { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-weight:700; color:#d4d4d8; cursor:pointer; flex-wrap:wrap; margin:0; }
   .assign-block .queue-lab input { width:14px; height:14px; accent-color:#10b981; flex-shrink:0; }
@@ -61,7 +63,7 @@
   .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
   input, select, textarea { width:100%; background:#18181b; border:1px solid #27272a; border-radius:12px; color:#fff; padding:10px 12px; font-size:13px; outline:none; }
   input:focus, select:focus, textarea:focus { border-color:#10b981; }
-  textarea { min-height:48px; max-height:48px; resize:none; }
+  textarea { min-height:64px; max-height:180px; resize:vertical; overflow:auto; line-height:1.4; white-space:pre-wrap; }
   .groups { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
   .groups button { flex:1; min-width:84px; border:0; border-radius:10px; padding:8px; background:#27272a; color:#d4d4d8; font-size:10px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
   .groups button.on { background:#10b981; color:#052e16; }
@@ -226,6 +228,23 @@ function toast(msg, err) {
 }
 function postHost(msg) {
   if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage(msg);
+}
+function autoGrowNotes() {
+  const el = document.getElementById('notes');
+  if (!el) return;
+  el.style.height = 'auto';
+  const next = Math.min(180, Math.max(64, el.scrollHeight));
+  el.style.height = next + 'px';
+}
+function fitWindowToContent() {
+  try {
+    const shell = document.querySelector('.shell');
+    const panel = document.querySelector('.panel');
+    if (!shell || !panel) return;
+    // Cabeçalho nativo (~42) + borda + folga.
+    const need = Math.ceil(panel.getBoundingClientRect().height + 56);
+    postHost('resize:' + need);
+  } catch (e) {}
 }
 async function postJson(url, body) {
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
@@ -812,11 +831,16 @@ function paintHouseLinks() {
       paintHouseLinks();
     };
   });
+  requestAnimationFrame(fitWindowToContent);
 }
 function paintImages() {
   const box = document.getElementById('imgs');
   if (!box) return;
-  if (!state.noteImages.length) { box.innerHTML = ''; return; }
+  if (!state.noteImages.length) {
+    box.innerHTML = '';
+    requestAnimationFrame(fitWindowToContent);
+    return;
+  }
   box.innerHTML = state.noteImages.map((src, i) =>
     '<div class="shot"><img src="' + src + '" alt=""><button type="button" data-rm-img="' + i + '">×</button></div>'
   ).join('');
@@ -826,6 +850,7 @@ function paintImages() {
       paintImages();
     };
   });
+  requestAnimationFrame(fitWindowToContent);
 }
 function paint() {
   const dados = state.dados;
@@ -896,6 +921,7 @@ function paint() {
     + '<div class="pending-box"><span>Pendentes</span>' + paintPendingHeader()
     + '<div class="who">Conectado: ' + (dados.me.name || '—') + '</div></div></div>'
     + '<form id="form">'
+    + '<div class="form-scroll">'
     + '<div class="paste-hint">Ctrl+V cola orçamento da calculadora nos campos · Ctrl+V com print cola imagem nas anotações (até 4)</div>'
     + '<div><label class="cap">Tipo do Pedido <span class="req">*</span></label><div class="seg" id="types">'
     + '<button type="button" data-type="contas" class="' + (state.type === 'contas' ? 'on' : '') + '">Op. Contas</button>'
@@ -937,15 +963,17 @@ function paint() {
     + '<div class="link-row" style="margin-top:6px"><input id="link0" placeholder="https://..."><button type="button" class="plus" id="add-link" title="Adicionar outro link">+</button></div>'
     + '<div class="extra-links" id="extra-links" style="display:none"></div></div>'
     + '<div class="notes-wrap"><label class="cap">Anotações / Observações</label>'
-    + '<textarea id="notes" rows="2" placeholder="Instruções específicas para a operação... Ctrl+V cola uma imagem"></textarea>'
+    + '<textarea id="notes" rows="3" placeholder="O texto entra no site do jeito que você digitar aqui. Ctrl+V cola imagem."></textarea>'
     + '<div class="imgs" id="imgs"></div><div class="hint">Ctrl+V cola um print. Até 4 imagens.</div></div>'
     + ((state.type === 'contas' || state.type === 'montante') ? operadorERepasseBlock : '')
+    + '</div>'
+    + '<div class="form-end">'
     + '<div class="summary" id="summary"></div>'
     + '<div class="foot">'
     + '<button type="button" class="soft" id="cancel">Cancelar</button>'
     + '<button type="button" class="pend" id="pending">Pendente</button>'
     + '<button type="submit" class="go" id="save">Registrar Pedido</button>'
-    + '</div></form>';
+    + '</div></div></form>';
 
   // type colors
   const types = document.getElementById('types');
@@ -1069,6 +1097,11 @@ function paint() {
   if (snap.notes) document.getElementById('notes').value = snap.notes;
   if (snap.assign) { const a = document.getElementById('assign'); if (a) a.value = snap.assign; }
   if (snap.customFaixa) { const c = document.getElementById('custom-faixa'); if (c) c.value = snap.customFaixa; }
+  const notesEl = document.getElementById('notes');
+  if (notesEl) {
+    notesEl.oninput = () => { autoGrowNotes(); fitWindowToContent(); };
+    autoGrowNotes();
+  }
   updateApostaHint();
   const assignEl = document.getElementById('assign');
   if (assignEl) {
@@ -1148,6 +1181,8 @@ function paint() {
   paintImages();
   paintSummary();
   updateApostaHint();
+  autoGrowNotes();
+  requestAnimationFrame(fitWindowToContent);
 }
 function qtdFromMontanteRules(value) {
   const rules = ((state.dados && state.dados.rules) || []).filter((r) => !r.grupo || String(r.grupo) === state.montanteGrupo);
