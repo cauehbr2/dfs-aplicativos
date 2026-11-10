@@ -81,6 +81,8 @@ const state = {
   mgrupo: 'Grupo 01',
   // Padrão ligado: Pix da fila sempre filtrado até o usuário desmarcar.
   onlyQueue: localStorage.getItem(CALC_ONLY_QUEUE_KEY) !== '0',
+  // true = acompanha o 1º; false = usuário escolheu outra Pix e o refresh não sobrescreve.
+  pixFollowFirst: true,
   edited: { contas: false, montante: false, multiplo: false },
   descontoManual: { contas: false, montante: false },
   text: { contas: '', montante: '', multiplo: '' },
@@ -415,7 +417,21 @@ function pixBlock(tab){
 function wireOnlyQueue(){
   const only=document.getElementById('only-queue');
   if(!only) return;
-  only.onchange=()=>{ state.onlyQueue=!!only.checked; localStorage.setItem(CALC_ONLY_QUEUE_KEY, state.onlyQueue?'1':'0'); paint(); };
+  only.onchange=()=>{
+    state.onlyQueue=!!only.checked;
+    if(state.onlyQueue) state.pixFollowFirst=true;
+    localStorage.setItem(CALC_ONLY_QUEUE_KEY, state.onlyQueue?'1':'0');
+    paint();
+  };
+}
+function markPixChoice(select){
+  if(!select || !state.onlyQueue) return;
+  const tab=state.tab==='montante'?'montante':'contas';
+  const keys=pix(tab);
+  const firstId=keys[0]?String(keys[0].id):'';
+  const v=String(select.value||'');
+  // Escolheu outra pessoa → trava. Vazio ou o 1º → volta a seguir o 1º.
+  state.pixFollowFirst=!v || (firstId && v===firstId);
 }
 function paint(){
   const box=document.getElementById('box');
@@ -496,8 +512,11 @@ function paint(){
     const p=document.getElementById('pix');
     if(p){
       const keys=pix(state.tab==='montante'?'montante':'contas');
-      if(state.onlyQueue && keys[0]) p.value=String(keys[0].id);
-      else if(snap.pix && [...p.options].some(o=>o.value===snap.pix)) p.value=snap.pix;
+      if(state.onlyQueue){
+        if(!state.pixFollowFirst && snap.pix && keys.some(k=>String(k.id)===String(snap.pix))) p.value=String(snap.pix);
+        else if(keys[0]){ p.value=String(keys[0].id); state.pixFollowFirst=true; }
+        else p.value='';
+      } else if(snap.pix && [...p.options].some(o=>o.value===snap.pix)) p.value=snap.pix;
       else if(keys[0]) p.value=String(keys[0].id);
     }
   }
@@ -512,6 +531,7 @@ function paint(){
         const now=camp('contas', state.grupo, null, Number(el.value)||1);
         const d=document.getElementById('desconto'); if(d&&now!=null) d.value=String(now);
       }
+      if(id==='pix') markPixChoice(el);
       refresh();
     };
     el.onchange=el.oninput;
@@ -663,12 +683,18 @@ function queueSig(data){
   const pack=(list)=> (Array.isArray(list)?list:[]).map(x=>String((x&& (x.userId||x.id||''))+'|'+(x&&x.position!=null?x.position:''))).join(',');
   return pack(data&&data.contas)+'#'+pack(data&&data.montante);
 }
-function pickPixAfterQueue(select, keys, prevValue, queueChanged){
+function pickPixAfterQueue(select, keys, prevValue){
   if(!select) return;
   const first=keys[0];
-  // Com "Só quem está na fila", a Pix acompanha o 1º da fila sempre que a fila muda.
+  const firstId=first?String(first.id):'';
+  // Só fila: padrão é o 1º. Se o usuário trocou, respeita até sair da fila.
   if(state.onlyQueue){
-    select.value=first?String(first.id):'';
+    if(!state.pixFollowFirst && prevValue && keys.some(k=>String(k.id)===String(prevValue))){
+      select.value=String(prevValue);
+      return;
+    }
+    state.pixFollowFirst=true;
+    select.value=firstId;
     return;
   }
   if(prevValue && keys.some(k=>String(k.id)===String(prevValue))) select.value=prevValue;
@@ -687,9 +713,9 @@ async function refreshQueueSoft(){
     if(!select) return;
     const selected=select.value; const tab=state.tab==='montante'?'montante':'contas'; const keys=pix(tab);
     select.innerHTML='<option value="">-- Selecione uma Pix --</option>'+keys.map(k=>'<option value="'+k.id+'" data-chave="'+k.chave+'" data-nome="'+k.nome+'" data-banco="'+k.banco+'" data-tipo="'+k.tipo+'">'+formatPixLabel(k)+'</option>').join('');
-    pickPixAfterQueue(select, keys, selected, queueChanged);
+    pickPixAfterQueue(select, keys, selected);
     if(count) count.textContent=pixCountLabel(tab);
-    if(queueChanged && state.onlyQueue) refresh();
+    if(queueChanged && state.onlyQueue && state.pixFollowFirst) refresh();
   }catch(e){}
 }
 async function refreshCatalogSoft(){
@@ -725,7 +751,7 @@ async function refreshCatalogSoft(){
       if(pixEl){
         const keys=pix(tab==='montante'?'montante':'contas');
         pixEl.innerHTML='<option value="">-- Selecione uma Pix --</option>'+keys.map(k=>'<option value="'+k.id+'" data-chave="'+k.chave+'" data-nome="'+k.nome+'" data-banco="'+k.banco+'" data-tipo="'+k.tipo+'">'+formatPixLabel(k)+'</option>').join('');
-        pickPixAfterQueue(pixEl, keys, snapPix, false);
+        pickPixAfterQueue(pixEl, keys, snapPix);
         const count=document.getElementById('qcount');
         if(count) count.textContent=pixCountLabel(tab==='montante'?'montante':'contas');
       }

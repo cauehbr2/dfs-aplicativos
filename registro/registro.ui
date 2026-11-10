@@ -167,6 +167,8 @@ const state = {
   clientId: '',
   onlyQueue: localStorage.getItem('dfs_assign_only_queue') === '1',
   assignKeepFree: false,
+  // true = acompanha o 1º; false = usuário escolheu outro e o refresh não sobrescreve.
+  assignFollowFirst: true,
   houseLinks: [''],
   noteImages: [],
   pendingId: null,
@@ -200,6 +202,7 @@ function resetFormAfterRegister() {
   state.semDesconto = false;
   state.descontoManual = { contas: false, montante: false };
   state.assignKeepFree = false;
+  state.assignFollowFirst = true;
   state.day = 'hoje';
   state.formSnap = emptyFormSnap();
   state.skipSnap = true;
@@ -633,13 +636,19 @@ function paintAssignOnly() {
   const ops = operatorsForType();
   assign.innerHTML = '<option value="">Sem operador designado (Livre na fila)</option>'
     + ops.map((op) => '<option value="' + op.id + '">' + op.name + ' (' + op.role + ')</option>').join('');
-  // Só fila: acompanha o 1º. "Livre" (vazio) só fica se o usuário escolheu de propósito.
+  // Só fila: padrão é o 1º. Se o usuário trocou (ou escolheu Livre), respeita.
   if (state.onlyQueue) {
-    if (selected === '' && state.assignKeepFree) assign.value = '';
-    else if (ops[0]) {
+    if (selected === '' && state.assignKeepFree) {
+      assign.value = '';
+    } else if (!state.assignFollowFirst && selected && ops.some((op) => String(op.id) === String(selected))) {
+      assign.value = selected;
+    } else if (ops[0]) {
       assign.value = String(ops[0].id);
+      state.assignFollowFirst = true;
       state.assignKeepFree = false;
-    } else assign.value = '';
+    } else {
+      assign.value = '';
+    }
   } else if (selected && ops.some((op) => String(op.id) === String(selected))) {
     assign.value = selected;
   } else {
@@ -1064,15 +1073,24 @@ function paint() {
   const assignEl = document.getElementById('assign');
   if (assignEl) {
     assignEl.onchange = () => {
-      state.assignKeepFree = !String(assignEl.value || '');
+      const v = String(assignEl.value || '');
+      state.assignKeepFree = !v;
+      if (!state.onlyQueue) return;
+      const ops = operatorsForType();
+      const firstId = ops[0] ? String(ops[0].id) : '';
+      // Livre ou o 1º → volta a seguir o 1º. Outra pessoa → trava a escolha.
+      state.assignFollowFirst = !v || (firstId && v === firstId);
     };
   }
-  // Só fila: se não escolheu "Livre", já deixa o 1º da fila.
-  if (state.onlyQueue && !state.assignKeepFree) paintAssignOnly();
+  // Só fila: se está seguindo o 1º (e não "Livre"), alinha ao atual da vez.
+  if (state.onlyQueue && state.assignFollowFirst && !state.assignKeepFree) paintAssignOnly();
   const only = document.getElementById('only-queue');
   if (only) only.onchange = () => {
     state.onlyQueue = only.checked;
-    if (only.checked) state.assignKeepFree = false;
+    if (only.checked) {
+      state.assignKeepFree = false;
+      state.assignFollowFirst = true;
+    }
     localStorage.setItem('dfs_assign_only_queue', only.checked ? '1' : '0');
     paint();
   };
