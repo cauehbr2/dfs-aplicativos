@@ -33,16 +33,16 @@
   .pill, .tab, .field, .select, .company {
     border:1px solid rgba(39,39,42,.8); background:#18181b; color:#a1a1aa; border-radius:8px;
   }
-  /* Inativos em cinza (não preto no fundo escuro). */
+  /* Mesmo cinza do Registro Central (.groups button): #27272a. */
   .pill, .tab {
-    background:#3f3f46; border-color:#52525b; color:#e4e4e7;
+    background:#27272a; border-color:#3f3f46; color:#d4d4d8;
   }
-  .pill:hover, .tab:hover { background:#52525b; color:#fafafa; border-color:#71717a; }
+  .pill:hover, .tab:hover { background:#3f3f46; color:#f4f4f5; border-color:#52525b; }
   .pill { padding:6px 10px; font-size:12px; font-weight:700; flex:none; }
   .pill.on { background:#f4f4f5; color:#09090b; font-weight:900; border-color:transparent; }
   .tab { padding:6px 9px; border-radius:10px; font-size:11px; font-weight:800; letter-spacing:.02em; text-transform:uppercase; display:inline-flex; align-items:center; gap:6px; flex:none; white-space:nowrap; }
   .tab.on { background:#10b981; color:#09090b; font-weight:900; border-color:transparent; box-shadow:0 8px 18px rgba(16,185,129,.2); }
-  .badge { padding:1px 8px; border-radius:8px; font-family:ui-monospace, Consolas, monospace; font-size:10px; font-weight:800; background:#52525b; color:#f4f4f5; }
+  .badge { padding:1px 8px; border-radius:8px; font-family:ui-monospace, Consolas, monospace; font-size:10px; font-weight:800; background:#3f3f46; color:#e4e4e7; }
   .tab.on .badge { background:rgba(9,9,11,.2); color:#09090b; }
   .grid4 { display:grid; grid-template-columns:1.3fr 1fr 1fr 1fr; gap:12px; }
   .search { position:relative; }
