@@ -1811,9 +1811,6 @@ async function createRegisteredOrder(session, body) {
         throw new Error('Pedido ' + payload.orderCode + ' gravou, mas a imagem ' + (i + 1) + ' não: ' + msg + '.');
       }
     }
-    imageMap = null;
-    imageMapAt = 0;
-    imageMapPromise = null;
   }
   const moneyFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountAmount);
   const discountNote = discountPercentage > 0
