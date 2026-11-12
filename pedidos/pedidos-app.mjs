@@ -2016,6 +2016,22 @@ const server = http.createServer((req, res) => {
     sendJson(res, 200, { ok: true, version });
     return;
   }
+  if (url === '/registro/versao' && req.method === 'GET') {
+    let version = '1.0.0';
+    try {
+      const candidates = [
+        path.join(installDir, 'app-versao-registro.txt'),
+        path.join(installDir, 'app-versao.txt'),
+      ];
+      for (const file of candidates) {
+        if (!fs.existsSync(file)) continue;
+        const text = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '').trim();
+        if (text) { version = text; break; }
+      }
+    } catch (e) {}
+    sendJson(res, 200, { ok: true, version });
+    return;
+  }
   if ((url === '/fila' || url === '/fila.html') && req.method === 'GET') {
     if (!fs.existsSync(filaHtmlFile)) { res.writeHead(404); res.end('fila.html'); return; }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });

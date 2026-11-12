@@ -246,7 +246,6 @@
     <div class="head-side">
       <div class="who">
         <span id="account">Conectado: —</span>
-        <button type="button" class="ghost" id="goto-registro">Registro Central</button>
         <button type="button" class="ghost" id="logout">Sair</button>
       </div>
       <button type="button" class="fila-side" id="open-fila" title="Fila operacional">
@@ -704,9 +703,6 @@ document.getElementById('open-fila').addEventListener('click', () => {
   const button = document.getElementById('open-fila');
   button.classList.toggle('on');
   if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('fila-toggle');
-});
-document.getElementById('goto-registro').addEventListener('click', () => {
-  if (window.chrome && window.chrome.webview) window.chrome.webview.postMessage('open-registro');
 });
 function toast(message) {
   const el = document.getElementById('toast');

@@ -1,91 +1,93 @@
 {
-    "calculadora": {
-        "version": "1.1.45",
-        "remover": false,
-        "files": [
-            "app-versao.txt",
-            "Calculadora.exe",
-            "calculadora-app.pak",
-            "budget-templates.pak",
-            "calculadora.ui.pak",
-            "fila.ui.pak",
-            "ui-seal.pak",
-            "node.exe",
-            "elite-cpa-logo-4.png",
-            "icone.ico",
-            "icone.png",
-            "Microsoft.Web.WebView2.Core.dll",
-            "Microsoft.Web.WebView2.WinForms.dll",
-            "Microsoft.Web.WebView2.Wpf.dll",
-            "WebView2Loader.dll",
-            "runtimes/win-x64/native/WebView2Loader.dll",
-            "Calculadora.dll",
-            "Calculadora.deps.json",
-            "Calculadora.runtimeconfig.json"
-        ]
-    },
-    "operacoes": {
-        "version": "1.0.87",
-        "remover": false,
-        "files": [
-            "app-versao.txt",
-            "Operacoes.exe",
-            "operacoes-app.pak",
-            "painel-cartao.pak",
-            "contas-operacoes.ui.pak",
-            "ui-seal.pak",
-            "node.exe",
-            "elite-cpa-logo-4.png",
-            "icone.ico",
-            "icone.png",
-            "Microsoft.Web.WebView2.Core.dll",
-            "Microsoft.Web.WebView2.WinForms.dll",
-            "Microsoft.Web.WebView2.Wpf.dll",
-            "WebView2Loader.dll",
-            "runtimes/win-x64/native/WebView2Loader.dll",
-            "Operacoes.dll",
-            "Operacoes.deps.json",
-            "Operacoes.runtimeconfig.json"
-        ]
-    },
-    "pedidos": {
-        "version": "1.0.23",
-        "remover": false,
-        "files": [
-            "app-versao.txt",
-            "FilaPedidos.exe",
-            "FilaPedidos.dll",
-            "FilaPedidos.deps.json",
-            "FilaPedidos.runtimeconfig.json",
-            "pedidos-app.mjs",
-            "pedidos.ui",
-            "fila-pedidos.ico"
-        ]
-    },
-    "registro": {
-        "version": "1.0.35",
-        "remover": false,
-        "files": [
-            "app-versao.txt",
-            "RegistroCentral.exe",
-            "RegistroCentral.dll",
-            "RegistroCentral.deps.json",
-            "RegistroCentral.runtimeconfig.json",
-            "pedidos-app.mjs",
-            "registro.ui",
-            "calc.ui",
-            "budget-templates.json",
-            "node.exe",
-            "ui-seal.pak",
-            "elite-cpa-logo-4.png",
-            "icone.ico",
-            "icone.png",
-            "registro-central.ico",
-            "Microsoft.Web.WebView2.Core.dll",
-            "Microsoft.Web.WebView2.WinForms.dll",
-            "Microsoft.Web.WebView2.Wpf.dll",
-            "WebView2Loader.dll",
-            "runtimes/win-x64/native/WebView2Loader.dll"
-        ]
-    }
+    "calculadora":  {
+                        "version":  "1.1.45",
+                        "remover":  false,
+                        "files":  [
+                                      "app-versao.txt",
+                                      "Calculadora.exe",
+                                      "calculadora-app.pak",
+                                      "budget-templates.pak",
+                                      "calculadora.ui.pak",
+                                      "fila.ui.pak",
+                                      "ui-seal.pak",
+                                      "node.exe",
+                                      "elite-cpa-logo-4.png",
+                                      "icone.ico",
+                                      "icone.png",
+                                      "Microsoft.Web.WebView2.Core.dll",
+                                      "Microsoft.Web.WebView2.WinForms.dll",
+                                      "Microsoft.Web.WebView2.Wpf.dll",
+                                      "WebView2Loader.dll",
+                                      "runtimes/win-x64/native/WebView2Loader.dll",
+                                      "Calculadora.dll",
+                                      "Calculadora.deps.json",
+                                      "Calculadora.runtimeconfig.json"
+                                  ]
+                    },
+    "operacoes":  {
+                      "version":  "1.0.87",
+                      "remover":  false,
+                      "files":  [
+                                    "app-versao.txt",
+                                    "Operacoes.exe",
+                                    "operacoes-app.pak",
+                                    "painel-cartao.pak",
+                                    "contas-operacoes.ui.pak",
+                                    "ui-seal.pak",
+                                    "node.exe",
+                                    "elite-cpa-logo-4.png",
+                                    "icone.ico",
+                                    "icone.png",
+                                    "Microsoft.Web.WebView2.Core.dll",
+                                    "Microsoft.Web.WebView2.WinForms.dll",
+                                    "Microsoft.Web.WebView2.Wpf.dll",
+                                    "WebView2Loader.dll",
+                                    "runtimes/win-x64/native/WebView2Loader.dll",
+                                    "Operacoes.dll",
+                                    "Operacoes.deps.json",
+                                    "Operacoes.runtimeconfig.json"
+                                ]
+                  },
+    "pedidos":  {
+                    "version":  "1.0.25",
+                    "remover":  false,
+                    "files":  [
+                                  "app-versao.txt",
+                                  "FilaPedidos.exe",
+                                  "FilaPedidos.dll",
+                                  "FilaPedidos.deps.json",
+                                  "FilaPedidos.runtimeconfig.json",
+                                  "pedidos-app.mjs",
+                                  "pedidos.ui",
+                                  "fila-pedidos.ico",
+                                  "fila.ui",
+                                  "fila.html"
+                              ]
+                },
+    "registro":  {
+                     "version":  "1.0.36",
+                     "remover":  false,
+                     "files":  [
+                                   "app-versao.txt",
+                                   "RegistroCentral.exe",
+                                   "RegistroCentral.dll",
+                                   "RegistroCentral.deps.json",
+                                   "RegistroCentral.runtimeconfig.json",
+                                   "pedidos-app.mjs",
+                                   "registro.ui",
+                                   "calc.ui",
+                                   "budget-templates.json",
+                                   "node.exe",
+                                   "ui-seal.pak",
+                                   "elite-cpa-logo-4.png",
+                                   "icone.ico",
+                                   "icone.png",
+                                   "registro-central.ico",
+                                   "Microsoft.Web.WebView2.Core.dll",
+                                   "Microsoft.Web.WebView2.WinForms.dll",
+                                   "Microsoft.Web.WebView2.Wpf.dll",
+                                   "WebView2Loader.dll",
+                                   "runtimes/win-x64/native/WebView2Loader.dll"
+                               ]
+                 }
 }
