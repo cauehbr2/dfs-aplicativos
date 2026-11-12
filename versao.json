@@ -1,6 +1,6 @@
 {
     "calculadora": {
-        "version": "1.1.44",
+        "version": "1.1.45",
         "remover": false,
         "files": [
             "app-versao.txt",
@@ -25,7 +25,7 @@
         ]
     },
     "operacoes": {
-        "version": "1.0.86",
+        "version": "1.0.87",
         "remover": false,
         "files": [
             "app-versao.txt",

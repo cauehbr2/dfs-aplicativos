@@ -1,2 +1,2 @@
-﻿- Operações **1.0.86** / Calculadora **1.1.44**: aceita UI do servidor com BOM UTF-8 (erro “interface inválida: contas-operacoes”).
-- Registro **1.0.35**: janela redimensionável; conteúdo acompanha e, no limite, rola.
+﻿- Operações **1.0.87**: sobe o Node a partir do .pak (corrige ERR_CONNECTION_REFUSED). Calc 1.1.45.
+- Operações **1.0.86** / Calc **1.1.44**: UI com BOM UTF-8.
