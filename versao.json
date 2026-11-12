@@ -1,6 +1,6 @@
 {
     "calculadora":  {
-                        "version":  "1.1.45",
+                        "version":  "1.1.47",
                         "remover":  false,
                         "files":  [
                                       "app-versao.txt",
@@ -65,7 +65,7 @@
                               ]
                 },
     "registro":  {
-                     "version":  "1.0.37",
+                     "version":  "1.0.38",
                      "remover":  false,
                      "files":  [
                                    "app-versao.txt",
@@ -87,7 +87,8 @@
                                    "Microsoft.Web.WebView2.WinForms.dll",
                                    "Microsoft.Web.WebView2.Wpf.dll",
                                    "WebView2Loader.dll",
-                                   "runtimes/win-x64/native/WebView2Loader.dll"
+                                   "runtimes/win-x64/native/WebView2Loader.dll",
+                                   "calc.html"
                                ]
                  }
 }
