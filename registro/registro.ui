@@ -838,6 +838,42 @@ function montanteSummaryOf() {
   return { subtotal, discountPercent: percent, discountAmount, finalAmount, montante, taxa, qtdm, discountError: discountObj.error };
 }
 function summary() {
+  if (state.type === 'contas' && document.getElementById('pedido-blocks')) {
+    syncBlocksFromDom();
+    const parts = (state.blocks || []).map(blockContasMoney);
+    const subtotal = Math.round(parts.reduce((s, p) => s + p.subtotal, 0) * 100) / 100;
+    const discountAmount = Math.round(parts.reduce((s, p) => s + p.discountAmount, 0) * 100) / 100;
+    const finalAmount = Math.round(parts.reduce((s, p) => s + p.finalAmount, 0) * 100) / 100;
+    const first = parts[0] || blockContasMoney(emptyContasBlock());
+    return {
+      subtotal,
+      discountPercent: first.discountPercent,
+      discountAmount,
+      finalAmount,
+      qtd: first.qtd,
+      valor: first.valor,
+      montante: 0,
+      taxa: 0,
+      discountError: parts.map((p) => p.discountError).find(Boolean) || null,
+    };
+  }
+  if (state.type === 'montante' && document.getElementById('pedido-blocks')) {
+    syncBlocksFromDom();
+    const parts = (state.blocks || []).map(blockMontanteMoney);
+    const subtotal = Math.round(parts.reduce((s, p) => s + p.subtotal, 0) * 100) / 100;
+    const discountAmount = Math.round(parts.reduce((s, p) => s + p.discountAmount, 0) * 100) / 100;
+    const finalAmount = Math.round(parts.reduce((s, p) => s + p.finalAmount, 0) * 100) / 100;
+    const first = parts[0] || blockMontanteMoney(emptyMontanteBlock());
+    return {
+      ...first,
+      subtotal,
+      discountAmount,
+      finalAmount,
+      qtd: first.qtdm,
+      valor: 0,
+      discountError: parts.map((p) => p.discountError).find(Boolean) || null,
+    };
+  }
   const contas = contasSummaryOf();
   const montante = montanteSummaryOf();
   if (state.type === 'montante') return { ...montante, qtd: montante.qtdm, valor: 0 };
@@ -1042,6 +1078,11 @@ function applyDraft(d) {
   state.customRange = !!d.isCustomRange;
   state.noteImages = Array.isArray(d.noteImages) ? d.noteImages.slice(0, 4) : [];
   state.pendingId = d.id || state.pendingId;
+  if (Array.isArray(d.blocks) && d.blocks.length && (state.type === 'contas' || state.type === 'montante')) {
+    state.blocks = d.blocks.map((b) => Object.assign({}, b, { id: b.id || newBlockId() }));
+  } else if (state.type === 'contas' || state.type === 'montante') {
+    state.blocks = defaultBlocksForType(state.type);
+  }
   paint();
   const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
   set('cliente', d.clientName || '');
@@ -1197,7 +1238,10 @@ function paint() {
     + '<div class="grid2"><div class="rel"><label class="cap">Cliente <span class="req">*</span> ' + (state.clientId ? '<span class="badge">Cadastrado</span>' : '') + '</label>'
     + '<input id="cliente" placeholder="Digite o nome do cliente..." autocomplete="off" required><div class="suggest" id="suggest"></div></div>'
     + '<div class="rel"><label class="cap">WhatsApp / Telefone</label><input id="phone" placeholder="(00) 00000-0000" autocomplete="off"><div class="suggest" id="suggest-phone"></div></div></div>'
-    + (showContas
+    + ((state.type === 'contas' || state.type === 'montante')
+      ? renderPedidoBlocksHtml(campContas, campMontante)
+      : '')
+    + (state.type === 'multi' && showContas
       ? ('<div><label class="cap">Faixa de Depósito</label><div class="groups" id="groups">'
         + ['Grupo 01','Grupo 02','Grupo 03'].map((g) => '<button type="button" data-g="' + g + '" class="' + (state.grupo === g ? 'on' : '') + '">' + g + '</button>').join('')
         + '</div><select id="faixa"><option value="__custom__"' + (state.customRange ? ' selected' : '') + '>Outra / Digitar personalizado...</option>'
@@ -1209,7 +1253,7 @@ function paint() {
         + '<div><label class="cap">Desconto (%)' + (campContas != null && !state.semDesconto ? ' <span style="color:#34d399">campanha</span>' : '') + '</label><div class="rel"><input id="desconto" value="' + discContas + '" title="' + (campContas != null ? ('Campanha: ' + campContas + '% pelo grupo da faixa') : '') + '" style="padding-right:28px"><span style="position:absolute;right:10px;top:11px;font-size:12px;font-weight:800;color:#71717a;pointer-events:none">%</span></div></div>'
         + '</div></div>')
       : '')
-    + (showMontante
+    + (state.type === 'multi' && showMontante
       ? ('<div class="mont-box"><div class="title">Parâmetros de Op. Montantes</div><div class="groups" id="mgroups">'
         + '<button type="button" data-mg="Grupo 01" class="' + (state.montanteGrupo === 'Grupo 01' ? 'on' : '') + '">Grupo 01</button>'
         + '<button type="button" data-mg="Grupo 02" class="' + (state.montanteGrupo === 'Grupo 02' ? 'on' : '') + '">Grupo 02</button></div>'
@@ -1217,13 +1261,15 @@ function paint() {
         + '<div><label class="cap">Valor Montante (R$)</label><input id="montante" type="number" min="0" step="0.01" value="' + (snap.montante || '0') + '"></div>'
         + '<div><label class="cap">Quantidade</label><input id="qtdm" type="number" min="0" value="' + (snap.qtdm || '0') + '" title="Preenchida pelo valor do montante, como na calculadora"></div>'
         + '<div><label class="cap">Taxa</label><select id="taxa">' + rates.map((r) => '<option value="' + r.id + '" data-taxa="' + r.taxa + '" data-mult="' + (r.multiplicador || 0) + '" data-label="' + String(r.label || r.taxa).replace(/"/g, '&quot;') + '"' + (snap.taxa === r.id ? ' selected' : '') + '>' + (r.label || (r.taxa + '%')) + '</option>').join('') + '</select><div class="hint" id="aposta-hint" style="color:#fcd34d;font-weight:700;margin-top:4px"></div></div>'
-        + '<div><label class="cap">Desconto (%)' + (campMontante != null && !state.semDesconto ? ' <span style="color:#34d399">campanha</span>' : '') + ' <button type="button" id="sem-desc" style="border:0;background:transparent;color:#a1a1aa;font-size:9px;font-weight:900;cursor:pointer">Sem desconto</button></label><div class="rel"><input id="' + (showContas ? 'desconto-m' : 'desconto') + '" value="' + discMontante + '" title="' + (campMontante != null ? ('Campanha: ' + campMontante + '% pelo grupo/valor do montante') : '') + '" style="padding-right:28px"><span style="position:absolute;right:10px;top:11px;font-size:12px;font-weight:800;color:#71717a;pointer-events:none">%</span></div></div>'
+        + '<div><label class="cap">Desconto (%)' + (campMontante != null && !state.semDesconto ? ' <span style="color:#34d399">campanha</span>' : '') + ' <button type="button" id="sem-desc" style="border:0;background:transparent;color:#a1a1aa;font-size:9px;font-weight:900;cursor:pointer">Sem desconto</button></label><div class="rel"><input id="desconto-m" value="' + discMontante + '" title="' + (campMontante != null ? ('Campanha: ' + campMontante + '% pelo grupo/valor do montante') : '') + '" style="padding-right:28px"><span style="position:absolute;right:10px;top:11px;font-size:12px;font-weight:800;color:#71717a;pointer-events:none">%</span></div></div>'
         + '</div></div>')
       : '')
     + (state.type === 'multi' ? operadorFieldMulti : '')
-    + '<div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><label class="cap" style="margin:0">Link da Casa</label><div class="link-actions" id="link-actions"></div></div>'
-    + '<div class="link-row" style="margin-top:6px"><input id="link0" placeholder="https://..."><button type="button" class="plus" id="add-link" title="Adicionar outro link">+</button></div>'
-    + '<div class="extra-links" id="extra-links" style="display:none"></div></div>'
+    + (state.type === 'multi'
+      ? ('<div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><label class="cap" style="margin:0">Link da Casa</label><div class="link-actions" id="link-actions"></div></div>'
+        + '<div class="link-row" style="margin-top:6px"><input id="link0" placeholder="https://..."><button type="button" class="plus" id="add-link" title="Adicionar outro link">+</button></div>'
+        + '<div class="extra-links" id="extra-links" style="display:none"></div></div>')
+      : '')
     + '<div class="notes-wrap"><label class="cap">Anotações / Observações</label>'
     + '<textarea id="notes" rows="2" placeholder="Instruções específicas para a operação... Ctrl+V cola uma imagem"></textarea>'
     + '<div class="imgs" id="imgs"></div><div class="hint">Ctrl+V cola um print. Até 4 imagens.</div></div>'
@@ -1246,6 +1292,9 @@ function paint() {
     if (!btn) return;
     state.type = btn.dataset.type;
     state.customRange = false;
+    if (state.type === 'contas' || state.type === 'montante') {
+      state.blocks = defaultBlocksForType(state.type);
+    }
     paint();
   };
   document.getElementById('days').onclick = (ev) => {
@@ -1381,11 +1430,13 @@ function paint() {
   suggest.onclick = (ev) => { const btn = ev.target.closest('button[data-id]'); if (btn) pickClient(btn.dataset.id); };
   if (suggestPhone) suggestPhone.onclick = (ev) => { const btn = ev.target.closest('button[data-id]'); if (btn) pickClient(btn.dataset.id); };
 
-  document.getElementById('link0').oninput = (ev) => {
+  const link0 = document.getElementById('link0');
+  if (link0) link0.oninput = (ev) => {
     state.houseLinks[0] = ev.target.value;
     paintHouseLinks();
   };
-  document.getElementById('add-link').onclick = () => {
+  const addLink = document.getElementById('add-link');
+  if (addLink) addLink.onclick = () => {
     state.houseLinks.push('');
     paintHouseLinks();
   };
@@ -1394,7 +1445,10 @@ function paint() {
     paint();
   };
   document.getElementById('pending').onclick = () => {
-    const draft = Object.assign({ id: state.pendingId || ('pend-' + Date.now()), savedAt: Date.now() }, readFormDraft());
+    syncBlocksFromDom();
+    const draft = Object.assign({ id: state.pendingId || ('pend-' + Date.now()), savedAt: Date.now() }, readFormDraft(), {
+      blocks: (state.blocks || []).map((b) => Object.assign({}, b)),
+    });
     const without = state.pendingDrafts.filter((d) => d.id !== draft.id);
     savePendingList([draft, ...without]);
     state.pendingId = draft.id;
@@ -1403,7 +1457,8 @@ function paint() {
     paint();
   };
   document.getElementById('form').onsubmit = submitForm;
-  paintHouseLinks();
+  bindPedidoBlocks();
+  if (state.type === 'multi') paintHouseLinks();
   paintImages();
   paintSummary();
   updateApostaHint();
